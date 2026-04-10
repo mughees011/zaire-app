@@ -391,3 +391,57 @@
   color: rgba(0,212,255,0.15);
   margin-top: 130px; /* push below the sphere */
 }
+
+.drag-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  background: rgba(0, 6, 14, 0.2);
+}
+
+.drag-overlay:active {
+  cursor: grabbing;
+}
+
+.drag-helper-text {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 212, 255, 0.28);
+  background: rgba(0, 10, 24, 0.85);
+  box-shadow: 0 0 18px rgba(0, 212, 255, 0.08);
+  border-radius: 4px;
+  pointer-events: auto;
+}
+
+.drag-helper-text span {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: rgba(0, 212, 255, 0.72);
+  white-space: nowrap;
+}
+
+.drag-helper-text button {
+  background: rgba(0, 212, 255, 0.85);
+  border: 1px solid rgba(0, 212, 255, 0.95);
+  color: #001018;
+  font-family: inherit;
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  padding: 6px 10px;
+  border-radius: 2px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.drag-helper-text button:hover {
+  background: #00d4ff;
+}

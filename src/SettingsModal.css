@@ -110,6 +110,7 @@
   margin-top: 4px;
   font-size: 9px;
   color: rgba(0, 212, 255, 0.7);
+  flex-wrap: wrap;
 }
 .color-picker {
   -webkit-appearance: none;
@@ -122,12 +123,22 @@
 }
 .color-picker::-webkit-color-swatch-wrapper { padding: 0; }
 .color-picker::-webkit-color-swatch { border: 1px solid rgba(0, 212, 255, 0.3); border-radius: 4px; }
-.hex-display {
-  display: inline-block;
+.hex-input {
+  min-width: 94px;
   padding: 4px 8px;
   background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.2);
   border-radius: 2px;
+  color: rgba(0, 212, 255, 0.9);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.hex-input:focus {
+  outline: none;
+  border-color: rgba(0, 212, 255, 0.8);
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.2);
 }
 
 /* Range Slider */

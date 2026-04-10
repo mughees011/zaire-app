@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import './SettingsModal.css';
 
 const PRESET_COLORS = [
@@ -10,7 +10,42 @@ const PRESET_COLORS = [
   { label: 'VIOLET Core', hex: '#bb00ff' }
 ];
 
+function normalizeHexColor(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  const candidate = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+  if (/^#[0-9a-f]{6}$/i.test(candidate)) return candidate.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(candidate)) {
+    const short = candidate.slice(1);
+    return `#${short[0]}${short[0]}${short[1]}${short[1]}${short[2]}${short[2]}`.toLowerCase();
+  }
+  return null;
+}
+
 function SettingsModal({ isOpen, onClose, color, setColor, size, setSize, onEnterDragMode }) {
+  const [hexInputValue, setHexInputValue] = useState(color.toUpperCase());
+
+  useEffect(() => {
+    setHexInputValue(color.toUpperCase());
+  }, [color]);
+
+  const handleHexInputChange = (e) => {
+    const value = e.target.value.toUpperCase();
+    setHexInputValue(value);
+    const normalized = normalizeHexColor(value);
+    if (normalized) setColor(normalized);
+  };
+
+  const handleHexInputBlur = () => {
+    const normalized = normalizeHexColor(hexInputValue);
+    if (normalized) {
+      setColor(normalized);
+      setHexInputValue(normalized.toUpperCase());
+      return;
+    }
+    setHexInputValue(color.toUpperCase());
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -33,8 +68,8 @@ function SettingsModal({ isOpen, onClose, color, setColor, size, setSize, onEnte
               {PRESET_COLORS.map(p => (
                 <div 
                   key={p.hex}
-                  className={`color-swatch ${color === p.hex ? 'active' : ''}`}
-                  style={{ background: p.hex, boxShadow: color === p.hex ? `0 0 10px ${p.hex}` : 'none' }}
+                  className={`color-swatch ${color.toLowerCase() === p.hex ? 'active' : ''}`}
+                  style={{ background: p.hex, boxShadow: color.toLowerCase() === p.hex ? `0 0 10px ${p.hex}` : 'none' }}
                   onClick={() => setColor(p.hex)}
                   title={p.label}
                 />
@@ -48,7 +83,17 @@ function SettingsModal({ isOpen, onClose, color, setColor, size, setSize, onEnte
                 onChange={(e) => setColor(e.target.value)} 
                 className="color-picker"
               />
-              <span className="hex-display">{color.toUpperCase()}</span>
+              <input
+                type="text"
+                value={hexInputValue}
+                onChange={handleHexInputChange}
+                onBlur={handleHexInputBlur}
+                className="hex-input"
+                maxLength={7}
+                placeholder="#00B4FF"
+                spellCheck={false}
+                aria-label="Custom hex color input"
+              />
             </div>
           </div>
 

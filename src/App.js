@@ -6,12 +6,23 @@ import Navbar from './Navbar';
 import SettingsModal from './SettingsModal';
 import './App.css';
 
+const DEFAULT_BLOB_COLOR = '#00b4ff';
+const HEX6_COLOR_REGEX = /^#[0-9a-f]{6}$/i;
+
+function normalizeHexColor(value) {
+  if (!value || typeof value !== 'string') return DEFAULT_BLOB_COLOR;
+  const trimmed = value.trim();
+  return HEX6_COLOR_REGEX.test(trimmed) ? trimmed.toLowerCase() : DEFAULT_BLOB_COLOR;
+}
+
 function App() {
   const threeCanvasRef = useRef(null);
   const gridCanvasRef = useRef(null);
+  const cameraRef = useRef(null);
+  const dragStateRef = useRef({ isPointerDown: false });
   const [bootText, setBootText] = useState('INITIALIZING SYSTEM...');
 
-  const [blobColor, setBlobColor] = useState(() => localStorage.getItem('blobColor') || '#00b4ff');
+  const [blobColor, setBlobColor] = useState(() => normalizeHexColor(localStorage.getItem('blobColor') || DEFAULT_BLOB_COLOR));
   const [blobSize, setBlobSize] = useState(() => parseFloat(localStorage.getItem('blobSize')) || 1.0);
   const [blobPosition, setBlobPosition] = useState(() => {
     const saved = localStorage.getItem('blobPosition');
@@ -49,26 +60,45 @@ function App() {
     }
   }, [blobColor, blobSize, blobPosition]);
 
-  // Handle Dragging
-  const handleDragStart = (e) => {
-    if (!isDragging) return;
+  // Handle dragging using pointer coordinates mapped to world space (z = 0 plane).
+  const updateBlobPositionFromPointer = (clientX, clientY) => {
+    const camera = cameraRef.current;
+    if (!camera) return;
+
+    const ndc = new THREE.Vector3(
+      (clientX / window.innerWidth) * 2 - 1,
+      -(clientY / window.innerHeight) * 2 + 1,
+      0.5
+    );
+
+    ndc.unproject(camera);
+    const direction = ndc.sub(camera.position).normalize();
+    if (Math.abs(direction.z) < 1e-6) return;
+
+    const distance = -camera.position.z / direction.z;
+    const worldPoint = camera.position.clone().add(direction.multiplyScalar(distance));
+    setBlobPosition({ x: worldPoint.x, y: worldPoint.y });
   };
-  const handleDragMove = (e) => {
+
+  const handleDragPointerDown = (e) => {
     if (!isDragging) return;
-    if (e.buttons !== 1) return; // Only if left mouse button is held
-    
-    // Convert mouse movement to Three.js world space coordinates
-    // Adjust sensitivity multiplier as needed
-    const deltaX = (e.movementX / window.innerWidth) * 10;
-    const deltaY = -(e.movementY / window.innerHeight) * 10; 
-    
-    setBlobPosition(prev => ({
-      x: prev.x + deltaX,
-      y: prev.y + deltaY
-    }));
+    dragStateRef.current.isPointerDown = true;
+    if (e.currentTarget.setPointerCapture) {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    updateBlobPositionFromPointer(e.clientX, e.clientY);
   };
-  const handleDragEnd = () => {
-    // Keep dragging mode active until they press save/close if we want
+
+  const handleDragPointerMove = (e) => {
+    if (!isDragging || !dragStateRef.current.isPointerDown) return;
+    updateBlobPositionFromPointer(e.clientX, e.clientY);
+  };
+
+  const handleDragPointerUp = (e) => {
+    dragStateRef.current.isPointerDown = false;
+    if (e.currentTarget.hasPointerCapture && e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
   };
 
   useEffect(() => {
@@ -151,6 +181,7 @@ function App() {
 
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
     camera.position.z = 4.2;
+    cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -405,6 +436,7 @@ function App() {
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(animationId);
       renderer.dispose();
+      cameraRef.current = null;
     };
   }, []);
 
@@ -553,6 +585,7 @@ function App() {
         onEnterDragMode={() => {
           setIsSettingsOpen(false);
           setIsDragging(true);
+          dragStateRef.current.isPointerDown = false;
         }}
       />
 
@@ -560,14 +593,24 @@ function App() {
       {isDragging && (
         <div 
           className="drag-overlay" 
-          onMouseDown={handleDragStart}
-          onMouseMove={handleDragMove}
-          onMouseUp={handleDragEnd}
-          onMouseLeave={handleDragEnd}
+          onPointerDown={handleDragPointerDown}
+          onPointerMove={handleDragPointerMove}
+          onPointerUp={handleDragPointerUp}
+          onPointerCancel={handleDragPointerUp}
+          onPointerLeave={handleDragPointerUp}
         >
           <div className="drag-helper-text">
             <span>DRAG ANYWHERE TO REPOSITION</span>
-            <button onClick={(e) => { e.stopPropagation(); setIsDragging(false); }}>SAVE POSITION</button>
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                dragStateRef.current.isPointerDown = false;
+                setIsDragging(false);
+              }}
+            >
+              SAVE POSITION
+            </button>
           </div>
         </div>
       )}
