@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS — Boot Sequence</title>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #000;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  /* Three.js canvas sits at the very back */
+  #three-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+
+  /* ─── 2D HUD LAYER ─────────────────────────────────── */
+  #hud {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  /* Scanline sweep */
+  .scan-line {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(0,212,255,0.12) 20%,
+      rgba(0,212,255,0.35) 50%,
+      rgba(0,212,255,0.12) 80%,
+      transparent 100%);
+    animation: scanDown 7s linear infinite;
+  }
+  @keyframes scanDown {
+    0%   { top: -1px; opacity: 1; }
+    80%  { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  /* Vignette */
+  .vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center,
+      transparent 25%,
+      rgba(0,0,0,0.55) 70%,
+      rgba(0,0,0,0.88) 100%);
+  }
+
+  /* Hex grid overlay — very subtle */
+  .hex-overlay {
+    position: absolute;
+    inset: 0;
+    opacity: 0.06;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='97'%3E%3Cpath d='M28 2 L54 16 L54 46 L28 60 L2 46 L2 16Z' fill='none' stroke='%2300d4ff' stroke-width='0.5'/%3E%3Cpath d='M28 60 L54 74 L54 97' fill='none' stroke='%2300d4ff' stroke-width='0.5'/%3E%3Cpath d='M28 60 L2 74 L2 97' fill='none' stroke='%2300d4ff' stroke-width='0.5'/%3E%3C/svg%3E");
+    background-size: 56px 97px;
+  }
+
+  /* Perspective grid at the bottom */
+  #grid-canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  /* ─── CORNER BRACKETS ────────────────────────────── */
+  .corner {
+    position: absolute;
+    width: 48px;
+    height: 48px;
+    opacity: 0;
+    animation: fadeCorner 0.6s ease-out forwards;
+  }
+  .corner-tl { top: 20px; left: 20px; border-top: 1.5px solid rgba(0,212,255,0.7); border-left: 1.5px solid rgba(0,212,255,0.7); animation-delay: 0.4s; }
+  .corner-tr { top: 20px; right: 20px; border-top: 1.5px solid rgba(0,212,255,0.7); border-right: 1.5px solid rgba(0,212,255,0.7); animation-delay: 0.5s; }
+  .corner-bl { bottom: 20px; left: 20px; border-bottom: 1.5px solid rgba(0,212,255,0.7); border-left: 1.5px solid rgba(0,212,255,0.7); animation-delay: 0.6s; }
+  .corner-br { bottom: 20px; right: 20px; border-bottom: 1.5px solid rgba(0,212,255,0.7); border-right: 1.5px solid rgba(0,212,255,0.7); animation-delay: 0.7s; }
+  @keyframes fadeCorner {
+    from { opacity: 0; transform: scale(0.7); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  /* ─── SIDE DATA PANELS ───────────────────────────── */
+  .side-data {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(0,212,255,0.22);
+    line-height: 2.1;
+    opacity: 0;
+    animation: fadeIn 1s ease-out forwards;
+  }
+  .side-data-l { left: 28px; text-align: left;  animation-delay: 2.8s; }
+  .side-data-r { right: 28px; text-align: right; animation-delay: 3.0s; }
+
+  .side-data span {
+    display: block;
+    position: relative;
+    padding: 1px 0;
+  }
+  .side-data span::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    width: 0;
+    height: 1px;
+    background: rgba(0,212,255,0.15);
+    animation: lineExpand 0.4s ease-out forwards;
+  }
+  .side-data-l span::before { left: 0; animation-delay: calc(3s + var(--i) * 0.08s); }
+  .side-data-r span::before { right: 0; animation-delay: calc(3s + var(--i) * 0.08s); }
+  @keyframes lineExpand { to { width: 100%; } }
+
+  /* ─── RETICLE MARKERS ────────────────────────────── */
+  .reticle {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    opacity: 0;
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+  .reticle::before, .reticle::after {
+    content: '';
+    position: absolute;
+    background: rgba(0,212,255,0.35);
+  }
+  .reticle::before { width: 1px; height: 100%; left: 50%; transform: translateX(-50%); }
+  .reticle::after  { height: 1px; width: 100%; top: 50%; transform: translateY(-50%); }
+
+  /* top-left ring around reticle */
+  .reticle-ring {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 50%;
+    top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    animation: spinSlow 12s linear infinite;
+  }
+  @keyframes spinSlow { to { transform: translate(-50%,-50%) rotate(360deg); } }
+
+  /* ─── BOTTOM HUD BAR ─────────────────────────────── */
+  .bottom-hud {
+    position: absolute;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 360px;
+    text-align: center;
+    opacity: 0;
+    animation: fadeIn 0.5s ease-out 1.6s forwards;
+  }
+
+  .boot-track {
+    width: 100%;
+    height: 1px;
+    background: rgba(0,212,255,0.12);
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .boot-fill {
+    height: 100%;
+    width: 0;
+    background: rgba(0,212,255,0.8);
+    box-shadow: 0 0 8px rgba(0,212,255,0.6);
+    animation: bootFill 2.4s 2s cubic-bezier(0.4,0,0.2,1) forwards;
+  }
+  .boot-head {
+    position: absolute;
+    top: -2px;
+    width: 4px;
+    height: 5px;
+    background: #00d4ff;
+    left: 0;
+    animation: bootHead 2.4s 2s cubic-bezier(0.4,0,0.2,1) forwards;
+    box-shadow: 0 0 8px #00d4ff, 0 0 16px rgba(0,212,255,0.5);
+  }
+  @keyframes bootFill { to { width: 100%; } }
+  @keyframes bootHead { to { left: calc(100% - 4px); } }
+
+  .boot-label {
+    font-size: 8px;
+    letter-spacing: 3px;
+    color: rgba(0,212,255,0.35);
+    transition: color 0.3s;
+  }
+
+  /* ─── TOP STATUS BAR ─────────────────────────────── */
+  .top-hud {
+    position: absolute;
+    top: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    opacity: 0;
+    animation: fadeIn 0.6s ease-out 0.3s forwards;
+  }
+
+  .top-line-l, .top-line-r {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.4));
+    width: 0;
+    animation: topLineGrow 1s ease-out 0.6s forwards;
+  }
+  .top-line-r {
+    background: linear-gradient(90deg, rgba(0,212,255,0.4), transparent);
+  }
+  @keyframes topLineGrow { to { width: 100px; } }
+
+  .top-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 5px;
+    color: rgba(0,212,255,0.5);
+    white-space: nowrap;
+  }
+
+  .status-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #00ff88;
+    box-shadow: 0 0 8px #00ff88;
+    animation: dotPulse 2s ease-in-out infinite;
+    display: inline-block;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  @keyframes dotPulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: 0.4; }
+  }
+
+  /* ─── HORIZON LINE ───────────────────────────────── */
+  .horizon {
+    position: absolute;
+    bottom: 30%;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg,
+      transparent,
+      rgba(0,212,255,0.07) 20%,
+      rgba(0,212,255,0.18) 50%,
+      rgba(0,212,255,0.07) 80%,
+      transparent);
+    opacity: 0;
+    animation: fadeIn 1s ease-out 1.2s forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* ─── TEXT PLACEHOLDER ───────────────────────────── */
+  .text-placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    opacity: 0;
+    animation: fadeIn 1s ease-out 3.5s forwards;
+    pointer-events: none;
+  }
+  .text-placeholder p {
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: rgba(0,212,255,0.15);
+    margin-top: 130px; /* push below the sphere */
+  }
+</style>
+</head>
+<body>
+
+<!-- Three.js renders here -->
+<canvas id="three-canvas"></canvas>
+
+<!-- 2D HUD -->
+<div id="hud">
+
+  <canvas id="grid-canvas"></canvas>
+  <div class="hex-overlay"></div>
+  <div class="vignette"></div>
+  <div class="scan-line"></div>
+  <div class="horizon"></div>
+
+  <!-- Corners -->
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+
+  <!-- Top HUD -->
+  <div class="top-hud">
+    <div class="top-line-l"></div>
+    <span class="top-label"><span class="status-dot"></span>SYSTEM ONLINE</span>
+    <div class="top-line-r"></div>
+  </div>
+
+  <!-- Side data left -->
+  <div class="side-data side-data-l">
+    <span style="--i:0">SYS.BUILD / 0.1.0</span>
+    <span style="--i:1">CORE / ONLINE</span>
+    <span style="--i:2">VISION / ACTIVE</span>
+    <span style="--i:3">VOICE / READY</span>
+    <span style="--i:4">NET / LIVE</span>
+    <span style="--i:5">LATENCY / 4ms</span>
+  </div>
+
+  <!-- Side data right -->
+  <div class="side-data side-data-r">
+    <span style="--i:0">AUTH / VERIFIED</span>
+    <span style="--i:1">ENCRYPT / AES-256</span>
+    <span style="--i:2">NODES / 12</span>
+    <span style="--i:3">MEM / 8.2 GB</span>
+    <span style="--i:4">GPU / 94%</span>
+    <span style="--i:5">STATUS / GO</span>
+  </div>
+
+  <!-- Reticle markers -->
+  <div class="reticle" style="top:38%;left:22%;animation-delay:2s">
+    <div class="reticle-ring"></div>
+  </div>
+  <div class="reticle" style="top:38%;right:22%;animation-delay:2.2s">
+    <div class="reticle-ring"></div>
+  </div>
+  <div class="reticle" style="bottom:34%;left:50%;transform:translateX(-50%);animation-delay:2.4s">
+    <div class="reticle-ring"></div>
+  </div>
+
+  <!-- Text zone — add your title here -->
+  <div class="text-placeholder">
+    <p>— YOUR TITLE GOES HERE —</p>
+  </div>
+
+  <!-- Boot bar -->
+  <div class="bottom-hud">
+    <div class="boot-track">
+      <div class="boot-fill"></div>
+      <div class="boot-head"></div>
+    </div>
+    <div class="boot-label" id="bootLbl">INITIALIZING SYSTEM...</div>
+  </div>
+
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ─── CONFIG ───────────────────────────────────────────────────────
+const params = {
+  timeScale: 0.78,
+  rotationSpeedX: 0.0012,
+  rotationSpeedY: 0.004,
+  plasmaScale: 0.1404,
+  plasmaBrightness: 1.31,
+  voidThreshold: 0.072,
+  colorDeep:   0x001433,
+  colorMid:    0x0084ff,
+  colorBright: 0x00ffe1,
+  shellColor:  0x0066ff,
+  shellOpacity: 0.41
+};
+
+// ─── SCENE ────────────────────────────────────────────────────────
+const canvas = document.getElementById('three-canvas');
+const scene = new THREE.Scene();
+scene.background = null; // transparent so HUD is visible
+
+const camera = new THREE.PerspectiveCamera(
+  60,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  100
+);
+camera.position.z = 2.4;
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.9;
+renderer.setClearColor(0x000000, 0); // fully transparent bg
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.enablePan = false;
+controls.minDistance = 1.5;
+controls.maxDistance = 6;
+
+const mainGroup = new THREE.Group();
+scene.add(mainGroup);
+
+// ─── NOISE GLSL ───────────────────────────────────────────────────
+const noiseFunctions = `
+  vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
+  vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
+  vec4 permute(vec4 x){return mod289(((x*34.)+1.)*x);}
+  vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+  float snoise(vec3 v){
+    const vec2 C=vec2(1./6.,1./3.);
+    const vec4 D=vec4(0.,.5,1.,2.);
+    vec3 i=floor(v+dot(v,C.yyy));
+    vec3 x0=v-i+dot(i,C.xxx);
+    vec3 g=step(x0.yzx,x0.xyz);
+    vec3 l=1.-g;
+    vec3 i1=min(g.xyz,l.zxy);
+    vec3 i2=max(g.xyz,l.zxy);
+    vec3 x1=x0-i1+C.xxx;
+    vec3 x2=x0-i2+C.yyy;
+    vec3 x3=x0-D.yyy;
+    i=mod289(i);
+    vec4 p=permute(permute(permute(
+      i.z+vec4(0.,i1.z,i2.z,1.))
+      +i.y+vec4(0.,i1.y,i2.y,1.))
+      +i.x+vec4(0.,i1.x,i2.x,1.));
+    float n_=0.142857142857;
+    vec3 ns=n_*D.wyz-D.xzx;
+    vec4 j=p-49.*floor(p*ns.z*ns.z);
+    vec4 x_=floor(j*ns.z);
+    vec4 y_=floor(j-7.*x_);
+    vec4 x=x_*ns.x+ns.yyyy;
+    vec4 y=y_*ns.x+ns.yyyy;
+    vec4 h=1.-abs(x)-abs(y);
+    vec4 b0=vec4(x.xy,y.xy);
+    vec4 b1=vec4(x.zw,y.zw);
+    vec4 s0=floor(b0)*2.+1.;
+    vec4 s1=floor(b1)*2.+1.;
+    vec4 sh=-step(h,vec4(0.));
+    vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;
+    vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+    vec3 p0=vec3(a0.xy,h.x);
+    vec3 p1=vec3(a0.zw,h.y);
+    vec3 p2=vec3(a1.xy,h.z);
+    vec3 p3=vec3(a1.zw,h.w);
+    vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+    p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+    vec4 m=max(.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.);
+    m=m*m;
+    return 42.*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+  }
+  float fbm(vec3 p){
+    float total=0.;float amplitude=.5;float frequency=1.;
+    for(int i=0;i<3;i++){total+=snoise(p*frequency)*amplitude;amplitude*=.5;frequency*=2.;}
+    return total;
+  }
+`;
+
+// ─── LIGHT ────────────────────────────────────────────────────────
+const pointLight = new THREE.PointLight(0x0088ff, 2.0, 10);
+mainGroup.add(pointLight);
+
+// ─── OUTER SHELL ─────────────────────────────────────────────────
+const shellGeo = new THREE.SphereGeometry(1.0, 64, 64);
+const shellVert = `
+  varying vec3 vNormal;
+  varying vec3 vViewPosition;
+  void main(){
+    vNormal=normalize(normalMatrix*normal);
+    vec4 mvPosition=modelViewMatrix*vec4(position,1.);
+    vViewPosition=-mvPosition.xyz;
+    gl_Position=projectionMatrix*mvPosition;
+  }`;
+const shellFrag = `
+  varying vec3 vNormal;
+  varying vec3 vViewPosition;
+  uniform vec3 uColor;
+  uniform float uOpacity;
+  void main(){
+    float fresnel=pow(1.-dot(normalize(vNormal),normalize(vViewPosition)),2.5);
+    gl_FragColor=vec4(uColor,fresnel*uOpacity);
+  }`;
+
+const shellBackMat = new THREE.ShaderMaterial({
+  vertexShader: shellVert, fragmentShader: shellFrag,
+  uniforms: { uColor: { value: new THREE.Color(0x000055) }, uOpacity: { value: 0.3 } },
+  transparent: true, blending: THREE.AdditiveBlending, side: THREE.BackSide, depthWrite: false
+});
+const shellFrontMat = new THREE.ShaderMaterial({
+  vertexShader: shellVert, fragmentShader: shellFrag,
+  uniforms: { uColor: { value: new THREE.Color(params.shellColor) }, uOpacity: { value: params.shellOpacity } },
+  transparent: true, blending: THREE.AdditiveBlending, side: THREE.FrontSide, depthWrite: false
+});
+mainGroup.add(new THREE.Mesh(shellGeo, shellBackMat));
+mainGroup.add(new THREE.Mesh(shellGeo, shellFrontMat));
+
+// ─── PLASMA ───────────────────────────────────────────────────────
+const plasmaGeo = new THREE.SphereGeometry(0.998, 128, 128);
+const plasmaMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime:        { value: 0 },
+    uScale:       { value: params.plasmaScale },
+    uBrightness:  { value: params.plasmaBrightness },
+    uThreshold:   { value: params.voidThreshold },
+    uColorDeep:   { value: new THREE.Color(params.colorDeep) },
+    uColorMid:    { value: new THREE.Color(params.colorMid) },
+    uColorBright: { value: new THREE.Color(params.colorBright) }
+  },
+  vertexShader: `
+    varying vec3 vPosition;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    void main(){
+      vPosition=position;
+      vNormal=normalize(normalMatrix*normal);
+      vec4 mvPosition=modelViewMatrix*vec4(position,1.);
+      vViewPosition=-mvPosition.xyz;
+      gl_Position=projectionMatrix*mvPosition;
+    }`,
+  fragmentShader: `
+    uniform float uTime;
+    uniform float uScale;
+    uniform float uBrightness;
+    uniform float uThreshold;
+    uniform vec3 uColorDeep;
+    uniform vec3 uColorMid;
+    uniform vec3 uColorBright;
+    varying vec3 vPosition;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    ${noiseFunctions}
+    void main(){
+      vec3 p=vPosition*uScale;
+      vec3 q=vec3(
+        fbm(p+vec3(0.,uTime*.05,0.)),
+        fbm(p+vec3(5.2,1.3,2.8)+uTime*.05),
+        fbm(p+vec3(2.2,8.4,.5)-uTime*.02)
+      );
+      float density=fbm(p+2.*q);
+      float t=(density+.4)*.8;
+      float alpha=smoothstep(uThreshold,.7,t);
+      vec3 cWhite=vec3(1.);
+      vec3 color=mix(uColorDeep,uColorMid,smoothstep(uThreshold,.5,t));
+      color=mix(color,uColorBright,smoothstep(.5,.8,t));
+      color=mix(color,cWhite,smoothstep(.8,1.,t));
+      float facing=dot(normalize(vNormal),normalize(vViewPosition));
+      float depthFactor=(facing+1.)*.5;
+      float finalAlpha=alpha*(.02+.98*depthFactor);
+      gl_FragColor=vec4(color*uBrightness,finalAlpha);
+    }`,
+  transparent: true, blending: THREE.AdditiveBlending,
+  side: THREE.DoubleSide, depthWrite: false
+});
+const plasmaMesh = new THREE.Mesh(plasmaGeo, plasmaMat);
+mainGroup.add(plasmaMesh);
+
+// ─── PARTICLES ────────────────────────────────────────────────────
+const pCount = 600;
+const pPos   = new Float32Array(pCount * 3);
+const pSizes = new Float32Array(pCount);
+const sR = 0.95;
+for (let i = 0; i < pCount; i++) {
+  const r     = sR * Math.cbrt(Math.random());
+  const theta = Math.random() * Math.PI * 2;
+  const phi   = Math.acos(2 * Math.random() - 1);
+  pPos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+  pPos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+  pPos[i*3+2] = r * Math.cos(phi);
+  pSizes[i]   = Math.random();
+}
+const pGeo = new THREE.BufferGeometry();
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+pGeo.setAttribute('aSize',    new THREE.BufferAttribute(pSizes, 1));
+const pMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0xffffff) } },
+  vertexShader: `
+    uniform float uTime;
+    attribute float aSize;
+    varying float vAlpha;
+    void main(){
+      vec3 pos=position;
+      pos.y+=sin(uTime*.2+pos.x)*.02;
+      pos.x+=cos(uTime*.15+pos.z)*.02;
+      vec4 mvPosition=modelViewMatrix*vec4(pos,1.);
+      gl_Position=projectionMatrix*mvPosition;
+      float baseSize=8.*aSize+4.;
+      gl_PointSize=baseSize*(1./-mvPosition.z);
+      vAlpha=.8+.2*sin(uTime+aSize*10.);
+    }`,
+  fragmentShader: `
+    uniform vec3 uColor;
+    varying float vAlpha;
+    void main(){
+      vec2 uv=gl_PointCoord-vec2(.5);
+      if(length(uv)>.5)discard;
+      float glow=pow(1.-length(uv)*2.,1.8);
+      gl_FragColor=vec4(uColor,glow*vAlpha);
+    }`,
+  transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+});
+mainGroup.add(new THREE.Points(pGeo, pMat));
+
+// ─── RESIZE ───────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  initGrid();
+});
+
+// ─── PERSPECTIVE GRID (2D canvas) ────────────────────────────────
+const gridCanvas = document.getElementById('grid-canvas');
+const gCtx = gridCanvas.getContext('2d');
+
+function initGrid() {
+  gridCanvas.width  = window.innerWidth;
+  gridCanvas.height = window.innerHeight;
+}
+
+function drawGrid(t) {
+  const W = gridCanvas.width, H = gridCanvas.height;
+  gCtx.clearRect(0, 0, W, H);
+  const vx = W / 2, vy = H * 0.72, horizonY = H * 0.42;
+
+  const lCount = 24;
+  for (let i = 0; i <= lCount; i++) {
+    const frac = i / lCount;
+    const x = -W * 0.35 + frac * W * 1.7;
+    const op = 0.025 + Math.pow(frac > 0.5 ? 1-frac : frac, 1.5) * 0.055;
+    gCtx.strokeStyle = `rgba(0,180,255,${op})`;
+    gCtx.lineWidth = 0.5;
+    gCtx.beginPath();
+    gCtx.moveTo(x, H);
+    gCtx.lineTo(vx + (x-vx)*0.015, horizonY);
+    gCtx.stroke();
+  }
+
+  const hCount = 16;
+  for (let i = 0; i <= hCount; i++) {
+    const frac = i / hCount;
+    const scrollFrac = (frac + t * 0.04) % 1;
+    const y = horizonY + Math.pow(scrollFrac, 2.0) * (H - horizonY);
+    const xSpread = ((y - horizonY) / (H - horizonY)) * W * 0.68;
+    const op = Math.pow(scrollFrac, 0.9) * 0.07;
+    gCtx.strokeStyle = `rgba(0,180,255,${op})`;
+    gCtx.lineWidth = 0.5;
+    gCtx.beginPath();
+    gCtx.moveTo(vx - xSpread, y);
+    gCtx.lineTo(vx + xSpread, y);
+    gCtx.stroke();
+  }
+}
+
+// ─── BOOT SEQUENCE ────────────────────────────────────────────────
+const bootLabels = [
+  'INITIALIZING SYSTEM...',
+  'LOADING NEURAL CORE...',
+  'MOUNTING FILE SYSTEM...',
+  'ACTIVATING VISION ENGINE...',
+  'VOICE SYNTHESIS ONLINE...',
+  'ALL SYSTEMS GO'
+];
+let lblIdx = 0;
+const bootLbl = document.getElementById('bootLbl');
+const bootInterval = setInterval(() => {
+  lblIdx = Math.min(lblIdx + 1, bootLabels.length - 1);
+  bootLbl.textContent = bootLabels[lblIdx];
+  if (lblIdx === bootLabels.length - 1) {
+    bootLbl.style.color = 'rgba(0,255,136,0.5)';
+    clearInterval(bootInterval);
+  }
+}, 500);
+
+// ─── ANIMATE ──────────────────────────────────────────────────────
+initGrid();
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  plasmaMat.uniforms.uTime.value = t * params.timeScale;
+  pMat.uniforms.uTime.value = t;
+
+  plasmaMesh.rotation.y = t * 0.08;
+  mainGroup.rotation.x += params.rotationSpeedX;
+  mainGroup.rotation.y += params.rotationSpeedY;
+
+  drawGrid(t);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+</script>
+
+</body>
+</html>
