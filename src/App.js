@@ -1,18 +1,15 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import Navbar from './Navbar';
 import SettingsModal from './SettingsModal';
 import './App.css';
 
 const DEFAULT_BLOB_COLOR = '#00b4ff';
-const HEX6_COLOR_REGEX = /^#[0-9a-f]{6}$/i;
 
 function normalizeHexColor(value) {
   if (!value || typeof value !== 'string') return DEFAULT_BLOB_COLOR;
   const trimmed = value.trim();
-  return HEX6_COLOR_REGEX.test(trimmed) ? trimmed.toLowerCase() : DEFAULT_BLOB_COLOR;
+  return /^#[0-9a-f]{6}$/i.test(trimmed) ? trimmed.toLowerCase() : DEFAULT_BLOB_COLOR;
 }
 
 function App() {
@@ -20,21 +17,32 @@ function App() {
   const gridCanvasRef = useRef(null);
   const cameraRef = useRef(null);
   const dragStateRef = useRef({ isPointerDown: false });
+  
   const [bootText, setBootText] = useState('INITIALIZING SYSTEM...');
-
+  const [activeMode, setActiveMode] = useState('VOICE');
+  const [timeStr, setTimeStr] = useState('00:00:00');
+  const [navItem, setNavItem] = useState('HOME');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  
   const [blobColor, setBlobColor] = useState(() => normalizeHexColor(localStorage.getItem('blobColor') || DEFAULT_BLOB_COLOR));
   const [blobSize, setBlobSize] = useState(() => parseFloat(localStorage.getItem('blobSize')) || 1.0);
   const [blobPosition, setBlobPosition] = useState(() => {
     const saved = localStorage.getItem('blobPosition');
     return saved ? JSON.parse(saved) : { x: 0, y: 0 };
   });
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+  
+  const [activityFeed, setActivityFeed] = useState([
+    { time: '15:47', message: 'System boot complete' },
+    { time: '15:46', message: 'Neural core initialized' },
+    { time: '15:45', message: 'Voice synthesis online' },
+    { time: '15:44', message: 'Loading JARVIS protocol' },
+    { time: '15:43', message: 'Mounting file system' },
+  ]);
 
   const mainGroupRef = useRef(null);
   const uniformsRef = useRef(null);
 
-  // Sync state to 3D refs and LocalStorage
   useEffect(() => {
     localStorage.setItem('blobColor', blobColor);
     localStorage.setItem('blobSize', blobSize.toString());
@@ -42,7 +50,6 @@ function App() {
 
     if (mainGroupRef.current) {
       mainGroupRef.current.scale.set(blobSize, blobSize, blobSize);
-      // We flip Y because DOM runs top-down, but ThreeJS runs bottom-up
       mainGroupRef.current.position.set(blobPosition.x, blobPosition.y, 0);
     }
     
@@ -60,7 +67,6 @@ function App() {
     }
   }, [blobColor, blobSize, blobPosition]);
 
-  // Handle dragging using pointer coordinates mapped to world space (z = 0 plane).
   const updateBlobPositionFromPointer = (clientX, clientY) => {
     const camera = cameraRef.current;
     if (!camera) return;
@@ -102,7 +108,6 @@ function App() {
   };
 
   useEffect(() => {
-    // ─── CONFIG ───────────────────────────────────────────────────────
     const params = {
       timeScale: 0.78,
       rotationSpeedX: 0.0012,
@@ -117,7 +122,8 @@ function App() {
       shellOpacity: 0.41
     };
 
-    // ─── NOISE GLSL ───────────────────────────────────────────────────
+    const blobColor = normalizeHexColor(localStorage.getItem('blobColor') || DEFAULT_BLOB_COLOR);
+
     const noiseFunctions = `
       vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
       vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
@@ -139,7 +145,7 @@ function App() {
         vec4 p=permute(permute(permute(
           i.z+vec4(0.,i1.z,i2.z,1.))
           +i.y+vec4(0.,i1.y,i2.y,1.))
-          +i.x+vec4(0.,i1.x,i2.x,1.));
+          +i.x+vec4(0.,i1.x,i2.x,1.)));
         float n_=0.142857142857;
         vec3 ns=n_*D.wyz-D.xzx;
         vec4 j=p-49.*floor(p*ns.z*ns.z);
@@ -172,7 +178,6 @@ function App() {
       }
     `;
 
-    // ─── SCENE ────────────────────────────────────────────────────────
     const canvas = threeCanvasRef.current;
     if (!canvas) return;
 
@@ -198,12 +203,11 @@ function App() {
 
     const mainGroup = new THREE.Group();
     scene.add(mainGroup);
+    mainGroupRef.current = mainGroup;
 
-    // ─── LIGHT ────────────────────────────────────────────────────────
     const pointLight = new THREE.PointLight(0x0088ff, 2.0, 10);
     mainGroup.add(pointLight);
 
-    // ─── OUTER SHELL ─────────────────────────────────────────────────
     const shellGeo = new THREE.SphereGeometry(1.0, 64, 64);
     const shellVert = `
       varying vec3 vNormal;
@@ -237,7 +241,6 @@ function App() {
     mainGroup.add(new THREE.Mesh(shellGeo, shellBackMat));
     mainGroup.add(new THREE.Mesh(shellGeo, shellFrontMat));
 
-    // ─── PLASMA ───────────────────────────────────────────────────────
     const plasmaGeo = new THREE.SphereGeometry(0.998, 128, 128);
     const plasmaMat = new THREE.ShaderMaterial({
       uniforms: {
@@ -297,11 +300,9 @@ function App() {
     const plasmaMesh = new THREE.Mesh(plasmaGeo, plasmaMat);
     mainGroup.add(plasmaMesh);
     
-    // Save refs for dynamic updating
     mainGroupRef.current = mainGroup;
     uniformsRef.current = plasmaMat.uniforms;
     
-    // Initial sync
     mainGroup.scale.set(blobSize, blobSize, blobSize);
     mainGroup.position.set(blobPosition.x, blobPosition.y, 0);
     const initialBase = new THREE.Color(blobColor);
@@ -311,7 +312,6 @@ function App() {
     plasmaMat.uniforms.uColorMid.value = new THREE.Color().setHSL(idxHsl.h, idxHsl.s, Math.max(0, idxHsl.l - 0.2));
     plasmaMat.uniforms.uColorDeep.value = new THREE.Color().setHSL(idxHsl.h, idxHsl.s, Math.max(0, idxHsl.l - 0.4));
 
-    // ─── PARTICLES ────────────────────────────────────────────────────
     const pCount = 600;
     const pPos = new Float32Array(pCount * 3);
     const pSizes = new Float32Array(pCount);
@@ -357,7 +357,6 @@ function App() {
     });
     mainGroup.add(new THREE.Points(pGeo, pMat));
 
-    // ─── PERSPECTIVE GRID (2D canvas) ────────────────────────────────
     const gridCanvas = gridCanvasRef.current;
     if (!gridCanvas) return;
     const gCtx = gridCanvas.getContext('2d');
@@ -401,7 +400,6 @@ function App() {
       }
     };
 
-    // ─── RESIZE ───────────────────────────────────────────────────────
     const handleResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
@@ -410,7 +408,6 @@ function App() {
     };
     window.addEventListener('resize', handleResize);
 
-    // ─── ANIMATE ──────────────────────────────────────────────────────
     initGrid();
     const clock = new THREE.Clock();
     let animationId;
@@ -438,9 +435,8 @@ function App() {
       renderer.dispose();
       cameraRef.current = null;
     };
-  }, []);
+  }, [blobColor]);
 
-  // ─── BOOT SEQUENCE TEXT ──────────────────────────────────────────
   useEffect(() => {
     const bootLabels = [
       'INITIALIZING SYSTEM...',
@@ -456,125 +452,224 @@ function App() {
       setBootText(bootLabels[lblIdx]);
       if (lblIdx === bootLabels.length - 1) {
         clearInterval(bootInterval);
-        const lbl = document.getElementById('bootLbl');
-        if (lbl) lbl.style.color = 'rgba(0,255,136,0.5)';
       }
     }, 500);
 
     return () => clearInterval(bootInterval);
-  }, []);
+  }, [blobColor]);
+
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const hms = [now.getHours(), now.getMinutes(), now.getSeconds()]
+        .map(n => String(n).padStart(2, '0'))
+        .join(':');
+      setTimeStr(hms);
+    };
+    
+    const interval = setInterval(tick, 1000);
+    tick();
+
+    return () => clearInterval(interval);
+  }, [blobColor]);
+
+  const modes = ['VOICE', 'AGENT', 'FOCUS', 'STEALTH'];
+  const navItems = ['HOME', 'DASHBOARD', 'COMMAND', 'MEMORY', 'NEURAL'];
+  const modules = [
+    { name: 'VISION', status: 'READY' },
+    { name: 'VOICE', status: 'ACTIVE' },
+    { name: 'WEB', status: 'LIVE' },
+    { name: 'FILES', status: 'MOUNTED' },
+    { name: 'CAMERA', status: 'OFFLINE' },
+  ];
+  const quickAccess = ['SCREEN CAPTURE', 'OPEN BROWSER', 'FILE MANAGER'];
 
   return (
-    <div id="app-container">
+    <div className="jarvis-container">
       <canvas id="three-canvas" ref={threeCanvasRef}></canvas>
-      <div id="hud">
-        <Navbar />
-        <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
-        <div className="hex-overlay"></div>
-        <div className="vignette"></div>
-        <div className="scan-line"></div>
-        <div className="horizon"></div>
+      <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
+      
+      <div className="grid-overlay"></div>
+      <div className="vignette"></div>
+      <div className="scanline"></div>
+      <div className="hex-overlay"></div>
 
-        <div className="corner corner-tl"></div>
-        <div className="corner corner-tr"></div>
-        <div className="corner corner-bl"></div>
-        <div className="corner corner-br"></div>
-
-        <div className="top-hud">
-          <div className="top-line-l"></div>
-          <span className="top-label"><span className="status-dot"></span>SYSTEM ONLINE</span>
-          <div className="top-line-r"></div>
-        </div>
-
-        <div className="side-panel left-panel">
-          <div className="panel-header">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              <circle cx="12" cy="8" r="4"/>
-              <path d="M6 20v-2a6 6 0 0112 0v2"/>
-            </svg>
-            PROFILE
+      <div className="main-grid">
+        {/* ROW 1: NAVBAR */}
+        <div className="grid-navbar">
+          <div className="nav-logo">
+            <span className="logo-text">J·A·R·V·I·S</span>
+            <span className="logo-sub">PERSONAL AI · v0.1</span>
           </div>
-          <div className="panel-content">
-            <div className="panel-row mode-select">
-              <div className="p-mode active">VOICE <span className="p-dot"></span></div>
-              <div className="p-mode">AGENT <span className="p-dot"></span></div>
-              <div className="p-mode">FOCUS <span className="p-dot"></span></div>
+          
+          <div className="nav-links">
+            {navItems.map(item => (
+              <div 
+                key={item}
+                className={`nav-item ${navItem === item ? 'active' : ''}`}
+                onClick={() => setNavItem(item)}
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+          
+          <div className="nav-status">
+            <div className="settings-icon" onClick={() => setIsSettingsOpen(true)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 1.65 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+              </svg>
             </div>
-            <div className="radar-box">
-              <div className="radar-sweep"></div>
-              <div className="radar-ring r1"></div>
-              <div className="radar-ring r2"></div>
-              <div className="radar-crosshair"></div>
+            <div className="status-indicator">
+              <div className="status-dot"></div>
+              <span className="status-text">ONLINE</span>
+            </div>
+            <div className="clock-display">{timeStr}</div>
+          </div>
+        </div>
+
+        {/* ROW 2: LEFT PANEL */}
+        <div className="grid-left">
+          <div className="panel-section">
+            <div className="section-label">ACTIVE MODE</div>
+            <div className="mode-buttons">
+              {modes.map(mode => (
+                <div 
+                  key={mode}
+                  className={`mode-btn ${activeMode === mode ? 'active' : ''}`}
+                  onClick={() => setActiveMode(mode)}
+                >
+                  <span className="mode-text">{mode}</span>
+                  {activeMode === mode && <div className="mode-dot"></div>}
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="panel-section">
+            <div className="section-label">SYSTEM VITALS</div>
+            <div className="vitals-bars">
+              <div className="vital-row">
+                <span className="vital-label">CPU</span>
+                <div className="vital-bar"><div className="vital-fill" style={{width: '62%'}}></div></div>
+              </div>
+              <div className="vital-row">
+                <span className="vital-label">MEM</span>
+                <div className="vital-bar"><div className="vital-fill" style={{width: '78%'}}></div></div>
+              </div>
+              <div className="vital-row">
+                <span className="vital-label gpu">GPU</span>
+                <div className="vital-bar gpu"><div className="vital-fill" style={{width: '45%'}}></div></div>
+              </div>
+              <div className="vital-row">
+                <span className="vital-label net">NET</span>
+                <div className="vital-bar net"><div className="vital-fill" style={{width: '33%'}}></div></div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="panel-section">
+            <div className="section-label">MODULE STATUS</div>
+            <div className="module-list">
+              {modules.map(mod => (
+                <div key={mod.name} className="module-row">
+                  <span className="module-name">{mod.name}</span>
+                  <span className={`module-status ${mod.status === 'OFFLINE' ? 'offline' : ''}`}>{mod.status}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="side-panel right-panel">
-          <div className="panel-header right-align">
-            SYSTEM METRICS
-            <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
-              <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
-              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
-            </svg>
-          </div>
-          <div className="panel-content right-align-content">
-             <div className="panel-row icon-row">
-                <div className="icon-btn-large" title="Network">
-                  <div className="signal-bars-lg">
-                    <div className="sig-bar"></div><div className="sig-bar"></div><div className="sig-bar"></div><div className="sig-bar"></div>
-                  </div>
-                  <span>NET</span>
-                </div>
-                <div className="icon-btn-large" title="Settings" onClick={() => setIsSettingsOpen(true)}>
-                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-                  </svg>
-                  <span>CFG</span>
-                </div>
-                <div className="icon-btn-large power-btn" title="Power">
-                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.5" strokeLinecap="round" stroke="currentColor">
-                    <path d="M18.36 6.64A9 9 0 0112 3a9 9 0 00-6.36 15.36"/>
-                    <line x1="12" y1="3" x2="12" y2="12"/>
-                  </svg>
-                  <span>PWR</span>
-                </div>
-             </div>
-             <div className="chart-box">
-                <div className="c-bar b1"></div>
-                <div className="c-bar b2"></div>
-                <div className="c-bar b3"></div>
-                <div className="c-bar b4"></div>
-                <div className="c-bar b5"></div>
-             </div>
+        {/* ROW 2: CENTER (ORB) */}
+        <div className="grid-center">
+          <div className="orb-container">
+            <div className="target-ring"></div>
           </div>
         </div>
 
-        <div className="reticle" style={{ top: '38%', left: '22%', animationDelay: '2s' }}>
-          <div className="reticle-ring"></div>
-        </div>
-        <div className="reticle" style={{ top: '38%', right: '22%', animationDelay: '2.2s' }}>
-          <div className="reticle-ring"></div>
-        </div>
-        <div className="reticle" style={{ bottom: '34%', left: '50%', transform: 'translateX(-50%)', animationDelay: '2.4s' }}>
-          <div className="reticle-ring"></div>
-        </div>
-
-        <div className="text-placeholder">
-          <p>— JARVIS START PROTOCOL —</p>
-        </div>
-
-        <div className="bottom-hud">
-          <div className="boot-track">
-            <div className="boot-fill"></div>
-            <div className="boot-head"></div>
+        {/* ROW 2: RIGHT PANEL */}
+        <div className="grid-right">
+          <div className="panel-section">
+            <div className="section-label">SYSTEM METRICS</div>
+            <div className="metrics-grid">
+              <div className="metric-card">
+                <span className="metric-value">4ms</span>
+                <span className="metric-label">LATENCY</span>
+              </div>
+              <div className="metric-card">
+                <span className="metric-value good">99%</span>
+                <span className="metric-label">UPTIME</span>
+              </div>
+              <div className="metric-card">
+                <span className="metric-value">12</span>
+                <span className="metric-label">NODES</span>
+              </div>
+              <div className="metric-card">
+                <span className="metric-value">8.2GB</span>
+                <span className="metric-label">MEM</span>
+              </div>
+            </div>
           </div>
-          <div className="boot-label" id="bootLbl">{bootText}</div>
+          
+          <div className="panel-section">
+            <div className="section-label">RECENT ACTIVITY</div>
+            <div className="activity-feed">
+              {activityFeed.map((item, idx) => (
+                <div key={idx} className="activity-item">
+                  <span className="activity-time">{item.time}</span>
+                  <span className="activity-message">{item.message}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="panel-section">
+            <div className="section-label">QUICK ACCESS</div>
+            <div className="quick-list">
+              {quickAccess.map(item => (
+                <div key={item} className="quick-item">
+                  <span>{item}</span>
+                  <span className="quick-arrow">›</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ROW 3: BOTTOM BAR */}
+        <div className="grid-bottom">
+          <div className="bottom-left">
+            <div className="location-info">
+              <span className="location-row">CITY: KARACHI</span>
+              <span className="location-row">TZ: PKT +5</span>
+            </div>
+          </div>
+          
+          <div className="bottom-center">
+            <div className="command-label">COMMAND INTERFACE</div>
+            <div className="command-input-wrap">
+              <span className="command-caret">›</span>
+              <input 
+                type="text" 
+                className="command-input" 
+                placeholder="SPEAK OR TYPE YOUR COMMAND, SIR..."
+              />
+              <div className="mic-btn"></div>
+            </div>
+            <div className="command-status">{bootText}</div>
+          </div>
+          
+          <div className="bottom-right">
+            <div className="version-info">
+              <span className="version-row">VERSION: 0.1.0</span>
+              <span className="version-row verified">AUTH: VERIFIED</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Settings Modal */}
       <SettingsModal 
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 
@@ -589,7 +684,6 @@ function App() {
         }}
       />
 
-      {/* Drag Overlay */}
       {isDragging && (
         <div 
           className="drag-overlay" 
