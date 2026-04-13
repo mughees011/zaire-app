@@ -60,6 +60,7 @@ function App() {
   const [recognizedText, setRecognizedText] = useState('');
   const [finalRecognizedText, setFinalRecognizedText] = useState('');
   const [inputValue, setInputValue] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const [terminalLog, setTerminalLog] = useState([
     { time: '19:00', type: 'system', content: 'SYSTEM BOOT SEQUENCE INITIATED' },
     { time: '19:00', type: 'system', content: 'NEURAL CORE LOADED' },
@@ -1017,27 +1018,45 @@ function App() {
               </div>
               
               <div className="command-row">
-                <input 
-                  type="text" 
-                  className={`command-input ${isMicrophoneActive ? 'voice-active' : ''}`}
-                  placeholder={isMicrophoneActive ? 'SPEAK NOW...' : 'TYPE OR SPEAK COMMAND...'}
-                  value={isMicrophoneActive ? (recognizedText || '') : inputValue}
-                  onChange={(e) => !isMicrophoneActive && setInputValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.target.value.trim()) {
-                      const now = new Date();
-                      const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
-                      setTerminalLog(prev => [...prev, { time, type: 'input', content: e.target.value.toUpperCase() }]);
-                      setInputValue('');
-                    }
-                  }}
-                  disabled={isMicrophoneActive}
-                />
+                <div className={`command-input-wrapper ${isMicrophoneActive ? 'voice-mode' : (isTyping ? 'typing-mode' : '')}`}>
+                  <input 
+                    type="text" 
+                    className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
+                    placeholder={isMicrophoneActive ? 'LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
+                    value={isMicrophoneActive ? (recognizedText || '') : inputValue}
+                    onChange={(e) => {
+                      if (!isMicrophoneActive) {
+                        setInputValue(e.target.value);
+                        setIsTyping(e.target.value.length > 0);
+                      }
+                    }}
+                    onFocus={() => setIsTyping(true)}
+                    onBlur={() => setIsTyping(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && e.target.value.trim()) {
+                        const now = new Date();
+                        const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
+                        setTerminalLog(prev => [...prev, { time, type: 'input', content: e.target.value.toUpperCase() }]);
+                        setInputValue('');
+                        setIsTyping(false);
+                      }
+                    }}
+                    disabled={isMicrophoneActive}
+                  />
+                </div>
                 <button 
                   className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`}
                   onClick={toggleMicrophone}
                 >
-                  {isMicrophoneActive ? '■ STOP' : '● LISTEN'}
+                  {isMicrophoneActive && (
+                    <div className="level-meter">
+                      <div className="meter-bar"></div>
+                      <div className="meter-bar"></div>
+                      <div className="meter-bar"></div>
+                      <div className="meter-bar"></div>
+                    </div>
+                  )}
+                  {isMicrophoneActive ? 'STOP' : 'LISTEN'}
                 </button>
               </div>
             </div>
