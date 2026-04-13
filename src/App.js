@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import SettingsModal from './SettingsModal';
 import MorphingCommandButton from './MorphingCommandButton';
+import GhostTranscript from './GhostTranscript';
 import './App.css';
 
 const DEFAULT_BLOB_COLOR = '#00b4ff';
@@ -56,6 +57,13 @@ function App() {
   const [lastCommand, setLastCommand] = useState('');
   const [lastCommandTime, setLastCommandTime] = useState('');
   const [sessionUptime, setSessionUptime] = useState(0);
+  const [recognizedText, setRecognizedText] = useState('');
+  const [finalRecognizedText, setFinalRecognizedText] = useState('');
+  const [terminalLog, setTerminalLog] = useState([
+    { time: '19:00', type: 'system', content: 'SYSTEM BOOT SEQUENCE INITIATED' },
+    { time: '19:00', type: 'system', content: 'NEURAL CORE LOADED' },
+    { time: '19:00', type: 'system', content: 'VOICE INTERFACE ONLINE' },
+  ]);
 
   useEffect(() => {
     localStorage.setItem('blobColor', blobColor);
@@ -180,11 +188,17 @@ function App() {
         }
       }
 
-      if (finalTranscript.trim()) {
+      if (interimTranscript) {
+        setRecognizedText(interimTranscript);
+      } else if (finalTranscript.trim()) {
+        setFinalRecognizedText(finalTranscript.trim());
         const now = new Date();
         const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
-        setLastCommand(finalTranscript.trim());
-        setLastCommandTime(time);
+        setTerminalLog(prev => [...prev, { time, type: 'input', content: finalTranscript.trim().toUpperCase() }]);
+        
+        setTimeout(() => {
+          setFinalRecognizedText('');
+        }, 1500);
       }
     };
 
@@ -207,7 +221,12 @@ function App() {
       audioStreamRef.current.getTracks().forEach(track => track.stop());
       audioStreamRef.current = null;
     }
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
     setIsMicrophoneActive(false);
+    setRecognizedText('');
   };
 
   const toggleMicrophone = () => {
@@ -661,6 +680,7 @@ function App() {
       const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
       setLastCommand(e.target.value);
       setLastCommandTime(time);
+      setTerminalLog(prev => [...prev, { time, type: 'input', content: e.target.value.toUpperCase() }]);
       e.target.value = '';
     }
   };
@@ -986,25 +1006,35 @@ function App() {
           </div>
           
           <div className="bottom-center">
-            <div className="command-bar-wrapper">
-              <div className="command-bar-label">COMMAND INTERFACE</div>
-              
-              <div className="command-bar-input-row">
-                <div className="command-input-wrapper">
-                  <span className="command-input-caret">›</span>
-                  <input 
-                    type="text" 
-                    className="command-bar-input" 
-                    placeholder="SPEAK OR TYPE YOUR COMMAND, SIR..."
-                    onKeyDown={handleCommandSubmit}
-                  />
+            <div className="single-command-box">
+              <div className="command-header">
+                <span>COMMAND INTERFACE</span>
+                <div className={`mic-indicator ${isMicrophoneActive ? 'active' : ''}`}>
+                  <span className="mic-dot"></span>
+                  <span>{isMicrophoneActive ? 'LISTENING' : 'VOICE READY'}</span>
                 </div>
-                <MorphingCommandButton onToggleMicrophone={toggleMicrophone} isMicrophoneActive={isMicrophoneActive} />
               </div>
               
-              <div className="command-bar-status-row">
-                <span className="command-bar-status-left">ALL SYSTEMS GO</span>
-                <span className="command-bar-status-right">CLICK TO TOGGLE VOICE</span>
+              <div className="command-screen">
+                <span className={`command-output ${isMicrophoneActive ? 'live' : ''}`}>
+                  {recognizedText || 'AWAITING INPUT...'}
+                  {isMicrophoneActive && <span className="cursor">|</span>}
+                </span>
+              </div>
+              
+              <div className="command-row">
+                <input 
+                  type="text" 
+                  className="command-input" 
+                  placeholder="TYPE OR SPEAK COMMAND..."
+                  onKeyDown={handleCommandSubmit}
+                />
+                <button 
+                  className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`}
+                  onClick={toggleMicrophone}
+                >
+                  {isMicrophoneActive ? '● STOP' : '○ LISTEN'}
+                </button>
               </div>
             </div>
             <div className="command-status">{bootText}</div>

@@ -1,7 +1,7 @@
 .morphing-command-button {
   position: relative;
-  width: 140px;
-  height: 44px;
+  width: 160px;
+  height: 52px;
   background: rgba(0, 212, 255, 0.05);
   border: 1px solid rgba(0, 212, 255, 0.3);
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
