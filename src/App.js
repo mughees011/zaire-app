@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import SettingsModal from './SettingsModal';
+import MorphingCommandButton from './MorphingCommandButton';
 import './App.css';
 
 const DEFAULT_BLOB_COLOR = '#00b4ff';
@@ -16,7 +17,7 @@ function App() {
   const threeCanvasRef = useRef(null);
   const gridCanvasRef = useRef(null);
   const cameraRef = useRef(null);
-  const dragStateRef = useRef({ isPointerDown: false });
+  const dragStateRef = useRef({ isPointerDown: false, tempPosition: { x: 0, y: 0 } });
   
   const [bootText, setBootText] = useState('INITIALIZING SYSTEM...');
   const [activeMode, setActiveMode] = useState('VOICE');
@@ -24,6 +25,9 @@ function App() {
   const [navItem, setNavItem] = useState('HOME');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
+  const [audioFrequency, setAudioFrequency] = useState(0);
+  const frequencyBandsRef = useRef([0, 0, 0, 0, 0]);
   
   const [blobColor, setBlobColor] = useState(() => normalizeHexColor(localStorage.getItem('blobColor') || DEFAULT_BLOB_COLOR));
   const [blobSize, setBlobSize] = useState(() => parseFloat(localStorage.getItem('blobSize')) || 1.0);
@@ -42,6 +46,16 @@ function App() {
 
   const mainGroupRef = useRef(null);
   const uniformsRef = useRef(null);
+  const voiceWaveformRef = useRef(null);
+  const neuralGaugeRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const dataArrayRef = useRef(null);
+  const audioStreamRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const [lastCommand, setLastCommand] = useState('');
+  const [lastCommandTime, setLastCommandTime] = useState('');
+  const [sessionUptime, setSessionUptime] = useState(0);
 
   useEffect(() => {
     localStorage.setItem('blobColor', blobColor);
@@ -53,7 +67,7 @@ function App() {
       mainGroupRef.current.position.set(blobPosition.x, blobPosition.y, 0);
     }
     
-    if (uniformsRef.current) {
+    if (uniformsRef.current && blobColor) {
       const baseColor = new THREE.Color(blobColor);
       const hsl = {};
       baseColor.getHSL(hsl);
@@ -83,7 +97,11 @@ function App() {
 
     const distance = -camera.position.z / direction.z;
     const worldPoint = camera.position.clone().add(direction.multiplyScalar(distance));
-    setBlobPosition({ x: worldPoint.x, y: worldPoint.y });
+    dragStateRef.current.tempPosition = { x: worldPoint.x, y: worldPoint.y };
+    
+    if (mainGroupRef.current) {
+      mainGroupRef.current.position.set(worldPoint.x, worldPoint.y, 0);
+    }
   };
 
   const handleDragPointerDown = (e) => {
@@ -107,6 +125,99 @@ function App() {
     }
   };
 
+  const initializeMicrophone = async () => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+      
+      const analyser = audioContextRef.current.createAnalyser();
+      analyser.fftSize = 256;
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyser);
+      
+      analyserRef.current = analyser;
+      dataArrayRef.current = dataArray;
+      
+      startSpeechRecognition();
+      setIsMicrophoneActive(true);
+    } catch (error) {
+      console.error('Microphone access denied:', error);
+      setIsMicrophoneActive(false);
+    }
+  };
+
+  const startSpeechRecognition = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn('Speech recognition not supported in this browser');
+      return;
+    }
+
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+      let interimTranscript = '';
+      let finalTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + ' ';
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      if (finalTranscript.trim()) {
+        const now = new Date();
+        const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
+        setLastCommand(finalTranscript.trim());
+        setLastCommandTime(time);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+    };
+
+    recognition.onend = () => {
+      if (isMicrophoneActive && recognitionRef.current) {
+        recognitionRef.current.start();
+      }
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const stopMicrophone = () => {
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach(track => track.stop());
+      audioStreamRef.current = null;
+    }
+    setIsMicrophoneActive(false);
+  };
+
+  const toggleMicrophone = () => {
+    if (isMicrophoneActive) {
+      stopMicrophone();
+    } else {
+      initializeMicrophone();
+    }
+  };
+
   useEffect(() => {
     const params = {
       timeScale: 0.78,
@@ -122,7 +233,8 @@ function App() {
       shellOpacity: 0.41
     };
 
-    const blobColor = normalizeHexColor(localStorage.getItem('blobColor') || DEFAULT_BLOB_COLOR);
+    // Use the state blobColor, not localStorage - this is reactively updated when color picker changes
+    const blobColorToUse = blobColor || DEFAULT_BLOB_COLOR;
 
     const noiseFunctions = `
       vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
@@ -250,16 +362,29 @@ function App() {
         uThreshold: { value: params.voidThreshold },
         uColorDeep: { value: new THREE.Color(params.colorDeep) },
         uColorMid: { value: new THREE.Color(params.colorMid) },
-        uColorBright: { value: new THREE.Color(params.colorBright) }
+        uColorBright: { value: new THREE.Color(params.colorBright) },
+        uAudioBass: { value: 0 },
+        uAudioMid: { value: 0 },
+        uAudioTreble: { value: 0 },
+        uAudioIntensity: { value: 0 }
       },
       vertexShader: `
+        uniform float uAudioBass;
+        uniform float uAudioMid;
+        uniform float uAudioTreble;
+        uniform float uAudioIntensity;
+        uniform float uTime;
         varying vec3 vPosition;
         varying vec3 vNormal;
         varying vec3 vViewPosition;
         void main(){
-          vPosition=position;
-          vNormal=normalize(normalMatrix*normal);
-          vec4 mvPosition=modelViewMatrix*vec4(position,1.);
+          vec3 pos=position;
+          float angle=atan(pos.y,pos.x);
+          float audioInfluence=sin(angle*8.+uTime)*uAudioBass*0.15+sin(angle*12.+uTime*0.5)*uAudioMid*0.12+sin(angle*16.)*uAudioTreble*0.1;
+          pos=normalize(pos)*(1.+audioInfluence*uAudioIntensity);
+          vPosition=pos;
+          vNormal=normalize(normalMatrix*pos);
+          vec4 mvPosition=modelViewMatrix*vec4(pos,1.);
           vViewPosition=-mvPosition.xyz;
           gl_Position=projectionMatrix*mvPosition;
         }`,
@@ -271,6 +396,10 @@ function App() {
         uniform vec3 uColorDeep;
         uniform vec3 uColorMid;
         uniform vec3 uColorBright;
+        uniform float uAudioBass;
+        uniform float uAudioMid;
+        uniform float uAudioTreble;
+        uniform float uAudioIntensity;
         varying vec3 vPosition;
         varying vec3 vNormal;
         varying vec3 vViewPosition;
@@ -283,16 +412,18 @@ function App() {
             fbm(p+vec3(2.2,8.4,.5)-uTime*.02)
           );
           float density=fbm(p+2.*q);
-          float t=(density+.4)*.8;
+          float audioWave=sin(atan(vPosition.y,vPosition.x)*8.)*uAudioBass+sin(atan(vPosition.y,vPosition.x)*12.)*uAudioMid;
+          float t=(density+.4+audioWave*0.3)*.8;
           float alpha=smoothstep(uThreshold,.7,t);
+          float audioBoost=uAudioBass*0.4+uAudioMid*0.3+uAudioTreble*0.2;
           vec3 cWhite=vec3(1.);
           vec3 color=mix(uColorDeep,uColorMid,smoothstep(uThreshold,.5,t));
           color=mix(color,uColorBright,smoothstep(.5,.8,t));
-          color=mix(color,cWhite,smoothstep(.8,1.,t));
+          color=mix(color,cWhite,smoothstep(.8,1.,t)*audioBoost);
           float facing=dot(normalize(vNormal),normalize(vViewPosition));
           float depthFactor=(facing+1.)*.5;
-          float finalAlpha=alpha*(.02+.98*depthFactor);
-          gl_FragColor=vec4(color*uBrightness,finalAlpha);
+          float finalAlpha=alpha*(.02+.98*depthFactor)*(1.+audioBoost*0.5);
+          gl_FragColor=vec4(color*uBrightness*(1.+audioBoost*0.3),finalAlpha);
         }`,
       transparent: true, blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide, depthWrite: false
@@ -305,7 +436,7 @@ function App() {
     
     mainGroup.scale.set(blobSize, blobSize, blobSize);
     mainGroup.position.set(blobPosition.x, blobPosition.y, 0);
-    const initialBase = new THREE.Color(blobColor);
+    const initialBase = new THREE.Color(blobColorToUse);
     const idxHsl = {};
     initialBase.getHSL(idxHsl);
     plasmaMat.uniforms.uColorBright.value = initialBase.clone();
@@ -416,12 +547,49 @@ function App() {
       animationId = requestAnimationFrame(animate);
       const t = clock.getElapsedTime();
 
+      // Get audio frequency data if microphone is active
+      let audioIntensity = 0;
+      if (analyserRef.current && dataArrayRef.current) {
+        analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+        const total = dataArrayRef.current.length;
+        
+        // Split into frequency bands: bass, low-mid, mid, high-mid, treble
+        const bassBins = dataArrayRef.current.slice(0, Math.floor(total * 0.2));
+        const lowMidBins = dataArrayRef.current.slice(Math.floor(total * 0.2), Math.floor(total * 0.4));
+        const midBins = dataArrayRef.current.slice(Math.floor(total * 0.4), Math.floor(total * 0.6));
+        const highMidBins = dataArrayRef.current.slice(Math.floor(total * 0.6), Math.floor(total * 0.8));
+        const trebleBins = dataArrayRef.current.slice(Math.floor(total * 0.8));
+        
+        // Average each band
+        const bassAvg = (bassBins.reduce((a, b) => a + b, 0) / bassBins.length) / 255;
+        const lowMidAvg = (lowMidBins.reduce((a, b) => a + b, 0) / lowMidBins.length) / 255;
+        const midAvg = (midBins.reduce((a, b) => a + b, 0) / midBins.length) / 255;
+        const highMidAvg = (highMidBins.reduce((a, b) => a + b, 0) / highMidBins.length) / 255;
+        const trebleAvg = (trebleBins.reduce((a, b) => a + b, 0) / trebleBins.length) / 255;
+        
+        // Store in ref for shader
+        frequencyBandsRef.current = [bassAvg, lowMidAvg, midAvg, highMidAvg, trebleAvg];
+        audioIntensity = (bassAvg + lowMidAvg + midAvg) / 3;
+        setAudioFrequency(audioIntensity);
+      }
+
       plasmaMat.uniforms.uTime.value = t * params.timeScale;
+      plasmaMat.uniforms.uAudioBass.value = frequencyBandsRef.current[0];
+      plasmaMat.uniforms.uAudioMid.value = frequencyBandsRef.current[2];
+      plasmaMat.uniforms.uAudioTreble.value = frequencyBandsRef.current[4];
+      plasmaMat.uniforms.uAudioIntensity.value = audioIntensity;
+      
       pMat.uniforms.uTime.value = t;
 
       plasmaMesh.rotation.y = t * 0.08;
       mainGroup.rotation.x += params.rotationSpeedX;
       mainGroup.rotation.y += params.rotationSpeedY;
+
+      // Apply audio-based scaling with smoother animation
+      const targetScale = 1 + audioIntensity * 0.08;
+      mainGroup.scale.x += (targetScale - mainGroup.scale.x) * 0.1;
+      mainGroup.scale.y += (targetScale - mainGroup.scale.y) * 0.1;
+      mainGroup.scale.z += (targetScale - mainGroup.scale.z) * 0.1;
 
       drawGrid(t);
       controls.update();
@@ -435,7 +603,7 @@ function App() {
       renderer.dispose();
       cameraRef.current = null;
     };
-  }, [blobColor]);
+  }, [blobColor, blobSize, blobPosition]);
 
   useEffect(() => {
     const bootLabels = [
@@ -456,7 +624,7 @@ function App() {
     }, 500);
 
     return () => clearInterval(bootInterval);
-  }, [blobColor]);
+  }, []);
 
   useEffect(() => {
     const tick = () => {
@@ -471,7 +639,118 @@ function App() {
     tick();
 
     return () => clearInterval(interval);
-  }, [blobColor]);
+  }, []);
+
+  useEffect(() => {
+    const uptimeInterval = setInterval(() => {
+      setSessionUptime(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(uptimeInterval);
+  }, []);
+
+  const formatUptime = (seconds) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
+  };
+
+  const handleCommandSubmit = (e) => {
+    if (e.key === 'Enter' && e.target.value.trim()) {
+      const now = new Date();
+      const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
+      setLastCommand(e.target.value);
+      setLastCommandTime(time);
+      e.target.value = '';
+    }
+  };
+
+  useEffect(() => {
+    const canvas = voiceWaveformRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animationId;
+    let phase = 0;
+    
+    const drawWaveform = () => {
+      const width = canvas.width = canvas.offsetWidth;
+      const height = canvas.height = canvas.offsetHeight;
+      
+      ctx.clearRect(0, 0, width, height);
+      ctx.strokeStyle = 'rgba(0,212,255,0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      
+      const isVoiceActive = activeMode === 'VOICE';
+      
+      for (let x = 0; x < width; x++) {
+        let y;
+        if (isVoiceActive) {
+          const amplitude = 15 + Math.random() * 10;
+          y = height / 2 + Math.sin(x * 0.05 + phase) * amplitude + Math.sin(x * 0.02 + phase * 1.5) * (amplitude * 0.5);
+        } else {
+          y = height / 2 + Math.sin(x * 0.02 + phase) * 2;
+        }
+        
+        if (x === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      
+      ctx.stroke();
+      phase += isVoiceActive ? 0.15 : 0.05;
+      animationId = requestAnimationFrame(drawWaveform);
+    };
+    
+    drawWaveform();
+    return () => cancelAnimationFrame(animationId);
+  }, [activeMode]);
+
+  useEffect(() => {
+    const canvas = neuralGaugeRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animationId;
+    let currentLoad = 0;
+    const targetLoad = 74;
+    
+    const drawGauge = () => {
+      const width = canvas.width;
+      const height = canvas.height;
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const radius = 30;
+      
+      ctx.clearRect(0, 0, width, height);
+      
+      if (currentLoad < targetLoad) {
+        currentLoad += 0.5;
+      }
+      
+      const startAngle = -Math.PI / 2;
+      const endAngle = startAngle + (currentLoad / 100) * Math.PI * 2;
+      
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0,212,255,0.08)';
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+      ctx.strokeStyle = 'rgba(0,212,255,0.8)';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      
+      animationId = requestAnimationFrame(drawGauge);
+    };
+    
+    drawGauge();
+    return () => cancelAnimationFrame(animationId);
+  }, []);
 
   const modes = ['VOICE', 'AGENT', 'FOCUS', 'STEALTH'];
   const navItems = ['HOME', 'DASHBOARD', 'COMMAND', 'MEMORY', 'NEURAL'];
@@ -509,17 +788,22 @@ function App() {
                 className={`nav-item ${navItem === item ? 'active' : ''}`}
                 onClick={() => setNavItem(item)}
               >
+                <span className="nav-arrow">›</span>
                 {item}
               </div>
             ))}
           </div>
           
           <div className="nav-status">
-            <div className="settings-icon" onClick={() => setIsSettingsOpen(true)}>
+            <div className="settings-icon" onClick={() => setIsSettingsOpen(!isSettingsOpen)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 1.65 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
               </svg>
+            </div>
+            <div className="mode-indicator">
+              <div className="mode-dot"></div>
+              <span className="mode-text">MODE: {activeMode}</span>
             </div>
             <div className="status-indicator">
               <div className="status-dot"></div>
@@ -580,12 +864,47 @@ function App() {
               ))}
             </div>
           </div>
+          
+          <div className="panel-section">
+            <div className="section-label">VOICE MONITOR</div>
+            <canvas ref={voiceWaveformRef} className="voice-waveform"></canvas>
+          </div>
+          
+          <div className="panel-section">
+            <div className="section-label">LAST COMMAND</div>
+            <div className="last-command">
+              <div className="command-content">{lastCommand || '— AWAITING INPUT —'}</div>
+              {lastCommandTime && <div className="command-time">{lastCommandTime}</div>}
+            </div>
+          </div>
         </div>
 
         {/* ROW 2: CENTER (ORB) */}
         <div className="grid-center">
           <div className="orb-container">
-            <div className="target-ring"></div>
+            <div className="target-ring ring-1"></div>
+            <div className="target-ring ring-2"></div>
+            
+            <div className="hud-label top-left">
+              <span className="hud-line"></span>
+              <span>PLASMA DENSITY</span>
+              <span className="hud-value">4.2 TW</span>
+            </div>
+            <div className="hud-label top-right">
+              <span className="hud-line"></span>
+              <span>ENERGY OUTPUT</span>
+              <span className="hud-value">∞ MJ</span>
+            </div>
+            <div className="hud-label bottom-left">
+              <span className="hud-line"></span>
+              <span>CORE TEMP</span>
+              <span className="hud-value">15,000 K</span>
+            </div>
+            <div className="hud-label bottom-right">
+              <span className="hud-line"></span>
+              <span>FIELD STRENGTH</span>
+              <span className="hud-value">9.4 T</span>
+            </div>
           </div>
         </div>
 
@@ -636,6 +955,25 @@ function App() {
               ))}
             </div>
           </div>
+          
+          <div className="panel-section">
+            <div className="section-label">NEURAL LOAD</div>
+            <div className="neural-gauge">
+              <canvas ref={neuralGaugeRef} width="80" height="80"></canvas>
+              <div className="neural-text">
+                <span className="neural-percent">74%</span>
+                <span className="neural-label">NEURAL</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="panel-section">
+            <div className="section-label">SESSION UPTIME</div>
+            <div className="uptime-display">
+              <span className="uptime-value">{formatUptime(sessionUptime)}</span>
+              <span className="uptime-label">ACTIVE SINCE BOOT</span>
+            </div>
+          </div>
         </div>
 
         {/* ROW 3: BOTTOM BAR */}
@@ -648,15 +986,26 @@ function App() {
           </div>
           
           <div className="bottom-center">
-            <div className="command-label">COMMAND INTERFACE</div>
-            <div className="command-input-wrap">
-              <span className="command-caret">›</span>
-              <input 
-                type="text" 
-                className="command-input" 
-                placeholder="SPEAK OR TYPE YOUR COMMAND, SIR..."
-              />
-              <div className="mic-btn"></div>
+            <div className="command-bar-wrapper">
+              <div className="command-bar-label">COMMAND INTERFACE</div>
+              
+              <div className="command-bar-input-row">
+                <div className="command-input-wrapper">
+                  <span className="command-input-caret">›</span>
+                  <input 
+                    type="text" 
+                    className="command-bar-input" 
+                    placeholder="SPEAK OR TYPE YOUR COMMAND, SIR..."
+                    onKeyDown={handleCommandSubmit}
+                  />
+                </div>
+                <MorphingCommandButton onToggleMicrophone={toggleMicrophone} isMicrophoneActive={isMicrophoneActive} />
+              </div>
+              
+              <div className="command-bar-status-row">
+                <span className="command-bar-status-left">ALL SYSTEMS GO</span>
+                <span className="command-bar-status-right">CLICK TO TOGGLE VOICE</span>
+              </div>
             </div>
             <div className="command-status">{bootText}</div>
           </div>
@@ -672,11 +1021,11 @@ function App() {
 
       <SettingsModal 
         isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
-        color={blobColor} 
-        setColor={setBlobColor} 
-        size={blobSize} 
-        setSize={setBlobSize} 
+        onClose={() => setIsSettingsOpen(false)}
+        blobColor={blobColor}
+        setBlobColor={setBlobColor}
+        blobSize={blobSize}
+        setBlobSize={setBlobSize}
         onEnterDragMode={() => {
           setIsSettingsOpen(false);
           setIsDragging(true);
@@ -699,6 +1048,7 @@ function App() {
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
+                setBlobPosition(dragStateRef.current.tempPosition);
                 dragStateRef.current.isPointerDown = false;
                 setIsDragging(false);
               }}

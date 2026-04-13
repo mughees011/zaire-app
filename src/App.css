@@ -146,15 +146,16 @@ body {
   bottom: -1px;
   left: 50%;
   transform: translateX(-50%);
-  width: 40%;
+  width: 30%;
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--primary), transparent);
   animation: energyBreath 3s ease-in-out infinite;
+  opacity: 0.4;
 }
 
 @keyframes energyBreath {
-  0%, 100% { width: 30%; opacity: 0.5; }
-  50% { width: 50%; opacity: 1; }
+  0%, 100% { width: 30%; opacity: 0.4; }
+  50% { width: 65%; opacity: 0.9; }
 }
 
 .nav-logo {
@@ -190,8 +191,11 @@ body {
   padding: 8px 16px;
   cursor: pointer;
   position: relative;
-  transition: color 0.2s;
+  transition: color 0.2s, letter-spacing 0.2s;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .nav-item::before {
@@ -207,8 +211,20 @@ body {
   transition: width 0.25s ease;
 }
 
+.nav-item .nav-arrow {
+  opacity: 0;
+  transition: opacity 0.2s;
+  font-size: 8px;
+  color: var(--primary);
+}
+
 .nav-item:hover {
-  color: rgba(0, 212, 255, 0.85);
+  color: rgba(0,212,255,0.75);
+  letter-spacing: 3px;
+}
+
+.nav-item:hover .nav-arrow {
+  opacity: 1;
 }
 
 .nav-item:hover::before {
@@ -217,16 +233,50 @@ body {
 
 .nav-item.active {
   color: var(--primary);
+  letter-spacing: 3px;
 }
 
 .nav-item.active::before {
   width: 70%;
+  box-shadow: 0 2px 8px rgba(0,212,255,0.4);
+}
+
+.nav-item:not(.active):hover::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70%;
+  height: 0.5px;
+  background: rgba(0,212,255,0.2);
 }
 
 .nav-status {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+}
+
+.mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mode-indicator .mode-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 6px var(--primary);
+  animation: dotPulse 2s ease-in-out infinite;
+}
+
+.mode-indicator .mode-text {
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: rgba(0,212,255,0.4);
 }
 
 .status-indicator {
@@ -273,6 +323,73 @@ body {
   transition: all 0.2s;
 }
 
+.mic-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  transition: all 0.2s;
+}
+
+.mic-icon svg {
+  width: 14px;
+  height: 14px;
+  stroke: rgba(0, 212, 255, 0.5);
+  transition: stroke 0.2s;
+}
+
+.mic-icon:hover {
+  background: rgba(0, 212, 255, 0.08);
+  border-color: var(--border-active);
+}
+
+.mic-icon:hover svg {
+  stroke: var(--primary);
+}
+
+@keyframes micPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(0, 212, 255, 0);
+  }
+}
+
+@keyframes micGlow {
+  0%, 100% {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: var(--border-active);
+  }
+  50% {
+    background: rgba(0, 212, 255, 0.2);
+    border-color: var(--primary);
+  }
+}
+
+.mic-icon.active {
+  animation: micPulse 1.5s infinite, micGlow 1s ease-in-out infinite;
+  background: rgba(0, 212, 255, 0.15);
+  border-color: var(--primary);
+}
+
+.mic-icon.active svg {
+  stroke: var(--primary);
+  animation: micIconPulse 0.6s ease-in-out infinite;
+}
+
+@keyframes micIconPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
 .settings-icon svg {
   width: 14px;
   height: 14px;
@@ -301,6 +418,29 @@ body {
   gap: 20px;
   border-right: 1px solid var(--border-subtle);
   overflow-y: auto;
+  position: relative;
+}
+
+.grid-left::before {
+  content: '';
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 12px;
+  height: 12px;
+  border-top: 1.5px solid rgba(0,212,255,0.5);
+  border-left: 1.5px solid rgba(0,212,255,0.5);
+}
+
+.grid-left::after {
+  content: '';
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  width: 12px;
+  height: 12px;
+  border-bottom: 1.5px solid rgba(0,212,255,0.5);
+  border-right: 1.5px solid rgba(0,212,255,0.5);
 }
 
 .panel-section {
@@ -450,38 +590,33 @@ body {
   color: var(--accent-red);
 }
 
+.voice-waveform {
+  width: 100%;
+  height: 48px;
+  background: rgba(0, 20, 40, 0.3);
+  border: 1px solid var(--border-subtle);
+}
+
+.last-command {
+  background: rgba(0,212,255,0.03);
+  border: 1px solid rgba(0,212,255,0.08);
+  padding: 8px;
+}
+
+.last-command .command-content {
+  font-size: 8px;
+  color: rgba(0,212,255,0.4);
+}
+
+.last-command .command-time {
+  font-size: 7px;
+  color: rgba(255,180,0,0.4);
+  margin-top: 4px;
+}
+
 /* ══════════════════════════════════════════════════════════════
    ROW 2: CENTER (ORB)
-═══════════════════════════════════════════════════════════════════ */
-.grid-center {
-  grid-column: 2;
-  grid-row: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.orb-container {
-  position: relative;
-  width: 400px;
-  height: 400px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.target-ring {
-  position: absolute;
-  width: 280px;
-  height: 280px;
-  border: 1px solid rgba(0, 212, 255, 0.15);
-  border-radius: 50%;
-}
-
-/* ══════════════════════════════════════════════════════════════
-   ROW 2: RIGHT PANEL
-═══════════════════════════════════════════════════════════════════ */
+═════════════════════════════════════════════════════════════ */
 .grid-right {
   grid-column: 3;
   grid-row: 2;
@@ -491,6 +626,29 @@ body {
   gap: 20px;
   border-left: 1px solid var(--border-subtle);
   overflow-y: auto;
+  position: relative;
+}
+
+.grid-right::before {
+  content: '';
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 12px;
+  height: 12px;
+  border-top: 1.5px solid rgba(0,212,255,0.5);
+  border-right: 1.5px solid rgba(0,212,255,0.5);
+}
+
+.grid-right::after {
+  content: '';
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  width: 12px;
+  height: 12px;
+  border-bottom: 1.5px solid rgba(0,212,255,0.5);
+  border-left: 1.5px solid rgba(0,212,255,0.5);
 }
 
 .metrics-grid {
@@ -588,9 +746,60 @@ body {
   color: rgba(0, 212, 255, 0.3);
 }
 
+.neural-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.neural-gauge canvas {
+  display: block;
+}
+
+.neural-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.neural-percent {
+  font-family: var(--font-orbitron);
+  font-size: 14px;
+  color: var(--primary);
+}
+
+.neural-label {
+  font-size: 7px;
+  color: rgba(0,212,255,0.4);
+}
+
+.uptime-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.uptime-value {
+  font-family: var(--font-orbitron);
+  font-size: 16px;
+  letter-spacing: 3px;
+  color: var(--primary);
+}
+
+.uptime-label {
+  font-size: 7px;
+  color: rgba(0,212,255,0.4);
+}
+
 /* ══════════════════════════════════════════════════════════════
    ROW 3: BOTTOM BAR
-═══════════════════════════════════════════════════════════════════ */
+═════════════════════════════════════════════════════════════ */
 .grid-bottom {
   grid-column: 1 / -1;
   grid-row: 3;
@@ -634,6 +843,93 @@ body {
   color: rgba(0, 212, 255, 0.25);
 }
 
+.command-bar-wrapper {
+  background: rgba(0, 4, 12, 0.9);
+  border-top: 1px solid rgba(0, 212, 255, 0.12);
+  padding: 12px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.command-bar-label {
+  font-family: var(--font-share);
+  font-size: 7px;
+  letter-spacing: 3px;
+  color: rgba(0, 212, 255, 0.2);
+  text-align: center;
+}
+
+.command-bar-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+}
+
+.command-input-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.command-input-caret {
+  position: absolute;
+  left: 10px;
+  color: #00d4ff;
+  font-size: 14px;
+  animation: caretBlink 1s step-end infinite;
+  pointer-events: none;
+}
+
+@keyframes caretBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.command-bar-input {
+  width: 100%;
+  background: rgba(0, 212, 255, 0.03);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  border-top: 2px solid rgba(0, 212, 255, 0.3);
+  color: rgba(0, 212, 255, 0.7);
+  font-family: var(--font-share);
+  font-size: 11px;
+  letter-spacing: 1px;
+  padding: 10px 14px 10px 28px;
+  outline: none;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.command-bar-input::placeholder {
+  color: rgba(0, 212, 255, 0.25);
+  letter-spacing: 2px;
+}
+
+.command-bar-input:focus {
+  border-color: rgba(0, 212, 255, 0.5);
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.08);
+}
+
+.command-bar-status-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-share);
+  font-size: 7px;
+  letter-spacing: 2px;
+}
+
+.command-bar-status-left {
+  color: rgba(0, 212, 255, 0.2);
+}
+
+.command-bar-status-right {
+  color: rgba(0, 212, 255, 0.15);
+}
+
 .command-input-wrap {
   display: flex;
   align-items: center;
@@ -648,21 +944,18 @@ body {
   animation: caretBlink 1s step-end infinite;
 }
 
-@keyframes caretBlink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
 .command-input {
   flex: 1;
   background: rgba(0, 20, 40, 0.4);
   border: 1px solid var(--border-subtle);
+  border-radius: 2px;
   padding: 8px 12px;
   font-family: var(--font-share);
   font-size: 10px;
   color: var(--primary);
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
 }
 
 .command-input::placeholder {
@@ -670,17 +963,17 @@ body {
 }
 
 .command-input:focus {
-  border-color: var(--border-active);
+  border-color: rgba(0,212,255,0.6);
+  box-shadow: 0 0 20px rgba(0,212,255,0.1);
 }
 
 .mic-btn {
   width: 32px;
   height: 32px;
-  border: 1px solid var(--primary);
+  border: 1px solid rgba(0,212,255,0.3);
   border-radius: 50%;
   cursor: pointer;
-  animation: micPulse 2s ease-in-out infinite;
-  transition: background 0.2s;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
   position: relative;
 }
 
@@ -700,9 +993,14 @@ body {
   background: rgba(0, 212, 255, 0.1);
 }
 
+.mic-btn.active {
+  border-color: var(--primary);
+  animation: micPulse 1.5s ease-in-out infinite;
+}
+
 @keyframes micPulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.4); }
-  50% { box-shadow: 0 0 0 6px rgba(0, 212, 255, 0); }
+  50% { box-shadow: 0 0 0 8px rgba(0, 212, 255, 0); }
 }
 
 .command-status {
