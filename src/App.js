@@ -2,8 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import SettingsModal from './SettingsModal';
-import MorphingCommandButton from './MorphingCommandButton';
-import GhostTranscript from './GhostTranscript';
+import GroqSpeechService from './groqSpeechService';
 import './App.css';
 
 const DEFAULT_BLOB_COLOR = '#00b4ff';
@@ -61,6 +60,9 @@ function App() {
   const [finalRecognizedText, setFinalRecognizedText] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [useGroqSpeech, setUseGroqSpeech] = useState(false);
+  const [groqStatus, setGroqStatus] = useState('');
+  const groqSpeechRef = useRef(null);
   const [terminalLog, setTerminalLog] = useState([
     { time: '19:00', type: 'system', content: 'SYSTEM BOOT SEQUENCE INITIATED' },
     { time: '19:00', type: 'system', content: 'NEURAL CORE LOADED' },
@@ -137,24 +139,72 @@ function App() {
 
   const initializeMicrophone = async () => {
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      if (useGroqSpeech) {
+        // Use Groq Whisper API for better multilingual support
+        setGroqStatus('Starting...');
+        console.log('Starting Groq speech service...');
+        groqSpeechRef.current = new GroqSpeechService(
+          (text) => {
+            console.log('Groq transcript received:', text);
+            setGroqStatus('Transcribed!');
+            const now = new Date();
+            const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
+            setFinalRecognizedText(text);
+            setTerminalLog(prev => [...prev, { time, type: 'input', content: text.toUpperCase() }]);
+            setTimeout(() => setFinalRecognizedText(''), 2000);
+          },
+          (interim) => {
+            console.log('Groq interim:', interim);
+            setGroqStatus('Listening...');
+            setRecognizedText(interim);
+          },
+          (error) => {
+            console.error('Groq error:', error);
+            setGroqStatus('Error: ' + error);
+          }
+        );
+        
+        setGroqStatus('Connecting...');
+        const started = await groqSpeechRef.current.start();
+        console.log('Groq started:', started);
+        if (started) {
+          setIsMicrophoneActive(true);
+          setGroqStatus('GROQ Active');
+        } else {
+          setGroqStatus('Failed - using browser');
+          // Fallback to browser speech
+          setUseGroqSpeech(false);
+          alert('Groq failed. Using browser speech instead.');
+          // Try browser mode
+          if (!audioContextRef.current) {
+            audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+          }
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioStreamRef.current = stream;
+          startSpeechRecognition();
+          setIsMicrophoneActive(true);
+        }
+      } else {
+        // Use browser Web Speech API (free, real-time)
+        if (!audioContextRef.current) {
+          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioStreamRef.current = stream;
+        
+        const analyser = audioContextRef.current.createAnalyser();
+        analyser.fftSize = 256;
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        
+        const source = audioContextRef.current.createMediaStreamSource(stream);
+        source.connect(analyser);
+        
+        analyserRef.current = analyser;
+        dataArrayRef.current = dataArray;
+        
+        startSpeechRecognition();
+        setIsMicrophoneActive(true);
       }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioStreamRef.current = stream;
-      
-      const analyser = audioContextRef.current.createAnalyser();
-      analyser.fftSize = 256;
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      source.connect(analyser);
-      
-      analyserRef.current = analyser;
-      dataArrayRef.current = dataArray;
-      
-      startSpeechRecognition();
-      setIsMicrophoneActive(true);
     } catch (error) {
       console.error('Microphone access denied:', error);
       setIsMicrophoneActive(false);
@@ -169,21 +219,61 @@ function App() {
     }
 
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
     }
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    recognition.maxAlternatives = 5;
+    
+    // Try to detect language automatically, fallback to multi-language model
+    // Using local match for broader language support
+    const getBestLanguage = () => {
+      try {
+        const lang = navigator.language || 'en-US';
+        // Try browser language first
+        if (lang.startsWith('ur')) return 'ur-PK';
+        if (lang.startsWith('en')) return 'en-US';
+        if (lang.startsWith('es')) return 'es-ES';
+        if (lang.startsWith('fr')) return 'fr-FR';
+        if (lang.startsWith('de')) return 'de-DE';
+        if (lang.startsWith('zh')) return 'zh-CN';
+        if (lang.startsWith('ja')) return 'ja-JP';
+        if (lang.startsWith('ko')) return 'ko-KR';
+        if (lang.startsWith('ar')) return 'ar-SA';
+        if (lang.startsWith('hi')) return 'hi-IN';
+        if (lang.startsWith('pt')) return 'pt-BR';
+        if (lang.startsWith('ru')) return 'ru-RU';
+        // Fallback to universal language code
+        return 'en-US';
+      } catch (e) {
+        return 'en-US';
+      }
+    };
+    
+    recognition.lang = getBestLanguage();
 
     recognition.onresult = (event) => {
       let interimTranscript = '';
       let finalTranscript = '';
+      let bestConfidence = 0;
+      let bestTranscript = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
+        const result = event.results[i];
+        const transcript = result[0].transcript;
+        const confidence = result[0].confidence || 0;
+        
+        // Get the best alternative
+        if (confidence > bestConfidence) {
+          bestConfidence = confidence;
+          bestTranscript = transcript;
+        }
+        
+        if (result.isFinal) {
           finalTranscript += transcript + ' ';
         } else {
           interimTranscript += transcript;
@@ -206,25 +296,55 @@ function App() {
 
     recognition.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
+      // Auto-restart on common errors
+      if (event.error === 'no-speech' || event.error === 'audio-capture') {
+        setTimeout(() => {
+          if (isMicrophoneActive && recognitionRef.current) {
+            try {
+              recognitionRef.current.start();
+            } catch (e) {}
+          }
+        }, 100);
+      }
     };
 
     recognition.onend = () => {
       if (isMicrophoneActive && recognitionRef.current) {
-        recognitionRef.current.start();
+        try {
+          recognitionRef.current.start();
+        } catch (e) {
+          // Restart if stopped
+          setTimeout(() => {
+            if (isMicrophoneActive) {
+              startSpeechRecognition();
+            }
+          }, 100);
+        }
       }
     };
 
-    recognitionRef.current = recognition;
-    recognition.start();
+    try {
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (e) {
+      console.error('Failed to start recognition:', e);
+    }
   };
 
   const stopMicrophone = () => {
+    setGroqStatus('');
+    if (groqSpeechRef.current) {
+      groqSpeechRef.current.stop();
+      groqSpeechRef.current = null;
+    }
     if (audioStreamRef.current) {
       audioStreamRef.current.getTracks().forEach(track => track.stop());
       audioStreamRef.current = null;
     }
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
       recognitionRef.current = null;
     }
     setIsMicrophoneActive(false);
@@ -626,26 +746,7 @@ function App() {
     };
   }, [blobColor, blobSize, blobPosition]);
 
-  useEffect(() => {
-    const bootLabels = [
-      'INITIALIZING SYSTEM...',
-      'LOADING NEURAL CORE...',
-      'MOUNTING FILE SYSTEM...',
-      'ACTIVATING VISION ENGINE...',
-      'VOICE SYNTHESIS ONLINE...',
-      'ALL SYSTEMS GO'
-    ];
-    let lblIdx = 0;
-    const bootInterval = setInterval(() => {
-      lblIdx = Math.min(lblIdx + 1, bootLabels.length - 1);
-      setBootText(bootLabels[lblIdx]);
-      if (lblIdx === bootLabels.length - 1) {
-        clearInterval(bootInterval);
-      }
-    }, 500);
-
-    return () => clearInterval(bootInterval);
-  }, []);
+  // Boot sequence handled elsewhere
 
   useEffect(() => {
     const tick = () => {
@@ -1011,9 +1112,19 @@ function App() {
             <div className="single-command-box">
               <div className="command-header">
                 <span>COMMAND INTERFACE</span>
-                <div className={`mic-indicator ${isMicrophoneActive ? 'active' : ''}`}>
-                  <span className="mic-dot"></span>
-                  <span>{isMicrophoneActive ? 'LISTENING' : 'VOICE READY'}</span>
+                <div className="header-controls">
+                  <button 
+                    className={`engine-toggle ${useGroqSpeech ? 'groq' : 'browser'}`}
+                    onClick={() => setUseGroqSpeech(!useGroqSpeech)}
+                    title={useGroqSpeech ? 'Using Groq AI (Whisper)' : 'Using Browser Speech'}
+                  >
+                    {useGroqSpeech ? 'GROQ' : 'BROWSER'}
+                  </button>
+                  <span className="groq-status">{groqStatus}</span>
+                  <div className={`mic-indicator ${isMicrophoneActive ? 'active' : ''}`}>
+                    <span className="mic-dot"></span>
+                    <span>{isMicrophoneActive ? 'LISTENING' : 'VOICE READY'}</span>
+                  </div>
                 </div>
               </div>
               
@@ -1047,16 +1158,11 @@ function App() {
                 <button 
                   className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`}
                   onClick={toggleMicrophone}
+                  title={isMicrophoneActive ? 'Stop Listening' : 'Start Listening'}
                 >
-                  {isMicrophoneActive && (
-                    <div className="level-meter">
-                      <div className="meter-bar"></div>
-                      <div className="meter-bar"></div>
-                      <div className="meter-bar"></div>
-                      <div className="meter-bar"></div>
-                    </div>
-                  )}
-                  {isMicrophoneActive ? 'STOP' : 'LISTEN'}
+                  <svg className="mic-icon" viewBox="0 0 24 24">
+                    <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                  </svg>
                 </button>
               </div>
             </div>
