@@ -59,6 +59,7 @@ function App() {
   const [sessionUptime, setSessionUptime] = useState(0);
   const [recognizedText, setRecognizedText] = useState('');
   const [finalRecognizedText, setFinalRecognizedText] = useState('');
+  const [inputValue, setInputValue] = useState('');
   const [terminalLog, setTerminalLog] = useState([
     { time: '19:00', type: 'system', content: 'SYSTEM BOOT SEQUENCE INITIATED' },
     { time: '19:00', type: 'system', content: 'NEURAL CORE LOADED' },
@@ -1015,29 +1016,31 @@ function App() {
                 </div>
               </div>
               
-              <div className="command-screen">
-                <span className={`command-output ${isMicrophoneActive ? 'live' : ''}`}>
-                  {recognizedText || 'AWAITING INPUT...'}
-                  {isMicrophoneActive && <span className="cursor">|</span>}
-                </span>
-              </div>
-              
               <div className="command-row">
                 <input 
                   type="text" 
-                  className="command-input" 
-                  placeholder="TYPE OR SPEAK COMMAND..."
-                  onKeyDown={handleCommandSubmit}
+                  className={`command-input ${isMicrophoneActive ? 'voice-active' : ''}`}
+                  placeholder={isMicrophoneActive ? 'SPEAK NOW...' : 'TYPE OR SPEAK COMMAND...'}
+                  value={isMicrophoneActive ? (recognizedText || '') : inputValue}
+                  onChange={(e) => !isMicrophoneActive && setInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.target.value.trim()) {
+                      const now = new Date();
+                      const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
+                      setTerminalLog(prev => [...prev, { time, type: 'input', content: e.target.value.toUpperCase() }]);
+                      setInputValue('');
+                    }
+                  }}
+                  disabled={isMicrophoneActive}
                 />
                 <button 
                   className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`}
                   onClick={toggleMicrophone}
                 >
-                  {isMicrophoneActive ? '● STOP' : '○ LISTEN'}
+                  {isMicrophoneActive ? '■ STOP' : '● LISTEN'}
                 </button>
               </div>
             </div>
-            <div className="command-status">{bootText}</div>
           </div>
           
           <div className="bottom-right">

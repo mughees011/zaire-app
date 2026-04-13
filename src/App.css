@@ -876,15 +876,112 @@ body {
   color: rgba(0, 212, 255, 0.25);
 }
 
-.command-bar-wrapper {
-  background: rgba(0, 4, 12, 0.95);
-  border: 1px solid rgba(0, 212, 255, 0.25);
-  border-left: 3px solid var(--primary);
-  padding: 14px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.single-command-box {
   width: 100%;
+  background: rgba(0, 6, 18, 0.95);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-left: 3px solid var(--primary);
+}
+
+.command-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.15);
+  font-family: var(--font-share);
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: rgba(0, 212, 255, 0.4);
+}
+
+.mic-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(0, 212, 255, 0.3);
+}
+
+.mic-indicator.active {
+  color: var(--accent-green);
+}
+
+.mic-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(0, 212, 255, 0.4);
+}
+
+.mic-indicator.active .mic-dot {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
+  animation: pulse 1s ease infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.command-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.command-input {
+  flex: 1;
+  background: rgba(2, 12, 36, 0.7);
+  border: 1px solid rgba(0, 212, 255, 0.25);
+  color: rgba(0, 242, 255, 0.9);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Share Tech Mono', monospace;
+  font-size: 13px;
+  letter-spacing: 1px;
+  padding: 10px 14px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.command-input::placeholder {
+  color: rgba(0, 212, 255, 0.3);
+  letter-spacing: 1px;
+}
+
+.command-input:focus {
+  border-color: rgba(0, 212, 255, 0.5);
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.15);
+}
+
+.command-input.voice-active {
+  color: rgba(0, 242, 255, 0.4);
+}
+
+.command-input.voice-active::placeholder {
+  color: rgba(0, 242, 255, 0.5);
+}
+
+.mic-btn {
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  color: rgba(0, 212, 255, 0.6);
+  font-family: var(--font-share);
+  font-size: 9px;
+  letter-spacing: 2px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mic-btn:hover {
+  background: rgba(0, 212, 255, 0.15);
+  border-color: rgba(0, 212, 255, 0.5);
+}
+
+.mic-btn.active {
+  background: rgba(255, 64, 64, 0.15);
+  border-color: rgba(255, 64, 64, 0.6);
+  color: rgba(255, 64, 64, 0.8);
 }
 
 .command-bar-header {
