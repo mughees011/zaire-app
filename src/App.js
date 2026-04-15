@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import SettingsModal from './SettingsModal';
 import GroqSpeechService from './groqSpeechService';
+import { io } from 'socket.io-client';
 import './App.css';
 
 const DEFAULT_BLOB_COLOR = '#00b4ff';
@@ -18,7 +19,7 @@ function App() {
   const gridCanvasRef = useRef(null);
   const cameraRef = useRef(null);
   const dragStateRef = useRef({ isPointerDown: false, tempPosition: { x: 0, y: 0 } });
-  
+
   const [bootText, setBootText] = useState('INITIALIZING SYSTEM...');
   const [activeMode, setActiveMode] = useState('VOICE');
   const [timeStr, setTimeStr] = useState('00:00:00');
@@ -28,14 +29,14 @@ function App() {
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
   const [audioFrequency, setAudioFrequency] = useState(0);
   const frequencyBandsRef = useRef([0, 0, 0, 0, 0]);
-  
+
   const [blobColor, setBlobColor] = useState(() => normalizeHexColor(localStorage.getItem('blobColor') || DEFAULT_BLOB_COLOR));
   const [blobSize, setBlobSize] = useState(() => parseFloat(localStorage.getItem('blobSize')) || 1.0);
   const [blobPosition, setBlobPosition] = useState(() => {
     const saved = localStorage.getItem('blobPosition');
     return saved ? JSON.parse(saved) : { x: 0, y: 0 };
   });
-  
+
   const [activityFeed, setActivityFeed] = useState([
     { time: '15:47', message: 'System boot complete' },
     { time: '15:46', message: 'Neural core initialized' },
@@ -63,12 +64,62 @@ function App() {
   const [useGroqSpeech, setUseGroqSpeech] = useState(false);
   const [groqStatus, setGroqStatus] = useState('');
   const groqSpeechRef = useRef(null);
+
+  // Real-time Socket states
+  const socketRef = useRef(null);
+  const [jarvisResponseStream, setJarvisResponseStream] = useState('');
+  const audioQueueRef = useRef([]);
+  const isPlayingAudioRef = useRef(false);
+
   const [terminalLog, setTerminalLog] = useState([
     { time: '19:00', type: 'system', content: 'SYSTEM BOOT SEQUENCE INITIATED' },
     { time: '19:00', type: 'system', content: 'NEURAL CORE LOADED' },
     { time: '19:00', type: 'system', content: 'VOICE INTERFACE ONLINE' },
   ]);
 
+  const playNextAudioChunk = async () => {
+    if (isPlayingAudioRef.current || audioQueueRef.current.length === 0) return;
+    isPlayingAudioRef.current = true;
+
+    const buffer = audioQueueRef.current.shift();
+    const blob = new Blob([buffer], { type: 'audio/mp3' });
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+
+    audio.onended = () => {
+      isPlayingAudioRef.current = false;
+      playNextAudioChunk();
+    };
+
+    audio.play().catch(e => {
+      console.error('Audio play error:', e);
+      isPlayingAudioRef.current = false;
+      playNextAudioChunk();
+    });
+  };
+
+  useEffect(() => {
+    socketRef.current = io('http://localhost:3001');
+
+    socketRef.current.on('ai_text_delta', (delta) => {
+      setJarvisResponseStream(prev => prev + delta);
+    });
+
+    socketRef.current.on('ai_text_complete', () => {
+      setTimeout(() => {
+        setJarvisResponseStream('');
+      }, 12000);
+    });
+
+    socketRef.current.on('audio_chunk', (data) => {
+      audioQueueRef.current.push(data.audio);
+      playNextAudioChunk();
+    });
+
+    return () => {
+      if (socketRef.current) socketRef.current.disconnect();
+    }
+  }, []);
   useEffect(() => {
     localStorage.setItem('blobColor', blobColor);
     localStorage.setItem('blobSize', blobSize.toString());
@@ -78,7 +129,7 @@ function App() {
       mainGroupRef.current.scale.set(blobSize, blobSize, blobSize);
       mainGroupRef.current.position.set(blobPosition.x, blobPosition.y, 0);
     }
-    
+
     if (uniformsRef.current && blobColor) {
       const baseColor = new THREE.Color(blobColor);
       const hsl = {};
@@ -86,7 +137,7 @@ function App() {
       const bright = baseColor.clone();
       const mid = new THREE.Color().setHSL(hsl.h, hsl.s, Math.max(0, hsl.l - 0.2));
       const deep = new THREE.Color().setHSL(hsl.h, hsl.s, Math.max(0, hsl.l - 0.4));
-      
+
       uniformsRef.current.uColorBright.value = bright;
       uniformsRef.current.uColorMid.value = mid;
       uniformsRef.current.uColorDeep.value = deep;
@@ -110,7 +161,7 @@ function App() {
     const distance = -camera.position.z / direction.z;
     const worldPoint = camera.position.clone().add(direction.multiplyScalar(distance));
     dragStateRef.current.tempPosition = { x: worldPoint.x, y: worldPoint.y };
-    
+
     if (mainGroupRef.current) {
       mainGroupRef.current.position.set(worldPoint.x, worldPoint.y, 0);
     }
@@ -150,6 +201,13 @@ function App() {
             const now = new Date();
             const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
             setFinalRecognizedText(text);
+
+            // Send to Real-time Backend
+            setJarvisResponseStream('');
+            if (socketRef.current) {
+              socketRef.current.emit('user_message', text);
+            }
+
             setTerminalLog(prev => [...prev, { time, type: 'input', content: text.toUpperCase() }]);
             setTimeout(() => setFinalRecognizedText(''), 2000);
           },
@@ -163,7 +221,7 @@ function App() {
             setGroqStatus('Error: ' + error);
           }
         );
-        
+
         setGroqStatus('Connecting...');
         const started = await groqSpeechRef.current.start();
         console.log('Groq started:', started);
@@ -191,17 +249,17 @@ function App() {
         }
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioStreamRef.current = stream;
-        
+
         const analyser = audioContextRef.current.createAnalyser();
         analyser.fftSize = 256;
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        
+
         const source = audioContextRef.current.createMediaStreamSource(stream);
         source.connect(analyser);
-        
+
         analyserRef.current = analyser;
         dataArrayRef.current = dataArray;
-        
+
         startSpeechRecognition();
         setIsMicrophoneActive(true);
       }
@@ -221,14 +279,14 @@ function App() {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 5;
-    
+
     // Try to detect language automatically, fallback to multi-language model
     // Using local match for broader language support
     const getBestLanguage = () => {
@@ -253,7 +311,7 @@ function App() {
         return 'en-US';
       }
     };
-    
+
     recognition.lang = getBestLanguage();
 
     recognition.onresult = (event) => {
@@ -266,13 +324,13 @@ function App() {
         const result = event.results[i];
         const transcript = result[0].transcript;
         const confidence = result[0].confidence || 0;
-        
+
         // Get the best alternative
         if (confidence > bestConfidence) {
           bestConfidence = confidence;
           bestTranscript = transcript;
         }
-        
+
         if (result.isFinal) {
           finalTranscript += transcript + ' ';
         } else {
@@ -283,11 +341,19 @@ function App() {
       if (interimTranscript) {
         setRecognizedText(interimTranscript);
       } else if (finalTranscript.trim()) {
-        setFinalRecognizedText(finalTranscript.trim());
+        const text = finalTranscript.trim();
+        setFinalRecognizedText(text);
+
+        // Send to Real-time Backend
+        setJarvisResponseStream('');
+        if (socketRef.current) {
+          socketRef.current.emit('user_message', text);
+        }
+
         const now = new Date();
         const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
-        setTerminalLog(prev => [...prev, { time, type: 'input', content: finalTranscript.trim().toUpperCase() }]);
-        
+        setTerminalLog(prev => [...prev, { time, type: 'input', content: text.toUpperCase() }]);
+
         setTimeout(() => {
           setFinalRecognizedText('');
         }, 1500);
@@ -302,7 +368,7 @@ function App() {
           if (isMicrophoneActive && recognitionRef.current) {
             try {
               recognitionRef.current.start();
-            } catch (e) {}
+            } catch (e) { }
           }
         }, 100);
       }
@@ -344,7 +410,7 @@ function App() {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-      } catch (e) {}
+      } catch (e) { }
       recognitionRef.current = null;
     }
     setIsMicrophoneActive(false);
@@ -571,10 +637,10 @@ function App() {
     });
     const plasmaMesh = new THREE.Mesh(plasmaGeo, plasmaMat);
     mainGroup.add(plasmaMesh);
-    
+
     mainGroupRef.current = mainGroup;
     uniformsRef.current = plasmaMat.uniforms;
-    
+
     mainGroup.scale.set(blobSize, blobSize, blobSize);
     mainGroup.position.set(blobPosition.x, blobPosition.y, 0);
     const initialBase = new THREE.Color(blobColorToUse);
@@ -693,21 +759,21 @@ function App() {
       if (analyserRef.current && dataArrayRef.current) {
         analyserRef.current.getByteFrequencyData(dataArrayRef.current);
         const total = dataArrayRef.current.length;
-        
+
         // Split into frequency bands: bass, low-mid, mid, high-mid, treble
         const bassBins = dataArrayRef.current.slice(0, Math.floor(total * 0.2));
         const lowMidBins = dataArrayRef.current.slice(Math.floor(total * 0.2), Math.floor(total * 0.4));
         const midBins = dataArrayRef.current.slice(Math.floor(total * 0.4), Math.floor(total * 0.6));
         const highMidBins = dataArrayRef.current.slice(Math.floor(total * 0.6), Math.floor(total * 0.8));
         const trebleBins = dataArrayRef.current.slice(Math.floor(total * 0.8));
-        
+
         // Average each band
         const bassAvg = (bassBins.reduce((a, b) => a + b, 0) / bassBins.length) / 255;
         const lowMidAvg = (lowMidBins.reduce((a, b) => a + b, 0) / lowMidBins.length) / 255;
         const midAvg = (midBins.reduce((a, b) => a + b, 0) / midBins.length) / 255;
         const highMidAvg = (highMidBins.reduce((a, b) => a + b, 0) / highMidBins.length) / 255;
         const trebleAvg = (trebleBins.reduce((a, b) => a + b, 0) / trebleBins.length) / 255;
-        
+
         // Store in ref for shader
         frequencyBandsRef.current = [bassAvg, lowMidAvg, midAvg, highMidAvg, trebleAvg];
         audioIntensity = (bassAvg + lowMidAvg + midAvg) / 3;
@@ -719,7 +785,7 @@ function App() {
       plasmaMat.uniforms.uAudioMid.value = frequencyBandsRef.current[2];
       plasmaMat.uniforms.uAudioTreble.value = frequencyBandsRef.current[4];
       plasmaMat.uniforms.uAudioIntensity.value = audioIntensity;
-      
+
       pMat.uniforms.uTime.value = t;
 
       plasmaMesh.rotation.y = t * 0.08;
@@ -756,7 +822,7 @@ function App() {
         .join(':');
       setTimeStr(hms);
     };
-    
+
     const interval = setInterval(tick, 1000);
     tick();
 
@@ -777,35 +843,24 @@ function App() {
     return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
   };
 
-  const handleCommandSubmit = (e) => {
-    if (e.key === 'Enter' && e.target.value.trim()) {
-      const now = new Date();
-      const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
-      setLastCommand(e.target.value);
-      setLastCommandTime(time);
-      setTerminalLog(prev => [...prev, { time, type: 'input', content: e.target.value.toUpperCase() }]);
-      e.target.value = '';
-    }
-  };
-
   useEffect(() => {
     const canvas = voiceWaveformRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     let animationId;
     let phase = 0;
-    
+
     const drawWaveform = () => {
       const width = canvas.width = canvas.offsetWidth;
       const height = canvas.height = canvas.offsetHeight;
-      
+
       ctx.clearRect(0, 0, width, height);
       ctx.strokeStyle = 'rgba(0,212,255,0.7)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      
+
       const isVoiceActive = activeMode === 'VOICE';
-      
+
       for (let x = 0; x < width; x++) {
         let y;
         if (isVoiceActive) {
@@ -814,19 +869,19 @@ function App() {
         } else {
           y = height / 2 + Math.sin(x * 0.02 + phase) * 2;
         }
-        
+
         if (x === 0) {
           ctx.moveTo(x, y);
         } else {
           ctx.lineTo(x, y);
         }
       }
-      
+
       ctx.stroke();
       phase += isVoiceActive ? 0.15 : 0.05;
       animationId = requestAnimationFrame(drawWaveform);
     };
-    
+
     drawWaveform();
     return () => cancelAnimationFrame(animationId);
   }, [activeMode]);
@@ -838,39 +893,39 @@ function App() {
     let animationId;
     let currentLoad = 0;
     const targetLoad = 74;
-    
+
     const drawGauge = () => {
       const width = canvas.width;
       const height = canvas.height;
       const centerX = width / 2;
       const centerY = height / 2;
       const radius = 30;
-      
+
       ctx.clearRect(0, 0, width, height);
-      
+
       if (currentLoad < targetLoad) {
         currentLoad += 0.5;
       }
-      
+
       const startAngle = -Math.PI / 2;
       const endAngle = startAngle + (currentLoad / 100) * Math.PI * 2;
-      
+
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
       ctx.strokeStyle = 'rgba(0,212,255,0.08)';
       ctx.lineWidth = 6;
       ctx.stroke();
-      
+
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, startAngle, endAngle);
       ctx.strokeStyle = 'rgba(0,212,255,0.8)';
       ctx.lineWidth = 6;
       ctx.lineCap = 'round';
       ctx.stroke();
-      
+
       animationId = requestAnimationFrame(drawGauge);
     };
-    
+
     drawGauge();
     return () => cancelAnimationFrame(animationId);
   }, []);
@@ -890,7 +945,7 @@ function App() {
     <div className="jarvis-container">
       <canvas id="three-canvas" ref={threeCanvasRef}></canvas>
       <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
-      
+
       <div className="grid-overlay"></div>
       <div className="vignette"></div>
       <div className="scanline"></div>
@@ -903,10 +958,10 @@ function App() {
             <span className="logo-text">J·A·R·V·I·S</span>
             <span className="logo-sub">PERSONAL AI · v0.1</span>
           </div>
-          
+
           <div className="nav-links">
             {navItems.map(item => (
-              <div 
+              <div
                 key={item}
                 className={`nav-item ${navItem === item ? 'active' : ''}`}
                 onClick={() => setNavItem(item)}
@@ -916,12 +971,12 @@ function App() {
               </div>
             ))}
           </div>
-          
+
           <div className="nav-status">
             <div className="settings-icon" onClick={() => setIsSettingsOpen(!isSettingsOpen)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 1.65 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 1.65 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
               </svg>
             </div>
             <div className="mode-indicator">
@@ -942,7 +997,7 @@ function App() {
             <div className="section-label">ACTIVE MODE</div>
             <div className="mode-buttons">
               {modes.map(mode => (
-                <div 
+                <div
                   key={mode}
                   className={`mode-btn ${activeMode === mode ? 'active' : ''}`}
                   onClick={() => setActiveMode(mode)}
@@ -953,29 +1008,29 @@ function App() {
               ))}
             </div>
           </div>
-          
+
           <div className="panel-section">
             <div className="section-label">SYSTEM VITALS</div>
             <div className="vitals-bars">
               <div className="vital-row">
                 <span className="vital-label">CPU</span>
-                <div className="vital-bar"><div className="vital-fill" style={{width: '62%'}}></div></div>
+                <div className="vital-bar"><div className="vital-fill" style={{ width: '62%' }}></div></div>
               </div>
               <div className="vital-row">
                 <span className="vital-label">MEM</span>
-                <div className="vital-bar"><div className="vital-fill" style={{width: '78%'}}></div></div>
+                <div className="vital-bar"><div className="vital-fill" style={{ width: '78%' }}></div></div>
               </div>
               <div className="vital-row">
                 <span className="vital-label gpu">GPU</span>
-                <div className="vital-bar gpu"><div className="vital-fill" style={{width: '45%'}}></div></div>
+                <div className="vital-bar gpu"><div className="vital-fill" style={{ width: '45%' }}></div></div>
               </div>
               <div className="vital-row">
                 <span className="vital-label net">NET</span>
-                <div className="vital-bar net"><div className="vital-fill" style={{width: '33%'}}></div></div>
+                <div className="vital-bar net"><div className="vital-fill" style={{ width: '33%' }}></div></div>
               </div>
             </div>
           </div>
-          
+
           <div className="panel-section">
             <div className="section-label">MODULE STATUS</div>
             <div className="module-list">
@@ -987,27 +1042,37 @@ function App() {
               ))}
             </div>
           </div>
-          
+
           <div className="panel-section">
             <div className="section-label">VOICE MONITOR</div>
             <canvas ref={voiceWaveformRef} className="voice-waveform"></canvas>
           </div>
-          
+
           <div className="panel-section">
             <div className="section-label">LAST COMMAND</div>
-            <div className="last-command">
-              <div className="command-content">{lastCommand || '— AWAITING INPUT —'}</div>
-              {lastCommandTime && <div className="command-time">{lastCommandTime}</div>}
+            <div className="last-command" style={{ minHeight: '60px' }}>
+              <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
             </div>
+
+            {(jarvisResponseStream || isMicrophoneActive) && (
+              <div style={{ marginTop: '15px' }}>
+                <div className="section-label" style={{ color: '#00ffe1' }}>SYSTEM RESPONSE</div>
+                <div className="last-command" style={{ borderColor: 'rgba(0, 255, 225, 0.3)' }}>
+                  <div className="command-content" style={{ color: '#00ffe1', fontSize: '12px', lineHeight: '1.4' }}>
+                    {jarvisResponseStream || (isMicrophoneActive ? '— LISTENING... —' : '— PROCESSING... —')}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* ROW 2: CENTER (ORB) */}
-        <div className="grid-center">
+        {/* <div className="grid-center">
           <div className="orb-container">
             <div className="target-ring ring-1"></div>
             <div className="target-ring ring-2"></div>
-            
+
             <div className="hud-label top-left">
               <span className="hud-line"></span>
               <span>PLASMA DENSITY</span>
@@ -1029,7 +1094,7 @@ function App() {
               <span className="hud-value">9.4 T</span>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* ROW 2: RIGHT PANEL */}
         <div className="grid-right">
@@ -1054,7 +1119,7 @@ function App() {
               </div>
             </div>
           </div>
-          
+
           <div className="panel-section">
             <div className="section-label">RECENT ACTIVITY</div>
             <div className="activity-feed">
@@ -1066,7 +1131,7 @@ function App() {
               ))}
             </div>
           </div>
-          
+
           <div className="panel-section">
             <div className="section-label">QUICK ACCESS</div>
             <div className="quick-list">
@@ -1078,7 +1143,7 @@ function App() {
               ))}
             </div>
           </div>
-          
+
           <div className="panel-section">
             <div className="section-label">NEURAL LOAD</div>
             <div className="neural-gauge">
@@ -1089,7 +1154,7 @@ function App() {
               </div>
             </div>
           </div>
-          
+
           <div className="panel-section">
             <div className="section-label">SESSION UPTIME</div>
             <div className="uptime-display">
@@ -1107,13 +1172,13 @@ function App() {
               <span className="location-row">TZ: PKT +5</span>
             </div>
           </div>
-          
+
           <div className="bottom-center">
             <div className="single-command-box">
               <div className="command-header">
                 <span>COMMAND INTERFACE</span>
                 <div className="header-controls">
-                  <button 
+                  <button
                     className={`engine-toggle ${useGroqSpeech ? 'groq' : 'browser'}`}
                     onClick={() => setUseGroqSpeech(!useGroqSpeech)}
                     title={useGroqSpeech ? 'Using Groq AI (Whisper)' : 'Using Browser Speech'}
@@ -1127,11 +1192,11 @@ function App() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="command-row">
                 <div className={`command-input-wrapper ${isMicrophoneActive ? 'voice-mode' : (isTyping ? 'typing-mode' : '')}`}>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
                     placeholder={isMicrophoneActive ? 'LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
                     value={isMicrophoneActive ? (recognizedText || '') : inputValue}
@@ -1150,24 +1215,29 @@ function App() {
                         setTerminalLog(prev => [...prev, { time, type: 'input', content: e.target.value.toUpperCase() }]);
                         setInputValue('');
                         setIsTyping(false);
+
+                        setJarvisResponseStream('');
+                        if (socketRef.current) {
+                          socketRef.current.emit('user_message', e.target.value);
+                        }
                       }
                     }}
                     disabled={isMicrophoneActive}
                   />
                 </div>
-                <button 
+                <button
                   className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`}
                   onClick={toggleMicrophone}
                   title={isMicrophoneActive ? 'Stop Listening' : 'Start Listening'}
                 >
                   <svg className="mic-icon" viewBox="0 0 24 24">
-                    <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                    <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
                   </svg>
                 </button>
               </div>
             </div>
           </div>
-          
+
           <div className="bottom-right">
             <div className="version-info">
               <span className="version-row">VERSION: 0.1.0</span>
@@ -1177,8 +1247,8 @@ function App() {
         </div>
       </div>
 
-      <SettingsModal 
-        isOpen={isSettingsOpen} 
+      <SettingsModal
+        isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         blobColor={blobColor}
         setBlobColor={setBlobColor}
@@ -1192,8 +1262,8 @@ function App() {
       />
 
       {isDragging && (
-        <div 
-          className="drag-overlay" 
+        <div
+          className="drag-overlay"
           onPointerDown={handleDragPointerDown}
           onPointerMove={handleDragPointerMove}
           onPointerUp={handleDragPointerUp}

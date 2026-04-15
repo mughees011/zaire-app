@@ -1,8 +1,3 @@
-const GROQ_API_KEY = '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';
-const GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions';
-
-const LLM_MODEL = 'llama-3.1-8b-instant';
-
 class GroqSpeechService {
   constructor(onTranscript, onInterim, onError) {
     this.onTranscript = onTranscript;
@@ -48,7 +43,6 @@ class GroqSpeechService {
       if (final.trim()) {
         this.lastTranscript = final.trim();
         this.onTranscript?.(final.trim());
-        this.processWithLLM(final.trim());
       }
     };
 
@@ -80,35 +74,7 @@ class GroqSpeechService {
     }
   }
 
-  async processWithLLM(transcript) {
-    try {
-      const response = await fetch(GROQ_CHAT_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${GROQ_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: LLM_MODEL,
-          messages: [
-            { role: 'system', content: 'You are J.A.R.V.I.S. Respond concisely.' },
-            { role: 'user', content: transcript }
-          ],
-          temperature: 0.7,
-          max_tokens: 128
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.choices && data.choices[0]) {
-          console.log('J.A.R.V.I.S.:', data.choices[0].message.content);
-        }
-      }
-    } catch (error) {
-      console.log('LLM:', error.message);
-    }
-  }
+  // LLM processing is now securely handled by the backend via WebSockets
 
   static isSupported() {
     return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
