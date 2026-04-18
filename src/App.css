@@ -1652,3 +1652,171 @@ body {
 .drag-helper-text button:hover {
   background: var(--primary);
 }
+
+/* ═══════════════════════════════════════════════
+   MEMORY CORE PANEL
+════════════════════════════════════════════════ */
+.memory-panel {
+  border: 1px solid rgba(0, 212, 255, 0.08);
+  padding: 10px;
+  background: rgba(0, 10, 25, 0.4);
+  transition: border-color 0.4s, box-shadow 0.4s;
+}
+
+.memory-panel.memory-flash {
+  border-color: rgba(0, 255, 225, 0.5);
+  box-shadow: 0 0 16px rgba(0, 255, 225, 0.2), inset 0 0 12px rgba(0, 255, 225, 0.05);
+  animation: memoryPulse 0.6s ease-in-out 3;
+}
+
+@keyframes memoryPulse {
+  0%, 100% { border-color: rgba(0, 255, 225, 0.3); }
+  50%       { border-color: rgba(0, 255, 225, 0.8); box-shadow: 0 0 24px rgba(0,255,225,0.3); }
+}
+
+.memory-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-left: 0 !important;
+}
+
+.memory-label::before {
+  display: none;
+}
+
+.memory-count {
+  font-size: 6px;
+  letter-spacing: 1px;
+  color: rgba(0, 255, 225, 0.4);
+  background: rgba(0, 255, 225, 0.05);
+  padding: 2px 6px;
+  border: 1px solid rgba(0, 255, 225, 0.1);
+}
+
+.memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.memory-empty {
+  font-size: 7px;
+  letter-spacing: 2px;
+  color: rgba(0, 212, 255, 0.18);
+  text-align: center;
+  padding: 8px 0;
+}
+
+.memory-item {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  animation: slideIn 0.4s ease-out;
+}
+
+.memory-dot {
+  font-size: 5px;
+  color: rgba(0, 255, 225, 0.5);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.memory-text {
+  font-size: 7.5px;
+  line-height: 1.4;
+  color: rgba(0, 255, 225, 0.65);
+  letter-spacing: 0.5px;
+  word-break: break-word;
+}
+
+/* ═══════════════════════════════════════════════
+   SCREEN VISION INDICATOR
+════════════════════════════════════════════════ */
+.vision-panel {
+  border: 1px solid rgba(0, 212, 255, 0.08);
+  padding: 10px;
+  background: rgba(0, 10, 25, 0.4);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.vision-panel.vision-active {
+  border-color: rgba(255, 140, 0, 0.5);
+  box-shadow: 0 0 16px rgba(255, 140, 0, 0.18);
+  animation: visionScan 1s ease-in-out infinite;
+}
+
+@keyframes visionScan {
+  0%, 100% { box-shadow: 0 0 8px rgba(255,140,0,0.1); }
+  50%       { box-shadow: 0 0 20px rgba(255,140,0,0.35); }
+}
+
+.vision-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-left: 0 !important;
+}
+
+.vision-label::before {
+  display: none;
+}
+
+.vision-status {
+  font-size: 7px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+}
+
+.vision-status.scanning {
+  color: rgba(255, 160, 0, 0.9);
+  animation: dotPulse 0.6s ease-in-out infinite;
+}
+
+.vision-status.standby {
+  color: rgba(0, 212, 255, 0.3);
+}
+
+.vision-hint {
+  font-size: 7px;
+  color: rgba(0, 212, 255, 0.25);
+  font-style: italic;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+.vision-hint em {
+  color: rgba(0, 212, 255, 0.45);
+  font-style: normal;
+}
+
+/* ═══════════════════════════════════════════════
+   SYSTEM ACTIONS LOG
+════════════════════════════════════════════════ */
+.action-log {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.action-log-item {
+  display: flex;
+  gap: 6px;
+  font-size: 7px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.04);
+  animation: slideIn 0.3s ease-out;
+}
+
+.action-time {
+  color: rgba(255, 180, 0, 0.4);
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.action-label {
+  color: rgba(0, 255, 136, 0.55);
+  letter-spacing: 0.5px;
+  word-break: break-all;
+}

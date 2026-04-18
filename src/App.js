@@ -65,6 +65,13 @@ function App() {
   const [groqStatus, setGroqStatus] = useState('');
   const groqSpeechRef = useRef(null);
 
+  // ── New: Vision, Memory, System Actions ──
+  const [isVisionScanning, setIsVisionScanning] = useState(false);
+  const [storedMemories, setStoredMemories] = useState([]);
+  const [memoryFlash, setMemoryFlash] = useState(false);
+  const [lastSystemAction, setLastSystemAction] = useState(null);
+  const [systemActionLog, setSystemActionLog] = useState([]);
+
   // Real-time Socket states
   const socketRef = useRef(null);
   const [jarvisResponseStream, setJarvisResponseStream] = useState('');
@@ -77,43 +84,222 @@ function App() {
     { time: '19:00', type: 'system', content: 'VOICE INTERFACE ONLINE' },
   ]);
 
+  const nextExpectedIndexRef = useRef(0);
+
   const playNextAudioChunk = async () => {
     if (isPlayingAudioRef.current || audioQueueRef.current.length === 0) return;
+
+    const chunk = audioQueueRef.current[0];
+    
+    // Safety check for valid audio data
+    if (!chunk || !chunk.audio) {
+      console.log('[TTS] Skipping invalid chunk:', chunk);
+      audioQueueRef.current.shift();
+      playNextAudioChunk();
+      return;
+    }
+
+    let audioData;
+    if (chunk.isBase64) {
+      // Decode from base64
+      const binaryString = atob(chunk.audio);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      audioData = bytes;
+    } else {
+      // Already binary
+      audioData = new Uint8Array(chunk.audio);
+    }
+
+    // Ensure it's a Buffer or ArrayBuffer
+    const audioLength = audioData.byteLength || audioData.length || 0;
+    if (audioLength === 0) {
+      console.log('[TTS] Skipping zero-length chunk index:', chunk.index);
+      audioQueueRef.current.shift();
+      playNextAudioChunk();
+      return;
+    }
+
     isPlayingAudioRef.current = true;
+    audioQueueRef.current.shift();
 
-    const buffer = audioQueueRef.current.shift();
-    const blob = new Blob([buffer], { type: 'audio/mp3' });
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
+    let url = null;
+    try {
+      console.log(`[TTS] Playing index: ${chunk.index} (${audioLength} bytes)`);
+      const blob = new Blob([audioData], { type: 'audio/mpeg' });
+      url = URL.createObjectURL(blob);
+      console.log(`[TTS] Blob URL created: ${url.substring(0, 50)}...`);
+      
+      const audio = new Audio(url);
+      
+      // Add timeout - if audio doesn't start playing within 3 seconds, move on
+      const playTimeout = setTimeout(() => {
+        console.warn(`[TTS] Play timeout for index ${chunk.index} - moving to next`);
+        if (url) URL.revokeObjectURL(url);
+        isPlayingAudioRef.current = false;
+        playNextAudioChunk();
+      }, 3000);
 
-    audio.onended = () => {
+      // Log audio element events for debugging
+      audio.addEventListener('canplaythrough', () => {
+        console.log(`[TTS] Audio can play through: ${chunk.index}`);
+      });
+      audio.addEventListener('loadedmetadata', () => {
+        console.log(`[TTS] Audio loaded metadata: ${chunk.index}, duration: ${audio.duration}`);
+      });
+      
+      audio.onended = () => {
+        clearTimeout(playTimeout);
+        console.log(`[TTS] Audio ended: ${chunk.index}`);
+        if (url) URL.revokeObjectURL(url);
+        isPlayingAudioRef.current = false;
+        playNextAudioChunk();
+      };
+
+      audio.onerror = (e) => {
+        clearTimeout(playTimeout);
+        console.error(`[TTS] Audio tag error at index ${chunk.index}:`, e);
+        console.error('[TTS] Audio error details:', audio.error);
+        if (url) URL.revokeObjectURL(url);
+        isPlayingAudioRef.current = false;
+        playNextAudioChunk();
+      };
+
+      // Play audio - properly handle both success and error
+      try {
+        await audio.play();
+        console.log(`[TTS] Play started (no error thrown): ${chunk.index}`);
+      } catch (playErr) {
+        clearTimeout(playTimeout);
+        console.error(`[TTS] Play error at index ${chunk.index}:`, playErr.name, playErr.message);
+        if (playErr.name === 'NotAllowedError') {
+          console.warn('[TTS] Playback blocked - user interaction required. Click anywhere on the page first.');
+        }
+        if (url) URL.revokeObjectURL(url);
+        isPlayingAudioRef.current = false;
+        playNextAudioChunk();
+      }
+
+    } catch (err) {
+      console.error('[TTS] Player logic exception:', err);
+      if (url) URL.revokeObjectURL(url);
       isPlayingAudioRef.current = false;
       playNextAudioChunk();
-    };
-
-    audio.play().catch(e => {
-      console.error('Audio play error:', e);
-      isPlayingAudioRef.current = false;
-      playNextAudioChunk();
-    });
+    }
   };
 
+  // Function to fetch TTS audio via HTTP
+  const fetchTTSAudio = async (text) => {
+    try {
+      const response = await fetch('http://localhost:3001/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, pitch: '+0Hz', rate: '+5%' })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`TTS HTTP error: ${response.status}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      return new Uint8Array(arrayBuffer);
+    } catch (err) {
+      console.error('[TTS HTTP] Failed:', err);
+      return null;
+    }
+  };
+
+  // Load memories from backend on startup
   useEffect(() => {
-    socketRef.current = io('http://localhost:3001');
+    fetch('http://localhost:3001/memories')
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) setStoredMemories(data.slice(0, 5));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    socketRef.current = io('http://localhost:3001', {
+      transports: ['polling', 'websocket'],
+      forceNew: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
+    });
+
+    socketRef.current.on('connect', () => {
+      console.log('[SOCKET] Connected to backend');
+    });
+
+    socketRef.current.on('connect_error', (err) => {
+      console.error('[SOCKET] Connection error:', err.message);
+    });
 
     socketRef.current.on('ai_text_delta', (delta) => {
       setJarvisResponseStream(prev => prev + delta);
     });
 
+    socketRef.current.on('audio_chunk', (data) => {
+      console.log('[SOCKET] Received audio_chunk:', data.index, 'isBase64:', data.isBase64, 'audio length:', data.audio ? (data.isBase64 ? data.audio.length : data.audio.byteLength) : 0);
+      // data contains { index, audio }
+      audioQueueRef.current.push(data);
+      // Sort by index to ensure sentences play in correct order
+      audioQueueRef.current.sort((a, b) => a.index - b.index);
+      playNextAudioChunk();
+    });
+
     socketRef.current.on('ai_text_complete', () => {
+      // Reset expected index for next response
+      nextExpectedIndexRef.current = 0;
       setTimeout(() => {
         setJarvisResponseStream('');
       }, 12000);
     });
 
-    socketRef.current.on('audio_chunk', (data) => {
-      audioQueueRef.current.push(data.audio);
-      playNextAudioChunk();
+    // Handle text chunks - fetch audio via HTTP for each chunk
+    socketRef.current.on('text_chunks', async ({ chunks }) => {
+      console.log('[SOCKET] Received text_chunks:', chunks.length);
+      for (const chunk of chunks) {
+        const audioData = await fetchTTSAudio(chunk.text);
+        if (audioData) {
+          audioQueueRef.current.push({ index: chunk.index, audio: audioData, isBase64: false });
+          audioQueueRef.current.sort((a, b) => a.index - b.index);
+          playNextAudioChunk();
+        }
+      }
+    });
+
+    // Vision status
+    socketRef.current.on('jarvis_status', (status) => {
+      if (status === 'scanning') {
+        setIsVisionScanning(true);
+      } else {
+        setIsVisionScanning(false);
+      }
+    });
+
+    // Memory stored event
+    socketRef.current.on('memory_stored', ({ text, count }) => {
+      const now = new Date();
+      const ts = now.toISOString();
+      setStoredMemories(prev => [{ id: Date.now(), timestamp: ts, text }, ...prev].slice(0, 5));
+      setMemoryFlash(true);
+      setTimeout(() => setMemoryFlash(false), 2000);
+    });
+
+    // System action events (mouse/keyboard)
+    socketRef.current.on('system_action', (action) => {
+      setLastSystemAction(action);
+      const now = new Date();
+      const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
+      let label = '';
+      if (action.type === 'mouse') label = `[MOUSE] ${action.action.toUpperCase()} → (${action.x ?? '?'}, ${action.y ?? '?'})`;
+      else if (action.type === 'keyboard') label = `[TYPE] "${action.text}"`;
+      else if (action.type === 'hotkey') label = `[HOTKEY] ${action.keys.join('+').toUpperCase()}`;
+      setSystemActionLog(prev => [{ time, label }, ...prev].slice(0, 6));
     });
 
     return () => {
@@ -1048,6 +1234,25 @@ function App() {
             <canvas ref={voiceWaveformRef} className="voice-waveform"></canvas>
           </div>
 
+          {/* ── MEMORY CORE ── */}
+          <div className={`panel-section memory-panel ${memoryFlash ? 'memory-flash' : ''}`}>
+            <div className="section-label memory-label">
+              <span>MEMORY CORE</span>
+              <span className="memory-count">{storedMemories.length} STORED</span>
+            </div>
+            <div className="memory-list">
+              {storedMemories.length === 0 && (
+                <div className="memory-empty">— NO MEMORIES YET —</div>
+              )}
+              {storedMemories.map((m, i) => (
+                <div key={m.id || i} className="memory-item">
+                  <span className="memory-dot">◆</span>
+                  <span className="memory-text">{m.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="panel-section">
             <div className="section-label">LAST COMMAND</div>
             <div className="last-command" style={{ minHeight: '60px' }}>
@@ -1098,6 +1303,35 @@ function App() {
 
         {/* ROW 2: RIGHT PANEL */}
         <div className="grid-right">
+
+          {/* ── VISION INDICATOR ── */}
+          <div className={`panel-section vision-panel ${isVisionScanning ? 'vision-active' : ''}`}>
+            <div className="section-label vision-label">
+              <span>SCREEN VISION</span>
+              <span className={`vision-status ${isVisionScanning ? 'scanning' : 'standby'}`}>
+                {isVisionScanning ? '● SCANNING' : '○ STANDBY'}
+              </span>
+            </div>
+            <div className="vision-hint">
+              Say: <em>"What's on my screen?"</em>
+            </div>
+          </div>
+
+          {/* ── SYSTEM ACTIONS LOG ── */}
+          {systemActionLog.length > 0 && (
+            <div className="panel-section">
+              <div className="section-label">SYSTEM ACTIONS</div>
+              <div className="action-log">
+                {systemActionLog.map((a, i) => (
+                  <div key={i} className="action-log-item">
+                    <span className="action-time">{a.time}</span>
+                    <span className="action-label">{a.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="panel-section">
             <div className="section-label">SYSTEM METRICS</div>
             <div className="metrics-grid">
