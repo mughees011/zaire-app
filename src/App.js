@@ -27,6 +27,13 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
+  const isMicrophoneActiveRef = useRef(false);
+
+  // Sync state to Ref for persistent event handlers
+  useEffect(() => {
+    isMicrophoneActiveRef.current = isMicrophoneActive;
+  }, [isMicrophoneActive]);
+
   const [audioFrequency, setAudioFrequency] = useState(0);
   const frequencyBandsRef = useRef([0, 0, 0, 0, 0]);
 
@@ -71,121 +78,87 @@ function App() {
   const [memoryFlash, setMemoryFlash] = useState(false);
   const [lastSystemAction, setLastSystemAction] = useState(null);
   const [systemActionLog, setSystemActionLog] = useState([]);
+  const [isDiagnosticActive, setIsDiagnosticActive] = useState(false);
 
   // Real-time Socket states
   const socketRef = useRef(null);
   const [jarvisResponseStream, setJarvisResponseStream] = useState('');
-  const audioQueueRef = useRef([]);
-  const isPlayingAudioRef = useRef(false);
+  const [showResponsePanel, setShowResponsePanel] = useState(false);
+  const responseTimeoutRef = useRef(null);
 
+  // Biometric State
+  const [biometricData, setBiometricData] = useState({ detected: false, name: 'ABSENT', confidence: 0 });
+  const [isSecurityAlert, setIsSecurityAlert] = useState(false);
+  
   const [terminalLog, setTerminalLog] = useState([
     { time: '19:00', type: 'system', content: 'SYSTEM BOOT SEQUENCE INITIATED' },
     { time: '19:00', type: 'system', content: 'NEURAL CORE LOADED' },
     { time: '19:00', type: 'system', content: 'VOICE INTERFACE ONLINE' },
   ]);
 
+  const audioQueueRef = useRef({}); // Using object keyed by index for O(1) lookups
+  const isPlayingAudioRef = useRef(false);
   const nextExpectedIndexRef = useRef(0);
 
   const playNextAudioChunk = async () => {
-    if (isPlayingAudioRef.current || audioQueueRef.current.length === 0) return;
-
-    const chunk = audioQueueRef.current[0];
+    if (isPlayingAudioRef.current) return;
+    
+    const nextIndex = nextExpectedIndexRef.current;
+    const chunk = audioQueueRef.current[nextIndex];
+    
+    if (!chunk) {
+      console.log(`[TTS] Sequence break - waiting for chunk ${nextIndex}`);
+      return; 
+    }
     
     // Safety check for valid audio data
-    if (!chunk || !chunk.audio) {
-      console.log('[TTS] Skipping invalid chunk:', chunk);
-      audioQueueRef.current.shift();
-      playNextAudioChunk();
-      return;
-    }
-
-    let audioData;
-    if (chunk.isBase64) {
-      // Decode from base64
-      const binaryString = atob(chunk.audio);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      audioData = bytes;
-    } else {
-      // Already binary
-      audioData = new Uint8Array(chunk.audio);
-    }
-
-    // Ensure it's a Buffer or ArrayBuffer
-    const audioLength = audioData.byteLength || audioData.length || 0;
-    if (audioLength === 0) {
-      console.log('[TTS] Skipping zero-length chunk index:', chunk.index);
-      audioQueueRef.current.shift();
+    if (!chunk.audio) {
+      console.error('[TTS] Null audio in chunk, skipping:', nextIndex);
+      delete audioQueueRef.current[nextIndex];
+      nextExpectedIndexRef.current++;
       playNextAudioChunk();
       return;
     }
 
     isPlayingAudioRef.current = true;
-    audioQueueRef.current.shift();
+    console.log(`[TTS] Beginning playback of chunk ${nextIndex}`);
+
+    let audioData;
+    if (chunk.isBase64) {
+      const binaryString = atob(chunk.audio);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+      audioData = bytes;
+    } else {
+      audioData = new Uint8Array(chunk.audio);
+    }
 
     let url = null;
     try {
-      console.log(`[TTS] Playing index: ${chunk.index} (${audioLength} bytes)`);
       const blob = new Blob([audioData], { type: 'audio/mpeg' });
       url = URL.createObjectURL(blob);
-      console.log(`[TTS] Blob URL created: ${url.substring(0, 50)}...`);
-      
       const audio = new Audio(url);
       
-      // Add timeout - if audio doesn't start playing within 3 seconds, move on
-      const playTimeout = setTimeout(() => {
-        console.warn(`[TTS] Play timeout for index ${chunk.index} - moving to next`);
+      const onFinished = () => {
         if (url) URL.revokeObjectURL(url);
+        delete audioQueueRef.current[nextIndex];
         isPlayingAudioRef.current = false;
-        playNextAudioChunk();
-      }, 3000);
-
-      // Log audio element events for debugging
-      audio.addEventListener('canplaythrough', () => {
-        console.log(`[TTS] Audio can play through: ${chunk.index}`);
-      });
-      audio.addEventListener('loadedmetadata', () => {
-        console.log(`[TTS] Audio loaded metadata: ${chunk.index}, duration: ${audio.duration}`);
-      });
-      
-      audio.onended = () => {
-        clearTimeout(playTimeout);
-        console.log(`[TTS] Audio ended: ${chunk.index}`);
-        if (url) URL.revokeObjectURL(url);
-        isPlayingAudioRef.current = false;
+        nextExpectedIndexRef.current++;
+        console.log(`[TTS] Finished chunk ${nextIndex}, next expected is ${nextExpectedIndexRef.current}`);
         playNextAudioChunk();
       };
 
+      audio.onended = onFinished;
       audio.onerror = (e) => {
-        clearTimeout(playTimeout);
-        console.error(`[TTS] Audio tag error at index ${chunk.index}:`, e);
-        console.error('[TTS] Audio error details:', audio.error);
-        if (url) URL.revokeObjectURL(url);
-        isPlayingAudioRef.current = false;
-        playNextAudioChunk();
+        console.error(`[TTS] Playback error on chunk ${nextIndex}:`, e);
+        onFinished();
       };
 
-      // Play audio - properly handle both success and error
-      try {
-        await audio.play();
-        console.log(`[TTS] Play started (no error thrown): ${chunk.index}`);
-      } catch (playErr) {
-        clearTimeout(playTimeout);
-        console.error(`[TTS] Play error at index ${chunk.index}:`, playErr.name, playErr.message);
-        if (playErr.name === 'NotAllowedError') {
-          console.warn('[TTS] Playback blocked - user interaction required. Click anywhere on the page first.');
-        }
-        if (url) URL.revokeObjectURL(url);
-        isPlayingAudioRef.current = false;
-        playNextAudioChunk();
-      }
-
+      await audio.play();
     } catch (err) {
-      console.error('[TTS] Player logic exception:', err);
-      if (url) URL.revokeObjectURL(url);
+      console.error(`[TTS] Critical error playing chunk ${nextIndex}:`, err);
       isPlayingAudioRef.current = false;
+      nextExpectedIndexRef.current++;
       playNextAudioChunk();
     }
   };
@@ -240,33 +213,44 @@ function App() {
 
     socketRef.current.on('ai_text_delta', (delta) => {
       setJarvisResponseStream(prev => prev + delta);
+      setShowResponsePanel(true);
+      
+      // Reset fade timeout
+      if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+      responseTimeoutRef.current = setTimeout(() => {
+        setShowResponsePanel(false);
+        setJarvisResponseStream('');
+      }, 12000); // Fade after 12s of silence
     });
 
     socketRef.current.on('audio_chunk', (data) => {
-      console.log('[SOCKET] Received audio_chunk:', data.index, 'isBase64:', data.isBase64, 'audio length:', data.audio ? (data.isBase64 ? data.audio.length : data.audio.byteLength) : 0);
-      // data contains { index, audio }
-      audioQueueRef.current.push(data);
-      // Sort by index to ensure sentences play in correct order
-      audioQueueRef.current.sort((a, b) => a.index - b.index);
+      console.log('[SOCKET] Received audio_chunk:', data.index);
+      
+      // If we get index 0, it's a new interaction, reset the sequence!
+      if (data.index === 0) {
+        console.log('[TTS] Sequence Reset detected (index 0)');
+        nextExpectedIndexRef.current = 0;
+      }
+
+      audioQueueRef.current[data.index] = data;
       playNextAudioChunk();
     });
 
     socketRef.current.on('ai_text_complete', () => {
-      // Reset expected index for next response
-      nextExpectedIndexRef.current = 0;
-      setTimeout(() => {
-        setJarvisResponseStream('');
-      }, 12000);
+      // Sequence will reset on next index 0
     });
 
     // Handle text chunks - fetch audio via HTTP for each chunk
     socketRef.current.on('text_chunks', async ({ chunks }) => {
       console.log('[SOCKET] Received text_chunks:', chunks.length);
+      
+      // New interaction, reset sequence
+      nextExpectedIndexRef.current = 0;
+      
       for (const chunk of chunks) {
         const audioData = await fetchTTSAudio(chunk.text);
         if (audioData) {
-          audioQueueRef.current.push({ index: chunk.index, audio: audioData, isBase64: false });
-          audioQueueRef.current.sort((a, b) => a.index - b.index);
+          audioQueueRef.current[chunk.index] = { index: chunk.index, audio: audioData, isBase64: false };
           playNextAudioChunk();
         }
       }
@@ -290,8 +274,16 @@ function App() {
       setTimeout(() => setMemoryFlash(false), 2000);
     });
 
+    // Neural Log events from Agent Daemon
+    socketRef.current.on('neural_log', ({ content }) => {
+      const now = new Date();
+      const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
+      setTerminalLog(prev => [...prev, { time, type: 'system', content: content.toUpperCase() }].slice(-50));
+    });
+
     // System action events (mouse/keyboard)
     socketRef.current.on('system_action', (action) => {
+
       setLastSystemAction(action);
       const now = new Date();
       const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
@@ -302,8 +294,34 @@ function App() {
       setSystemActionLog(prev => [{ time, label }, ...prev].slice(0, 6));
     });
 
+    // Proactive Briefing & Diagnostic Pulse
+    socketRef.current.on('diagnostic_alert', (active) => {
+      setIsDiagnosticActive(active);
+    });
+
+    // Biometric Polling (Observer Daemon on Port 3003)
+    const pollBiometrics = async () => {
+      try {
+        const res = await fetch('http://localhost:3003/status');
+        const data = await res.json();
+        setBiometricData(data);
+        
+        // Security Alert if Unknown detected
+        if (data.detected && (data.name === 'Unknown' || data.name === 'Security Alert')) {
+          setIsSecurityAlert(true);
+        } else {
+          setIsSecurityAlert(false);
+        }
+      } catch (e) {
+        // Observer not running?
+      }
+    };
+
+    const biometricInterval = setInterval(pollBiometrics, 3000);
+
     return () => {
       if (socketRef.current) socketRef.current.disconnect();
+      clearInterval(biometricInterval);
     }
   }, []);
   useEffect(() => {
@@ -547,31 +565,34 @@ function App() {
     };
 
     recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error);
-      // Auto-restart on common errors
-      if (event.error === 'no-speech' || event.error === 'audio-capture') {
-        setTimeout(() => {
-          if (isMicrophoneActive && recognitionRef.current) {
-            try {
-              recognitionRef.current.start();
-            } catch (e) { }
-          }
-        }, 100);
+      if (event.error === 'no-speech') {
+        console.log('[SPEECH] Silence detected, re-syncing...');
+      } else {
+        console.error('Speech recognition error:', event.error);
       }
+      // We no longer restart here to avoid race conditions with onend
     };
 
     recognition.onend = () => {
-      if (isMicrophoneActive && recognitionRef.current) {
-        try {
-          recognitionRef.current.start();
-        } catch (e) {
-          // Restart if stopped
-          setTimeout(() => {
-            if (isMicrophoneActive) {
+      console.log('[SPEECH] Recognition service disconnected');
+      
+      // If the microphone should be active, try to restart with a safe delay
+      if (isMicrophoneActiveRef.current) {
+        console.log('[SPEECH] Waiting for stable audio channel before restart...');
+        
+        // Use a longer delay to prevent the 'aborted' infinite loop
+        setTimeout(() => {
+          if (isMicrophoneActiveRef.current) {
+            try { 
+              recognition.start(); 
+              console.log('[SPEECH] Voice link re-established.');
+            } catch (e) {
+              // If the object is in a bad state, do a full reset
+              console.warn('[SPEECH] Soft restart failed, attempting full reset...');
               startSpeechRecognition();
             }
-          }, 100);
-        }
+          }
+        }, 400); // 400ms is safer for most browser/OS drivers
       }
     };
 
@@ -616,14 +637,14 @@ function App() {
       timeScale: 0.78,
       rotationSpeedX: 0.0012,
       rotationSpeedY: 0.004,
-      plasmaScale: 0.1404,
-      plasmaBrightness: 1.31,
-      voidThreshold: 0.072,
-      colorDeep: 0x001433,
-      colorMid: 0x0084ff,
-      colorBright: 0x00ffe1,
-      shellColor: 0x0066ff,
-      shellOpacity: 0.41
+      plasmaScale: 0.1504,
+      plasmaBrightness: 1.5,
+      voidThreshold: 0.05,
+      colorDeep: 0x000833,
+      colorMid: 0x0044ff,
+      colorBright: 0x00ccff,
+      shellColor: 0x0088ff,
+      shellOpacity: 0.35
     };
 
     // Use the state blobColor, not localStorage - this is reactively updated when color picker changes
@@ -833,8 +854,8 @@ function App() {
     const idxHsl = {};
     initialBase.getHSL(idxHsl);
     plasmaMat.uniforms.uColorBright.value = initialBase.clone();
-    plasmaMat.uniforms.uColorMid.value = new THREE.Color().setHSL(idxHsl.h, idxHsl.s, Math.max(0, idxHsl.l - 0.2));
-    plasmaMat.uniforms.uColorDeep.value = new THREE.Color().setHSL(idxHsl.h, idxHsl.s, Math.max(0, idxHsl.l - 0.4));
+    plasmaMat.uniforms.uColorMid.value = new THREE.Color(0x0044ff);
+    plasmaMat.uniforms.uColorDeep.value = new THREE.Color(0x000833);
 
     const pCount = 600;
     const pPos = new Float32Array(pCount * 3);
@@ -1089,13 +1110,21 @@ function App() {
 
       ctx.clearRect(0, 0, width, height);
 
+      // Animate to target, then fluctuate
       if (currentLoad < targetLoad) {
         currentLoad += 0.5;
+      } else {
+        // Subtle fluctuation: +/- 2%
+        const drift = (Math.random() - 0.5) * 0.4; 
+        currentLoad = Math.max(targetLoad - 2, Math.min(targetLoad + 2, currentLoad + drift));
       }
 
       const startAngle = -Math.PI / 2;
       const endAngle = startAngle + (currentLoad / 100) * Math.PI * 2;
 
+      // Update text if possible (optional, but currentLoad is internal)
+      // Since the text is in JSX, we'll just keep it 74% fixed there or assume it's just visual for now.
+      
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
       ctx.strokeStyle = 'rgba(0,212,255,0.08)';
@@ -1128,7 +1157,7 @@ function App() {
   const quickAccess = ['SCREEN CAPTURE', 'OPEN BROWSER', 'FILE MANAGER'];
 
   return (
-    <div className="jarvis-container">
+    <div className={`jarvis-container ${isDiagnosticActive ? 'diagnostic-active' : ''} ${isSecurityAlert ? 'security-alert' : ''}`}>
       <canvas id="three-canvas" ref={threeCanvasRef}></canvas>
       <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
 
@@ -1258,17 +1287,25 @@ function App() {
             <div className="last-command" style={{ minHeight: '60px' }}>
               <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
             </div>
+          </div>
 
-            {(jarvisResponseStream || isMicrophoneActive) && (
-              <div style={{ marginTop: '15px' }}>
-                <div className="section-label" style={{ color: '#00ffe1' }}>SYSTEM RESPONSE</div>
-                <div className="last-command" style={{ borderColor: 'rgba(0, 255, 225, 0.3)' }}>
-                  <div className="command-content" style={{ color: '#00ffe1', fontSize: '12px', lineHeight: '1.4' }}>
-                    {jarvisResponseStream || (isMicrophoneActive ? '— LISTENING... —' : '— PROCESSING... —')}
-                  </div>
-                </div>
+          {/* ── PREMIUM RESPONSE TRANSCRIPT ── */}
+          <div className={`jarvis-transcript-container ${showResponsePanel ? 'visible' : ''}`}>
+            <div className="transcript-header">
+              <span className="transcript-dot"></span>
+              <span className="transcript-label">JARVIS VOCAL OUTPUT</span>
+            </div>
+            <div className="transcript-content">
+              {jarvisResponseStream || '...'}
+            </div>
+            <div className="transcript-footer">
+              <div className="audio-bars">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="audio-bar" style={{ height: `${2 + Math.random() * 8}px` }}></div>
+                ))}
               </div>
-            )}
+              <span className="encoding-tag">PCM-STREAM: ACTIVE</span>
+            </div>
           </div>
         </div>
 
@@ -1303,6 +1340,29 @@ function App() {
 
         {/* ROW 2: RIGHT PANEL */}
         <div className="grid-right">
+
+          {/* ── BIOMETRIC HUD PANEL ── */}
+          <div className={`panel-section biometric-panel ${biometricData.detected ? 'detected' : ''}`}>
+            <div className="section-label">BIOMETRIC SCAN</div>
+            <div className="biometric-hud">
+              <div className="bio-status-row">
+                <span className="bio-label">IDENTITY:</span>
+                <span className={`bio-value ${biometricData.name === 'Master' ? 'master' : (biometricData.detected ? 'alert' : '')}`}>
+                  {biometricData.detected ? biometricData.name.toUpperCase() : 'ABSENT'}
+                </span>
+              </div>
+              <div className="bio-status-row">
+                <span className="bio-label">SCAN LOCK:</span>
+                <div className="bio-lock-bar">
+                  <div className={`bio-lock-fill ${biometricData.detected ? 'active' : ''}`} style={{ width: biometricData.detected ? '100%' : '0%' }}></div>
+                </div>
+              </div>
+              <div className="bio-meta">
+                <span className="meta-tag">SECURE LINK</span>
+                <span className="meta-tag pulse">ENCRYPTED</span>
+              </div>
+            </div>
+          </div>
 
           {/* ── VISION INDICATOR ── */}
           <div className={`panel-section vision-panel ${isVisionScanning ? 'vision-active' : ''}`}>
