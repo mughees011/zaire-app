@@ -90,6 +90,7 @@ function App() {
   const [biometricData, setBiometricData] = useState({ detected: false, name: 'ABSENT', confidence: 0 });
   const [isSecurityAlert, setIsSecurityAlert] = useState(false);
   const [specialistData, setSpecialistData] = useState(null);
+  const [isGlitchActive, setIsGlitchActive] = useState(false);
   
   const [terminalLog, setTerminalLog] = useState([
     { time: '19:00', type: 'system', content: 'SYSTEM BOOT SEQUENCE INITIATED' },
@@ -206,6 +207,21 @@ function App() {
 
     socketRef.current.on('connect', () => {
       console.log('[SOCKET] Connected to backend');
+      // Request state sync just in case
+      socketRef.current.emit('REQUEST_SYNC');
+    });
+
+    socketRef.current.on('MODE_SYNC', (data) => {
+      console.log('[SOCKET] System Sync:', data.mode);
+      if (data.mode) {
+        handleModeSync(data.mode);
+      }
+    });
+
+    socketRef.current.on('ai_error', (data) => {
+      console.error('[SOCKET] AI Error:', data.message);
+      setIsGlitchActive(true);
+      setTimeout(() => setIsGlitchActive(false), 3000);
     });
 
     socketRef.current.on('connect_error', (err) => {
@@ -369,6 +385,22 @@ function App() {
     setBlobColor(colors.primary);
     
     // Update CSS variables globally
+    document.documentElement.style.setProperty('--primary', colors.primary);
+    document.documentElement.style.setProperty('--accent', colors.accent);
+  };
+
+  const handleModeSync = (newMode) => {
+    setActiveMode(newMode);
+    
+    const modeColors = {
+      'JARVIS':    { primary: '#00d4ff', accent: '#00d4ff' },
+      'TRADER':    { primary: '#00ff88', accent: '#ffaa00' },
+      'PROFESSOR': { primary: '#a78bfa', accent: '#60a5fa' },
+      'ENGINEER':  { primary: '#f97316', accent: '#facc15' }
+    };
+
+    const colors = modeColors[newMode] || modeColors['JARVIS'];
+    setBlobColor(colors.primary);
     document.documentElement.style.setProperty('--primary', colors.primary);
     document.documentElement.style.setProperty('--accent', colors.accent);
   };
@@ -1205,7 +1237,7 @@ function App() {
   const quickAccess = ['SCREEN CAPTURE', 'OPEN BROWSER', 'FILE MANAGER'];
 
   return (
-    <div className={`jarvis-container ${isDiagnosticActive ? 'diagnostic-active' : ''} ${isSecurityAlert ? 'security-alert' : ''}`}>
+    <div className={`jarvis-container ${isDiagnosticActive ? 'diagnostic-active' : ''} ${isSecurityAlert ? 'security-alert' : ''} ${isGlitchActive ? 'glitch-active' : ''}`}>
       <canvas id="three-canvas" ref={threeCanvasRef}></canvas>
       <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
 
