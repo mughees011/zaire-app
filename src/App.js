@@ -21,7 +21,7 @@ function App() {
   const dragStateRef = useRef({ isPointerDown: false, tempPosition: { x: 0, y: 0 } });
 
   const [bootText, setBootText] = useState('INITIALIZING SYSTEM...');
-  const [activeMode, setActiveMode] = useState('VOICE');
+  const [activeMode, setActiveMode] = useState('JARVIS');
   const [timeStr, setTimeStr] = useState('00:00:00');
   const [navItem, setNavItem] = useState('HOME');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -89,6 +89,7 @@ function App() {
   // Biometric State
   const [biometricData, setBiometricData] = useState({ detected: false, name: 'ABSENT', confidence: 0 });
   const [isSecurityAlert, setIsSecurityAlert] = useState(false);
+  const [specialistData, setSpecialistData] = useState(null);
   
   const [terminalLog, setTerminalLog] = useState([
     { time: '19:00', type: 'system', content: 'SYSTEM BOOT SEQUENCE INITIATED' },
@@ -324,6 +325,53 @@ function App() {
       clearInterval(biometricInterval);
     }
   }, []);
+
+  // Poll for specialist data
+  useEffect(() => {
+    if (activeMode === 'JARVIS') {
+      setSpecialistData(null);
+      return;
+    }
+    
+    const fetchSpecialistData = async () => {
+      try {
+        const res = await fetch(`http://localhost:3002/agent/mode_data?mode=${activeMode}`);
+        const data = await res.json();
+        if (data.success) {
+          setSpecialistData(data.data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch specialist data:', e);
+      }
+    };
+    
+    fetchSpecialistData();
+    const interval = setInterval(fetchSpecialistData, 5000);
+    return () => clearInterval(interval);
+  }, [activeMode]);
+
+  // Handle Mode Change with Color Shift
+  const handleModeChange = (newMode) => {
+    setActiveMode(newMode);
+    if (socketRef.current) {
+      socketRef.current.emit('MODE_CHANGE', { mode: newMode });
+    }
+
+    // Color Mapping
+    const modeColors = {
+      'JARVIS':    { primary: '#00d4ff', accent: '#00d4ff' },
+      'TRADER':    { primary: '#00ff88', accent: '#ffaa00' },
+      'PROFESSOR': { primary: '#a78bfa', accent: '#60a5fa' },
+      'ENGINEER':  { primary: '#f97316', accent: '#facc15' }
+    };
+
+    const colors = modeColors[newMode] || modeColors['JARVIS'];
+    setBlobColor(colors.primary);
+    
+    // Update CSS variables globally
+    document.documentElement.style.setProperty('--primary', colors.primary);
+    document.documentElement.style.setProperty('--accent', colors.accent);
+  };
   useEffect(() => {
     localStorage.setItem('blobColor', blobColor);
     localStorage.setItem('blobSize', blobSize.toString());
@@ -1145,7 +1193,7 @@ function App() {
     return () => cancelAnimationFrame(animationId);
   }, []);
 
-  const modes = ['VOICE', 'AGENT', 'FOCUS', 'STEALTH'];
+  const modes = ['JARVIS', 'TRADER', 'PROFESSOR', 'ENGINEER'];
   const navItems = ['HOME', 'DASHBOARD', 'COMMAND', 'MEMORY', 'NEURAL'];
   const modules = [
     { name: 'VISION', status: 'READY' },
@@ -1215,35 +1263,111 @@ function App() {
                 <div
                   key={mode}
                   className={`mode-btn ${activeMode === mode ? 'active' : ''}`}
-                  onClick={() => setActiveMode(mode)}
+                  onClick={() => handleModeChange(mode)}
+                  style={activeMode === mode ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : {}}
                 >
                   <span className="mode-text">{mode}</span>
-                  {activeMode === mode && <div className="mode-dot"></div>}
+                  {activeMode === mode && <div className="mode-dot" style={{ background: 'var(--primary)' }}></div>}
                 </div>
               ))}
             </div>
           </div>
 
           <div className="panel-section">
-            <div className="section-label">SYSTEM VITALS</div>
-            <div className="vitals-bars">
-              <div className="vital-row">
-                <span className="vital-label">CPU</span>
-                <div className="vital-bar"><div className="vital-fill" style={{ width: '62%' }}></div></div>
-              </div>
-              <div className="vital-row">
-                <span className="vital-label">MEM</span>
-                <div className="vital-bar"><div className="vital-fill" style={{ width: '78%' }}></div></div>
-              </div>
-              <div className="vital-row">
-                <span className="vital-label gpu">GPU</span>
-                <div className="vital-bar gpu"><div className="vital-fill" style={{ width: '45%' }}></div></div>
-              </div>
-              <div className="vital-row">
-                <span className="vital-label net">NET</span>
-                <div className="vital-bar net"><div className="vital-fill" style={{ width: '33%' }}></div></div>
-              </div>
+            <div className="section-label">
+              {activeMode === 'JARVIS' && 'SYSTEM VITALS'}
+              {activeMode === 'TRADER' && 'PORTFOLIO'}
+              {activeMode === 'PROFESSOR' && 'STUDY TRACKER'}
+              {activeMode === 'ENGINEER' && 'ACTIVE PROJECT'}
             </div>
+            
+            {activeMode === 'JARVIS' && (
+              <div className="vitals-bars">
+                <div className="vital-row">
+                  <span className="vital-label">CPU</span>
+                  <div className="vital-bar"><div className="vital-fill" style={{ width: '62%' }}></div></div>
+                </div>
+                <div className="vital-row">
+                  <span className="vital-label">MEM</span>
+                  <div className="vital-bar"><div className="vital-fill" style={{ width: '78%' }}></div></div>
+                </div>
+                <div className="vital-row">
+                  <span className="vital-label gpu">GPU</span>
+                  <div className="vital-bar gpu"><div className="vital-fill" style={{ width: '45%' }}></div></div>
+                </div>
+                <div className="vital-row">
+                  <span className="vital-label net">NET</span>
+                  <div className="vital-bar net"><div className="vital-fill" style={{ width: '33%' }}></div></div>
+                </div>
+              </div>
+            )}
+
+            {activeMode === 'TRADER' && specialistData && (
+              <div className="specialist-hud trader-hud">
+                <div className="mini-holdings">
+                  {specialistData.portfolio?.map(h => (
+                    <div key={h.asset} className="holding-row">
+                      <span>{h.asset}</span>
+                      <span className="holding-val">{parseFloat(h.free).toFixed(4)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="market-pulse">
+                  <div className="pulse-item">
+                    <span>BTC</span>
+                    <span className={specialistData.market?.btc?.usd_24h_change > 0 ? 'up' : 'down'}>
+                      ${specialistData.market?.btc?.usd?.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="pulse-item">
+                    <span>SENTIMENT</span>
+                    <span className="sentiment">{specialistData.market?.sentiment}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeMode === 'PROFESSOR' && specialistData && (
+              <div className="specialist-hud professor-hud">
+                <div className="study-stats">
+                  <div className="stat-box">
+                    <span className="stat-label">TOPICS WK</span>
+                    <span className="stat-val">{specialistData.stats?.topics_week}</span>
+                  </div>
+                  <div className="stat-box">
+                    <span className="stat-label">STREAK</span>
+                    <span className="stat-val">{specialistData.stats?.streak}d</span>
+                  </div>
+                </div>
+                <div className="curriculum-dots">
+                  {specialistData.curriculum?.map(c => (
+                    <div key={c.name} className="curr-item">
+                      <div className={`curr-dot ${c.status}`}></div>
+                      <span>{c.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeMode === 'ENGINEER' && specialistData && (
+              <div className="specialist-hud engineer-hud">
+                <div className="project-header">
+                  <span className="proj-name">{specialistData.name}</span>
+                  <span className={`status-tag ${specialistData.server === 'RUNNING' ? 'alive' : ''}`}>{specialistData.server}</span>
+                </div>
+                <div className="git-mini">
+                  <div className="git-row">
+                    <span className="label">BRANCH</span>
+                    <span className="val">{specialistData.git?.branch}</span>
+                  </div>
+                  <div className="git-row">
+                    <span className="label">CHANGES</span>
+                    <span className="val">{specialistData.git?.changes}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="panel-section">
