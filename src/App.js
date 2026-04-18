@@ -20,7 +20,6 @@ function App() {
   const cameraRef = useRef(null);
   const dragStateRef = useRef({ isPointerDown: false, tempPosition: { x: 0, y: 0 } });
 
-  const [bootText, setBootText] = useState('INITIALIZING SYSTEM...');
   const [activeMode, setActiveMode] = useState('JARVIS');
   const [timeStr, setTimeStr] = useState('00:00:00');
   const [navItem, setNavItem] = useState('HOME');
@@ -44,7 +43,7 @@ function App() {
     return saved ? JSON.parse(saved) : { x: 0, y: 0 };
   });
 
-  const [activityFeed, setActivityFeed] = useState([
+  const [activityFeed] = useState([
     { time: '15:47', message: 'System boot complete' },
     { time: '15:46', message: 'Neural core initialized' },
     { time: '15:45', message: 'Voice synthesis online' },
@@ -62,7 +61,6 @@ function App() {
   const audioStreamRef = useRef(null);
   const recognitionRef = useRef(null);
   const [lastCommand, setLastCommand] = useState('');
-  const [lastCommandTime, setLastCommandTime] = useState('');
   const [sessionUptime, setSessionUptime] = useState(0);
   const [recognizedText, setRecognizedText] = useState('');
   const [finalRecognizedText, setFinalRecognizedText] = useState('');
@@ -91,12 +89,11 @@ function App() {
   const [isSecurityAlert, setIsSecurityAlert] = useState(false);
   const [specialistData, setSpecialistData] = useState(null);
   const [isGlitchActive, setIsGlitchActive] = useState(false);
-  
-  const [terminalLog, setTerminalLog] = useState([
-    { time: '19:00', type: 'system', content: 'SYSTEM BOOT SEQUENCE INITIATED' },
-    { time: '19:00', type: 'system', content: 'NEURAL CORE LOADED' },
-    { time: '19:00', type: 'system', content: 'VOICE INTERFACE ONLINE' },
-  ]);
+  const [isDigesting, setIsDigesting] = useState(false);
+  const [digestionProgress, setDigestionProgress] = useState(0);
+  const [artifactTokens, setArtifactTokens] = useState([]);
+  const fileInputRef = useRef(null);
+
 
   const audioQueueRef = useRef({}); // Using object keyed by index for O(1) lookups
   const isPlayingAudioRef = useRef(false);
@@ -104,15 +101,15 @@ function App() {
 
   const playNextAudioChunk = async () => {
     if (isPlayingAudioRef.current) return;
-    
+
     const nextIndex = nextExpectedIndexRef.current;
     const chunk = audioQueueRef.current[nextIndex];
-    
+
     if (!chunk) {
       console.log(`[TTS] Sequence break - waiting for chunk ${nextIndex}`);
-      return; 
+      return;
     }
-    
+
     // Safety check for valid audio data
     if (!chunk.audio) {
       console.error('[TTS] Null audio in chunk, skipping:', nextIndex);
@@ -140,7 +137,7 @@ function App() {
       const blob = new Blob([audioData], { type: 'audio/mpeg' });
       url = URL.createObjectURL(blob);
       const audio = new Audio(url);
-      
+
       const onFinished = () => {
         if (url) URL.revokeObjectURL(url);
         delete audioQueueRef.current[nextIndex];
@@ -173,11 +170,11 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, pitch: '+0Hz', rate: '+5%' })
       });
-      
+
       if (!response.ok) {
         throw new Error(`TTS HTTP error: ${response.status}`);
       }
-      
+
       const arrayBuffer = await response.arrayBuffer();
       return new Uint8Array(arrayBuffer);
     } catch (err) {
@@ -193,7 +190,7 @@ function App() {
       .then(data => {
         if (Array.isArray(data)) setStoredMemories(data.slice(0, 5));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -231,7 +228,7 @@ function App() {
     socketRef.current.on('ai_text_delta', (delta) => {
       setJarvisResponseStream(prev => prev + delta);
       setShowResponsePanel(true);
-      
+
       // Reset fade timeout
       if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
       responseTimeoutRef.current = setTimeout(() => {
@@ -242,7 +239,7 @@ function App() {
 
     socketRef.current.on('audio_chunk', (data) => {
       console.log('[SOCKET] Received audio_chunk:', data.index);
-      
+
       // If we get index 0, it's a new interaction, reset the sequence!
       if (data.index === 0) {
         console.log('[TTS] Sequence Reset detected (index 0)');
@@ -260,10 +257,10 @@ function App() {
     // Handle text chunks - fetch audio via HTTP for each chunk
     socketRef.current.on('text_chunks', async ({ chunks }) => {
       console.log('[SOCKET] Received text_chunks:', chunks.length);
-      
+
       // New interaction, reset sequence
       nextExpectedIndexRef.current = 0;
-      
+
       for (const chunk of chunks) {
         const audioData = await fetchTTSAudio(chunk.text);
         if (audioData) {
@@ -292,10 +289,8 @@ function App() {
     });
 
     // Neural Log events from Agent Daemon
-    socketRef.current.on('neural_log', ({ content }) => {
-      const now = new Date();
-      const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
-      setTerminalLog(prev => [...prev, { time, type: 'system', content: content.toUpperCase() }].slice(-50));
+    socketRef.current.on('neural_log', () => {
+      // Logic for log persistence handled via backend/memory
     });
 
     // System action events (mouse/keyboard)
@@ -322,7 +317,7 @@ function App() {
         const res = await fetch('http://localhost:3003/status');
         const data = await res.json();
         setBiometricData(data);
-        
+
         // Security Alert if Unknown detected
         if (data.detected && (data.name === 'Unknown' || data.name === 'Security Alert')) {
           setIsSecurityAlert(true);
@@ -340,6 +335,7 @@ function App() {
       if (socketRef.current) socketRef.current.disconnect();
       clearInterval(biometricInterval);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Poll for specialist data
@@ -348,7 +344,7 @@ function App() {
       setSpecialistData(null);
       return;
     }
-    
+
     const fetchSpecialistData = async () => {
       try {
         const res = await fetch(`http://localhost:3002/agent/mode_data?mode=${activeMode}`);
@@ -360,7 +356,7 @@ function App() {
         console.error('Failed to fetch specialist data:', e);
       }
     };
-    
+
     fetchSpecialistData();
     const interval = setInterval(fetchSpecialistData, 5000);
     return () => clearInterval(interval);
@@ -375,15 +371,15 @@ function App() {
 
     // Color Mapping
     const modeColors = {
-      'JARVIS':    { primary: '#00d4ff', accent: '#00d4ff' },
-      'TRADER':    { primary: '#00ff88', accent: '#ffaa00' },
+      'JARVIS': { primary: '#00d4ff', accent: '#00d4ff' },
+      'TRADER': { primary: '#00ff88', accent: '#ffaa00' },
       'PROFESSOR': { primary: '#a78bfa', accent: '#60a5fa' },
-      'ENGINEER':  { primary: '#f97316', accent: '#facc15' }
+      'ENGINEER': { primary: '#f97316', accent: '#facc15' }
     };
 
     const colors = modeColors[newMode] || modeColors['JARVIS'];
     setBlobColor(colors.primary);
-    
+
     // Update CSS variables globally
     document.documentElement.style.setProperty('--primary', colors.primary);
     document.documentElement.style.setProperty('--accent', colors.accent);
@@ -391,12 +387,12 @@ function App() {
 
   const handleModeSync = (newMode) => {
     setActiveMode(newMode);
-    
+
     const modeColors = {
-      'JARVIS':    { primary: '#00d4ff', accent: '#00d4ff' },
-      'TRADER':    { primary: '#00ff88', accent: '#ffaa00' },
+      'JARVIS': { primary: '#00d4ff', accent: '#00d4ff' },
+      'TRADER': { primary: '#00ff88', accent: '#ffaa00' },
       'PROFESSOR': { primary: '#a78bfa', accent: '#60a5fa' },
-      'ENGINEER':  { primary: '#f97316', accent: '#facc15' }
+      'ENGINEER': { primary: '#f97316', accent: '#facc15' }
     };
 
     const colors = modeColors[newMode] || modeColors['JARVIS'];
@@ -482,17 +478,15 @@ function App() {
           (text) => {
             console.log('Groq transcript received:', text);
             setGroqStatus('Transcribed!');
-            const now = new Date();
-            const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
             setFinalRecognizedText(text);
 
             // Send to Real-time Backend
             setJarvisResponseStream('');
             if (socketRef.current) {
-              socketRef.current.emit('user_message', text);
+              socketRef.current.emit('user_message', text, { artifactTokens });
             }
 
-            setTerminalLog(prev => [...prev, { time, type: 'input', content: text.toUpperCase() }]);
+            setLastCommand(text);
             setTimeout(() => setFinalRecognizedText(''), 2000);
           },
           (interim) => {
@@ -567,6 +561,7 @@ function App() {
     }
 
     const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 5;
@@ -601,19 +596,10 @@ function App() {
     recognition.onresult = (event) => {
       let interimTranscript = '';
       let finalTranscript = '';
-      let bestConfidence = 0;
-      let bestTranscript = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         const transcript = result[0].transcript;
-        const confidence = result[0].confidence || 0;
-
-        // Get the best alternative
-        if (confidence > bestConfidence) {
-          bestConfidence = confidence;
-          bestTranscript = transcript;
-        }
 
         if (result.isFinal) {
           finalTranscript += transcript + ' ';
@@ -631,12 +617,10 @@ function App() {
         // Send to Real-time Backend
         setJarvisResponseStream('');
         if (socketRef.current) {
-          socketRef.current.emit('user_message', text);
+          socketRef.current.emit('user_message', text, { artifactTokens });
         }
 
-        const now = new Date();
-        const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
-        setTerminalLog(prev => [...prev, { time, type: 'input', content: text.toUpperCase() }]);
+        setLastCommand(text);
 
         setTimeout(() => {
           setFinalRecognizedText('');
@@ -655,16 +639,16 @@ function App() {
 
     recognition.onend = () => {
       console.log('[SPEECH] Recognition service disconnected');
-      
+
       // If the microphone should be active, try to restart with a safe delay
       if (isMicrophoneActiveRef.current) {
         console.log('[SPEECH] Waiting for stable audio channel before restart...');
-        
+
         // Use a longer delay to prevent the 'aborted' infinite loop
         setTimeout(() => {
           if (isMicrophoneActiveRef.current) {
-            try { 
-              recognition.start(); 
+            try {
+              recognition.start();
               console.log('[SPEECH] Voice link re-established.');
             } catch (e) {
               // If the object is in a bad state, do a full reset
@@ -676,61 +660,111 @@ function App() {
       }
     };
 
+    recognition.start();
+  };
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    setIsDigesting(true);
+    setDigestionProgress(0);
+
+    const formData = new FormData();
+    files.forEach(file => formData.append('artifacts', file));
+
     try {
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (e) {
-      console.error('Failed to start recognition:', e);
+      // Simulate/Show progress
+      const interval = setInterval(() => {
+        setDigestionProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(interval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
+      const response = await fetch('http://localhost:3001/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      clearInterval(interval);
+      setDigestionProgress(100);
+
+      const result = await response.json();
+      if (result.success) {
+        setArtifactTokens(prev => [...prev, ...result.manifest]);
+        // Switch mode to ARTIFACT if it's the first upload
+        if (activeMode !== 'ARTIFACT') {
+          handleModeChange('ARTIFACT');
+        }
+      }
+    } catch (err) {
+      console.error('[UPLINK] Upload failed:', err);
+    } finally {
+      setTimeout(() => {
+        setIsDigesting(false);
+        setDigestionProgress(0);
+      }, 1000);
     }
   };
 
-  const stopMicrophone = () => {
-    setGroqStatus('');
-    if (groqSpeechRef.current) {
-      groqSpeechRef.current.stop();
-      groqSpeechRef.current = null;
-    }
-    if (audioStreamRef.current) {
-      audioStreamRef.current.getTracks().forEach(track => track.stop());
-      audioStreamRef.current = null;
-    }
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) { }
-      recognitionRef.current = null;
-    }
-    setIsMicrophoneActive(false);
-    setRecognizedText('');
-  };
-
-  const toggleMicrophone = () => {
-    if (isMicrophoneActive) {
-      stopMicrophone();
-    } else {
-      initializeMicrophone();
+  const removeArtifact = (index) => {
+    setArtifactTokens(prev => prev.filter((_, i) => i !== index));
+    if (activeMode === 'ARTIFACT' && artifactTokens.length <= 1) {
+      handleModeChange('JARVIS');
     }
   };
 
-  useEffect(() => {
-    const params = {
-      timeScale: 0.78,
-      rotationSpeedX: 0.0012,
-      rotationSpeedY: 0.004,
-      plasmaScale: 0.1504,
-      plasmaBrightness: 1.5,
-      voidThreshold: 0.05,
-      colorDeep: 0x000833,
-      colorMid: 0x0044ff,
-      colorBright: 0x00ccff,
-      shellColor: 0x0088ff,
-      shellOpacity: 0.35
-    };
+const stopMicrophone = () => {
+  setGroqStatus('');
+  if (groqSpeechRef.current) {
+    groqSpeechRef.current.stop();
+    groqSpeechRef.current = null;
+  }
+  if (audioStreamRef.current) {
+    audioStreamRef.current.getTracks().forEach(track => track.stop());
+    audioStreamRef.current = null;
+  }
+  if (recognitionRef.current) {
+    try {
+      recognitionRef.current.stop();
+    } catch (e) { }
+    recognitionRef.current = null;
+  }
+  setIsMicrophoneActive(false);
+  setRecognizedText('');
+};
 
-    // Use the state blobColor, not localStorage - this is reactively updated when color picker changes
-    const blobColorToUse = blobColor || DEFAULT_BLOB_COLOR;
+const toggleMicrophone = () => {
+  if (isMicrophoneActive) {
+    stopMicrophone();
+  } else {
+    initializeMicrophone();
+  }
+};
 
-    const noiseFunctions = `
+useEffect(() => {
+  const params = {
+    timeScale: 0.78,
+    rotationSpeedX: 0.0012,
+    rotationSpeedY: 0.004,
+    plasmaScale: 0.1504,
+    plasmaBrightness: 1.5,
+    voidThreshold: 0.05,
+    colorDeep: 0x000833,
+    colorMid: 0x0044ff,
+    colorBright: 0x00ccff,
+    shellColor: 0x0088ff,
+    shellOpacity: 0.35
+  };
+
+  // Use the state blobColor, not localStorage - this is reactively updated when color picker changes
+  const blobColorToUse = blobColor || DEFAULT_BLOB_COLOR;
+
+  const noiseFunctions = `
       vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
       vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
       vec4 permute(vec4 x){return mod289(((x*34.)+1.)*x);}
@@ -784,38 +818,38 @@ function App() {
       }
     `;
 
-    const canvas = threeCanvasRef.current;
-    if (!canvas) return;
+  const canvas = threeCanvasRef.current;
+  if (!canvas) return;
 
-    const scene = new THREE.Scene();
-    scene.background = null;
+  const scene = new THREE.Scene();
+  scene.background = null;
 
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.z = 4.2;
-    cameraRef.current = camera;
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.z = 4.2;
+  cameraRef.current = camera;
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.9;
-    renderer.setClearColor(0x000000, 0);
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.9;
+  renderer.setClearColor(0x000000, 0);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.enablePan = false;
-    controls.minDistance = 1.5;
-    controls.maxDistance = 6;
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.enablePan = false;
+  controls.minDistance = 1.5;
+  controls.maxDistance = 6;
 
-    const mainGroup = new THREE.Group();
-    scene.add(mainGroup);
-    mainGroupRef.current = mainGroup;
+  const mainGroup = new THREE.Group();
+  scene.add(mainGroup);
+  mainGroupRef.current = mainGroup;
 
-    const pointLight = new THREE.PointLight(0x0088ff, 2.0, 10);
-    mainGroup.add(pointLight);
+  const pointLight = new THREE.PointLight(0x0088ff, 2.0, 10);
+  mainGroup.add(pointLight);
 
-    const shellGeo = new THREE.SphereGeometry(1.0, 64, 64);
-    const shellVert = `
+  const shellGeo = new THREE.SphereGeometry(1.0, 64, 64);
+  const shellVert = `
       varying vec3 vNormal;
       varying vec3 vViewPosition;
       void main(){
@@ -824,7 +858,7 @@ function App() {
         vViewPosition=-mvPosition.xyz;
         gl_Position=projectionMatrix*mvPosition;
       }`;
-    const shellFrag = `
+  const shellFrag = `
       varying vec3 vNormal;
       varying vec3 vViewPosition;
       uniform vec3 uColor;
@@ -834,35 +868,35 @@ function App() {
         gl_FragColor=vec4(uColor,fresnel*uOpacity);
       }`;
 
-    const shellBackMat = new THREE.ShaderMaterial({
-      vertexShader: shellVert, fragmentShader: shellFrag,
-      uniforms: { uColor: { value: new THREE.Color(0x000055) }, uOpacity: { value: 0.3 } },
-      transparent: true, blending: THREE.AdditiveBlending, side: THREE.BackSide, depthWrite: false
-    });
-    const shellFrontMat = new THREE.ShaderMaterial({
-      vertexShader: shellVert, fragmentShader: shellFrag,
-      uniforms: { uColor: { value: new THREE.Color(params.shellColor) }, uOpacity: { value: params.shellOpacity } },
-      transparent: true, blending: THREE.AdditiveBlending, side: THREE.FrontSide, depthWrite: false
-    });
-    mainGroup.add(new THREE.Mesh(shellGeo, shellBackMat));
-    mainGroup.add(new THREE.Mesh(shellGeo, shellFrontMat));
+  const shellBackMat = new THREE.ShaderMaterial({
+    vertexShader: shellVert, fragmentShader: shellFrag,
+    uniforms: { uColor: { value: new THREE.Color(0x000055) }, uOpacity: { value: 0.3 } },
+    transparent: true, blending: THREE.AdditiveBlending, side: THREE.BackSide, depthWrite: false
+  });
+  const shellFrontMat = new THREE.ShaderMaterial({
+    vertexShader: shellVert, fragmentShader: shellFrag,
+    uniforms: { uColor: { value: new THREE.Color(params.shellColor) }, uOpacity: { value: params.shellOpacity } },
+    transparent: true, blending: THREE.AdditiveBlending, side: THREE.FrontSide, depthWrite: false
+  });
+  mainGroup.add(new THREE.Mesh(shellGeo, shellBackMat));
+  mainGroup.add(new THREE.Mesh(shellGeo, shellFrontMat));
 
-    const plasmaGeo = new THREE.SphereGeometry(0.998, 128, 128);
-    const plasmaMat = new THREE.ShaderMaterial({
-      uniforms: {
-        uTime: { value: 0 },
-        uScale: { value: params.plasmaScale },
-        uBrightness: { value: params.plasmaBrightness },
-        uThreshold: { value: params.voidThreshold },
-        uColorDeep: { value: new THREE.Color(params.colorDeep) },
-        uColorMid: { value: new THREE.Color(params.colorMid) },
-        uColorBright: { value: new THREE.Color(params.colorBright) },
-        uAudioBass: { value: 0 },
-        uAudioMid: { value: 0 },
-        uAudioTreble: { value: 0 },
-        uAudioIntensity: { value: 0 }
-      },
-      vertexShader: `
+  const plasmaGeo = new THREE.SphereGeometry(0.998, 128, 128);
+  const plasmaMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uScale: { value: params.plasmaScale },
+      uBrightness: { value: params.plasmaBrightness },
+      uThreshold: { value: params.voidThreshold },
+      uColorDeep: { value: new THREE.Color(params.colorDeep) },
+      uColorMid: { value: new THREE.Color(params.colorMid) },
+      uColorBright: { value: new THREE.Color(params.colorBright) },
+      uAudioBass: { value: 0 },
+      uAudioMid: { value: 0 },
+      uAudioTreble: { value: 0 },
+      uAudioIntensity: { value: 0 }
+    },
+    vertexShader: `
         uniform float uAudioBass;
         uniform float uAudioMid;
         uniform float uAudioTreble;
@@ -882,7 +916,7 @@ function App() {
           vViewPosition=-mvPosition.xyz;
           gl_Position=projectionMatrix*mvPosition;
         }`,
-      fragmentShader: `
+    fragmentShader: `
         uniform float uTime;
         uniform float uScale;
         uniform float uBrightness;
@@ -919,43 +953,43 @@ function App() {
           float finalAlpha=alpha*(.02+.98*depthFactor)*(1.+audioBoost*0.5);
           gl_FragColor=vec4(color*uBrightness*(1.+audioBoost*0.3),finalAlpha);
         }`,
-      transparent: true, blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide, depthWrite: false
-    });
-    const plasmaMesh = new THREE.Mesh(plasmaGeo, plasmaMat);
-    mainGroup.add(plasmaMesh);
+    transparent: true, blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide, depthWrite: false
+  });
+  const plasmaMesh = new THREE.Mesh(plasmaGeo, plasmaMat);
+  mainGroup.add(plasmaMesh);
 
-    mainGroupRef.current = mainGroup;
-    uniformsRef.current = plasmaMat.uniforms;
+  mainGroupRef.current = mainGroup;
+  uniformsRef.current = plasmaMat.uniforms;
 
-    mainGroup.scale.set(blobSize, blobSize, blobSize);
-    mainGroup.position.set(blobPosition.x, blobPosition.y, 0);
-    const initialBase = new THREE.Color(blobColorToUse);
-    const idxHsl = {};
-    initialBase.getHSL(idxHsl);
-    plasmaMat.uniforms.uColorBright.value = initialBase.clone();
-    plasmaMat.uniforms.uColorMid.value = new THREE.Color(0x0044ff);
-    plasmaMat.uniforms.uColorDeep.value = new THREE.Color(0x000833);
+  mainGroup.scale.set(blobSize, blobSize, blobSize);
+  mainGroup.position.set(blobPosition.x, blobPosition.y, 0);
+  const initialBase = new THREE.Color(blobColorToUse);
+  const idxHsl = {};
+  initialBase.getHSL(idxHsl);
+  plasmaMat.uniforms.uColorBright.value = initialBase.clone();
+  plasmaMat.uniforms.uColorMid.value = new THREE.Color(0x0044ff);
+  plasmaMat.uniforms.uColorDeep.value = new THREE.Color(0x000833);
 
-    const pCount = 600;
-    const pPos = new Float32Array(pCount * 3);
-    const pSizes = new Float32Array(pCount);
-    const sR = 0.95;
-    for (let i = 0; i < pCount; i++) {
-      const r = sR * Math.cbrt(Math.random());
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      pPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      pPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      pPos[i * 3 + 2] = r * Math.cos(phi);
-      pSizes[i] = Math.random();
-    }
-    const pGeo = new THREE.BufferGeometry();
-    pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-    pGeo.setAttribute('aSize', new THREE.BufferAttribute(pSizes, 1));
-    const pMat = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0xffffff) } },
-      vertexShader: `
+  const pCount = 600;
+  const pPos = new Float32Array(pCount * 3);
+  const pSizes = new Float32Array(pCount);
+  const sR = 0.95;
+  for (let i = 0; i < pCount; i++) {
+    const r = sR * Math.cbrt(Math.random());
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    pPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    pPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    pPos[i * 3 + 2] = r * Math.cos(phi);
+    pSizes[i] = Math.random();
+  }
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+  pGeo.setAttribute('aSize', new THREE.BufferAttribute(pSizes, 1));
+  const pMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0xffffff) } },
+    vertexShader: `
         uniform float uTime;
         attribute float aSize;
         varying float vAlpha;
@@ -969,7 +1003,7 @@ function App() {
           gl_PointSize=baseSize*(1./-mvPosition.z);
           vAlpha=.8+.2*sin(uTime+aSize*10.);
         }`,
-      fragmentShader: `
+    fragmentShader: `
         uniform vec3 uColor;
         varying float vAlpha;
         void main(){
@@ -978,495 +1012,495 @@ function App() {
           float glow=pow(1.-length(uv)*2.,1.8);
           gl_FragColor=vec4(uColor,glow*vAlpha);
         }`,
-      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
-    });
-    mainGroup.add(new THREE.Points(pGeo, pMat));
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  mainGroup.add(new THREE.Points(pGeo, pMat));
 
-    const gridCanvas = gridCanvasRef.current;
-    if (!gridCanvas) return;
-    const gCtx = gridCanvas.getContext('2d');
+  const gridCanvas = gridCanvasRef.current;
+  if (!gridCanvas) return;
+  const gCtx = gridCanvas.getContext('2d');
 
-    const initGrid = () => {
-      gridCanvas.width = window.innerWidth;
-      gridCanvas.height = window.innerHeight;
-    };
-
-    const drawGrid = (t) => {
-      const W = gridCanvas.width, H = gridCanvas.height;
-      gCtx.clearRect(0, 0, W, H);
-      const vx = W / 2, vy = H * 0.72, horizonY = H * 0.42;
-
-      const lCount = 24;
-      for (let i = 0; i <= lCount; i++) {
-        const frac = i / lCount;
-        const x = -W * 0.35 + frac * W * 1.7;
-        const op = 0.025 + Math.pow(frac > 0.5 ? 1 - frac : frac, 1.5) * 0.055;
-        gCtx.strokeStyle = `rgba(0,180,255,${op})`;
-        gCtx.lineWidth = 0.5;
-        gCtx.beginPath();
-        gCtx.moveTo(x, H);
-        gCtx.lineTo(vx + (x - vx) * 0.015, horizonY);
-        gCtx.stroke();
-      }
-
-      const hCount = 16;
-      for (let i = 0; i <= hCount; i++) {
-        const frac = i / hCount;
-        const scrollFrac = (frac + t * 0.04) % 1;
-        const y = horizonY + Math.pow(scrollFrac, 2.0) * (H - horizonY);
-        const xSpread = ((y - horizonY) / (H - horizonY)) * W * 0.68;
-        const op = Math.pow(scrollFrac, 0.9) * 0.07;
-        gCtx.strokeStyle = `rgba(0,180,255,${op})`;
-        gCtx.lineWidth = 0.5;
-        gCtx.beginPath();
-        gCtx.moveTo(vx - xSpread, y);
-        gCtx.lineTo(vx + xSpread, y);
-        gCtx.stroke();
-      }
-    };
-
-    const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      initGrid();
-    };
-    window.addEventListener('resize', handleResize);
-
-    initGrid();
-    const clock = new THREE.Clock();
-    let animationId;
-
-    const animate = () => {
-      animationId = requestAnimationFrame(animate);
-      const t = clock.getElapsedTime();
-
-      // Get audio frequency data if microphone is active
-      let audioIntensity = 0;
-      if (analyserRef.current && dataArrayRef.current) {
-        analyserRef.current.getByteFrequencyData(dataArrayRef.current);
-        const total = dataArrayRef.current.length;
-
-        // Split into frequency bands: bass, low-mid, mid, high-mid, treble
-        const bassBins = dataArrayRef.current.slice(0, Math.floor(total * 0.2));
-        const lowMidBins = dataArrayRef.current.slice(Math.floor(total * 0.2), Math.floor(total * 0.4));
-        const midBins = dataArrayRef.current.slice(Math.floor(total * 0.4), Math.floor(total * 0.6));
-        const highMidBins = dataArrayRef.current.slice(Math.floor(total * 0.6), Math.floor(total * 0.8));
-        const trebleBins = dataArrayRef.current.slice(Math.floor(total * 0.8));
-
-        // Average each band
-        const bassAvg = (bassBins.reduce((a, b) => a + b, 0) / bassBins.length) / 255;
-        const lowMidAvg = (lowMidBins.reduce((a, b) => a + b, 0) / lowMidBins.length) / 255;
-        const midAvg = (midBins.reduce((a, b) => a + b, 0) / midBins.length) / 255;
-        const highMidAvg = (highMidBins.reduce((a, b) => a + b, 0) / highMidBins.length) / 255;
-        const trebleAvg = (trebleBins.reduce((a, b) => a + b, 0) / trebleBins.length) / 255;
-
-        // Store in ref for shader
-        frequencyBandsRef.current = [bassAvg, lowMidAvg, midAvg, highMidAvg, trebleAvg];
-        audioIntensity = (bassAvg + lowMidAvg + midAvg) / 3;
-        setAudioFrequency(audioIntensity);
-      }
-
-      plasmaMat.uniforms.uTime.value = t * params.timeScale;
-      plasmaMat.uniforms.uAudioBass.value = frequencyBandsRef.current[0];
-      plasmaMat.uniforms.uAudioMid.value = frequencyBandsRef.current[2];
-      plasmaMat.uniforms.uAudioTreble.value = frequencyBandsRef.current[4];
-      plasmaMat.uniforms.uAudioIntensity.value = audioIntensity;
-
-      pMat.uniforms.uTime.value = t;
-
-      plasmaMesh.rotation.y = t * 0.08;
-      mainGroup.rotation.x += params.rotationSpeedX;
-      mainGroup.rotation.y += params.rotationSpeedY;
-
-      // Apply audio-based scaling with smoother animation
-      const targetScale = 1 + audioIntensity * 0.08;
-      mainGroup.scale.x += (targetScale - mainGroup.scale.x) * 0.1;
-      mainGroup.scale.y += (targetScale - mainGroup.scale.y) * 0.1;
-      mainGroup.scale.z += (targetScale - mainGroup.scale.z) * 0.1;
-
-      drawGrid(t);
-      controls.update();
-      renderer.render(scene, camera);
-    };
-    animate();
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animationId);
-      renderer.dispose();
-      cameraRef.current = null;
-    };
-  }, [blobColor, blobSize, blobPosition]);
-
-  // Boot sequence handled elsewhere
-
-  useEffect(() => {
-    const tick = () => {
-      const now = new Date();
-      const hms = [now.getHours(), now.getMinutes(), now.getSeconds()]
-        .map(n => String(n).padStart(2, '0'))
-        .join(':');
-      setTimeStr(hms);
-    };
-
-    const interval = setInterval(tick, 1000);
-    tick();
-
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const uptimeInterval = setInterval(() => {
-      setSessionUptime(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(uptimeInterval);
-  }, []);
-
-  const formatUptime = (seconds) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
+  const initGrid = () => {
+    gridCanvas.width = window.innerWidth;
+    gridCanvas.height = window.innerHeight;
   };
 
-  useEffect(() => {
-    const canvas = voiceWaveformRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let animationId;
-    let phase = 0;
+  const drawGrid = (t) => {
+    const W = gridCanvas.width, H = gridCanvas.height;
+    gCtx.clearRect(0, 0, W, H);
+    const vx = W / 2, horizonY = H * 0.42;
 
-    const drawWaveform = () => {
-      const width = canvas.width = canvas.offsetWidth;
-      const height = canvas.height = canvas.offsetHeight;
+    const lCount = 24;
+    for (let i = 0; i <= lCount; i++) {
+      const frac = i / lCount;
+      const x = -W * 0.35 + frac * W * 1.7;
+      const op = 0.025 + Math.pow(frac > 0.5 ? 1 - frac : frac, 1.5) * 0.055;
+      gCtx.strokeStyle = `rgba(0,180,255,${op})`;
+      gCtx.lineWidth = 0.5;
+      gCtx.beginPath();
+      gCtx.moveTo(x, H);
+      gCtx.lineTo(vx + (x - vx) * 0.015, horizonY);
+      gCtx.stroke();
+    }
 
-      ctx.clearRect(0, 0, width, height);
-      ctx.strokeStyle = 'rgba(0,212,255,0.7)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
+    const hCount = 16;
+    for (let i = 0; i <= hCount; i++) {
+      const frac = i / hCount;
+      const scrollFrac = (frac + t * 0.04) % 1;
+      const y = horizonY + Math.pow(scrollFrac, 2.0) * (H - horizonY);
+      const xSpread = ((y - horizonY) / (H - horizonY)) * W * 0.68;
+      const op = Math.pow(scrollFrac, 0.9) * 0.07;
+      gCtx.strokeStyle = `rgba(0,180,255,${op})`;
+      gCtx.lineWidth = 0.5;
+      gCtx.beginPath();
+      gCtx.moveTo(vx - xSpread, y);
+      gCtx.lineTo(vx + xSpread, y);
+      gCtx.stroke();
+    }
+  };
 
-      const isVoiceActive = activeMode === 'VOICE';
+  const handleResize = () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    initGrid();
+  };
+  window.addEventListener('resize', handleResize);
 
-      for (let x = 0; x < width; x++) {
-        let y;
-        if (isVoiceActive) {
-          const amplitude = 15 + Math.random() * 10;
-          y = height / 2 + Math.sin(x * 0.05 + phase) * amplitude + Math.sin(x * 0.02 + phase * 1.5) * (amplitude * 0.5);
-        } else {
-          y = height / 2 + Math.sin(x * 0.02 + phase) * 2;
-        }
+  initGrid();
+  const clock = new THREE.Clock();
+  let animationId;
 
-        if (x === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
+  const animate = () => {
+    animationId = requestAnimationFrame(animate);
+    const t = clock.getElapsedTime();
 
-      ctx.stroke();
-      phase += isVoiceActive ? 0.15 : 0.05;
-      animationId = requestAnimationFrame(drawWaveform);
-    };
+    // Get audio frequency data if microphone is active
+    let audioIntensity = 0;
+    if (analyserRef.current && dataArrayRef.current) {
+      analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+      const total = dataArrayRef.current.length;
 
-    drawWaveform();
-    return () => cancelAnimationFrame(animationId);
-  }, [activeMode]);
+      // Split into frequency bands: bass, low-mid, mid, high-mid, treble
+      const bassBins = dataArrayRef.current.slice(0, Math.floor(total * 0.2));
+      const lowMidBins = dataArrayRef.current.slice(Math.floor(total * 0.2), Math.floor(total * 0.4));
+      const midBins = dataArrayRef.current.slice(Math.floor(total * 0.4), Math.floor(total * 0.6));
+      const highMidBins = dataArrayRef.current.slice(Math.floor(total * 0.6), Math.floor(total * 0.8));
+      const trebleBins = dataArrayRef.current.slice(Math.floor(total * 0.8));
 
-  useEffect(() => {
-    const canvas = neuralGaugeRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let animationId;
-    let currentLoad = 0;
-    const targetLoad = 74;
+      // Average each band
+      const bassAvg = (bassBins.reduce((a, b) => a + b, 0) / bassBins.length) / 255;
+      const lowMidAvg = (lowMidBins.reduce((a, b) => a + b, 0) / lowMidBins.length) / 255;
+      const midAvg = (midBins.reduce((a, b) => a + b, 0) / midBins.length) / 255;
+      const highMidAvg = (highMidBins.reduce((a, b) => a + b, 0) / highMidBins.length) / 255;
+      const trebleAvg = (trebleBins.reduce((a, b) => a + b, 0) / trebleBins.length) / 255;
 
-    const drawGauge = () => {
-      const width = canvas.width;
-      const height = canvas.height;
-      const centerX = width / 2;
-      const centerY = height / 2;
-      const radius = 30;
+      // Store in ref for shader
+      frequencyBandsRef.current = [bassAvg, lowMidAvg, midAvg, highMidAvg, trebleAvg];
+      audioIntensity = (bassAvg + lowMidAvg + midAvg) / 3;
+      setAudioFrequency(audioIntensity);
+    }
 
-      ctx.clearRect(0, 0, width, height);
+    plasmaMat.uniforms.uTime.value = t * params.timeScale;
+    plasmaMat.uniforms.uAudioBass.value = frequencyBandsRef.current[0];
+    plasmaMat.uniforms.uAudioMid.value = frequencyBandsRef.current[2];
+    plasmaMat.uniforms.uAudioTreble.value = frequencyBandsRef.current[4];
+    plasmaMat.uniforms.uAudioIntensity.value = audioIntensity;
 
-      // Animate to target, then fluctuate
-      if (currentLoad < targetLoad) {
-        currentLoad += 0.5;
+    pMat.uniforms.uTime.value = t;
+
+    plasmaMesh.rotation.y = t * 0.08;
+    mainGroup.rotation.x += params.rotationSpeedX;
+    mainGroup.rotation.y += params.rotationSpeedY;
+
+    // Apply audio-based scaling with smoother animation
+    const targetScale = 1 + audioIntensity * 0.08;
+    mainGroup.scale.x += (targetScale - mainGroup.scale.x) * 0.1;
+    mainGroup.scale.y += (targetScale - mainGroup.scale.y) * 0.1;
+    mainGroup.scale.z += (targetScale - mainGroup.scale.z) * 0.1;
+
+    drawGrid(t);
+    controls.update();
+    renderer.render(scene, camera);
+  };
+  animate();
+
+  return () => {
+    window.removeEventListener('resize', handleResize);
+    cancelAnimationFrame(animationId);
+    renderer.dispose();
+    cameraRef.current = null;
+  };
+}, [blobColor, blobSize, blobPosition]);
+
+// Boot sequence handled elsewhere
+
+useEffect(() => {
+  const tick = () => {
+    const now = new Date();
+    const hms = [now.getHours(), now.getMinutes(), now.getSeconds()]
+      .map(n => String(n).padStart(2, '0'))
+      .join(':');
+    setTimeStr(hms);
+  };
+
+  const interval = setInterval(tick, 1000);
+  tick();
+
+  return () => clearInterval(interval);
+}, []);
+
+useEffect(() => {
+  const uptimeInterval = setInterval(() => {
+    setSessionUptime(prev => prev + 1);
+  }, 1000);
+  return () => clearInterval(uptimeInterval);
+}, []);
+
+const formatUptime = (seconds) => {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
+};
+
+useEffect(() => {
+  const canvas = voiceWaveformRef.current;
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let animationId;
+  let phase = 0;
+
+  const drawWaveform = () => {
+    const width = canvas.width = canvas.offsetWidth;
+    const height = canvas.height = canvas.offsetHeight;
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.strokeStyle = 'rgba(0,212,255,0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+
+    const isVoiceActive = activeMode === 'VOICE';
+
+    for (let x = 0; x < width; x++) {
+      let y;
+      if (isVoiceActive) {
+        const amplitude = 15 + Math.random() * 10;
+        y = height / 2 + Math.sin(x * 0.05 + phase) * amplitude + Math.sin(x * 0.02 + phase * 1.5) * (amplitude * 0.5);
       } else {
-        // Subtle fluctuation: +/- 2%
-        const drift = (Math.random() - 0.5) * 0.4; 
-        currentLoad = Math.max(targetLoad - 2, Math.min(targetLoad + 2, currentLoad + drift));
+        y = height / 2 + Math.sin(x * 0.02 + phase) * 2;
       }
 
-      const startAngle = -Math.PI / 2;
-      const endAngle = startAngle + (currentLoad / 100) * Math.PI * 2;
+      if (x === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
 
-      // Update text if possible (optional, but currentLoad is internal)
-      // Since the text is in JSX, we'll just keep it 74% fixed there or assume it's just visual for now.
-      
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(0,212,255,0.08)';
-      ctx.lineWidth = 6;
-      ctx.stroke();
+    ctx.stroke();
+    phase += isVoiceActive ? 0.15 : 0.05;
+    animationId = requestAnimationFrame(drawWaveform);
+  };
 
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-      ctx.strokeStyle = 'rgba(0,212,255,0.8)';
-      ctx.lineWidth = 6;
-      ctx.lineCap = 'round';
-      ctx.stroke();
+  drawWaveform();
+  return () => cancelAnimationFrame(animationId);
+}, [activeMode]);
 
-      animationId = requestAnimationFrame(drawGauge);
-    };
+useEffect(() => {
+  const canvas = neuralGaugeRef.current;
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let animationId;
+  let currentLoad = 0;
+  const targetLoad = 74;
 
-    drawGauge();
-    return () => cancelAnimationFrame(animationId);
-  }, []);
+  const drawGauge = () => {
+    const width = canvas.width;
+    const height = canvas.height;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = 30;
 
-  const modes = ['JARVIS', 'TRADER', 'PROFESSOR', 'ENGINEER'];
-  const navItems = ['HOME', 'DASHBOARD', 'COMMAND', 'MEMORY', 'NEURAL'];
-  const modules = [
-    { name: 'VISION', status: 'READY' },
-    { name: 'VOICE', status: 'ACTIVE' },
-    { name: 'WEB', status: 'LIVE' },
-    { name: 'FILES', status: 'MOUNTED' },
-    { name: 'CAMERA', status: 'OFFLINE' },
-  ];
-  const quickAccess = ['SCREEN CAPTURE', 'OPEN BROWSER', 'FILE MANAGER'];
+    ctx.clearRect(0, 0, width, height);
 
-  return (
-    <div className={`jarvis-container ${isDiagnosticActive ? 'diagnostic-active' : ''} ${isSecurityAlert ? 'security-alert' : ''} ${isGlitchActive ? 'glitch-active' : ''}`}>
-      <canvas id="three-canvas" ref={threeCanvasRef}></canvas>
-      <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
+    // Animate to target, then fluctuate
+    if (currentLoad < targetLoad) {
+      currentLoad += 0.5;
+    } else {
+      // Subtle fluctuation: +/- 2%
+      const drift = (Math.random() - 0.5) * 0.4;
+      currentLoad = Math.max(targetLoad - 2, Math.min(targetLoad + 2, currentLoad + drift));
+    }
 
-      <div className="grid-overlay"></div>
-      <div className="vignette"></div>
-      <div className="scanline"></div>
-      <div className="hex-overlay"></div>
+    const startAngle = -Math.PI / 2;
+    const endAngle = startAngle + (currentLoad / 100) * Math.PI * 2;
 
-      <div className="main-grid">
-        {/* ROW 1: NAVBAR */}
-        <div className="grid-navbar">
-          <div className="nav-logo">
-            <span className="logo-text">J·A·R·V·I·S</span>
-            <span className="logo-sub">PERSONAL AI · v0.1</span>
+    // Update text if possible (optional, but currentLoad is internal)
+    // Since the text is in JSX, we'll just keep it 74% fixed there or assume it's just visual for now.
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,212,255,0.08)';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+    ctx.strokeStyle = 'rgba(0,212,255,0.8)';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    animationId = requestAnimationFrame(drawGauge);
+  };
+
+  drawGauge();
+  return () => cancelAnimationFrame(animationId);
+}, []);
+
+const modes = ['JARVIS', 'TRADER', 'PROFESSOR', 'ENGINEER'];
+const navItems = ['HOME', 'DASHBOARD', 'COMMAND', 'MEMORY', 'NEURAL'];
+const modules = [
+  { name: 'VISION', status: 'READY' },
+  { name: 'VOICE', status: 'ACTIVE' },
+  { name: 'WEB', status: 'LIVE' },
+  { name: 'FILES', status: 'MOUNTED' },
+  { name: 'CAMERA', status: 'OFFLINE' },
+];
+const quickAccess = ['SCREEN CAPTURE', 'OPEN BROWSER', 'FILE MANAGER'];
+
+return (
+  <div className={`jarvis-container ${isDiagnosticActive ? 'diagnostic-active' : ''} ${isSecurityAlert ? 'security-alert' : ''} ${isGlitchActive ? 'glitch-active' : ''}`}>
+    <canvas id="three-canvas" ref={threeCanvasRef}></canvas>
+    <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
+
+    <div className="grid-overlay"></div>
+    <div className="vignette"></div>
+    <div className="scanline"></div>
+    <div className="hex-overlay"></div>
+
+    <div className="main-grid">
+      {/* ROW 1: NAVBAR */}
+      <div className="grid-navbar">
+        <div className="nav-logo">
+          <span className="logo-text">J·A·R·V·I·S</span>
+          <span className="logo-sub">PERSONAL AI · v0.1</span>
+        </div>
+
+        <div className="nav-links">
+          {navItems.map(item => (
+            <div
+              key={item}
+              className={`nav-item ${navItem === item ? 'active' : ''}`}
+              onClick={() => setNavItem(item)}
+            >
+              <span className="nav-arrow">›</span>
+              {item}
+            </div>
+          ))}
+        </div>
+
+        <div className="nav-status">
+          <div className="settings-icon" onClick={() => setIsSettingsOpen(!isSettingsOpen)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 1.65 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+            </svg>
           </div>
+          <div className="mode-indicator">
+            <div className="mode-dot"></div>
+            <span className="mode-text">MODE: {activeMode}</span>
+          </div>
+          <div className="status-indicator">
+            <div className="status-dot"></div>
+            <span className="status-text">ONLINE</span>
+          </div>
+          <div className="clock-display">{timeStr}</div>
+        </div>
+      </div>
 
-          <div className="nav-links">
-            {navItems.map(item => (
+      {/* ROW 2: LEFT PANEL */}
+      <div className="grid-left">
+        <div className="panel-section">
+          <div className="section-label">ACTIVE MODE</div>
+          <div className="mode-buttons">
+            {modes.map(mode => (
               <div
-                key={item}
-                className={`nav-item ${navItem === item ? 'active' : ''}`}
-                onClick={() => setNavItem(item)}
+                key={mode}
+                className={`mode-btn ${activeMode === mode ? 'active' : ''}`}
+                onClick={() => handleModeChange(mode)}
+                style={activeMode === mode ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : {}}
               >
-                <span className="nav-arrow">›</span>
-                {item}
+                <span className="mode-text">{mode}</span>
+                {activeMode === mode && <div className="mode-dot" style={{ background: 'var(--primary)' }}></div>}
               </div>
             ))}
           </div>
-
-          <div className="nav-status">
-            <div className="settings-icon" onClick={() => setIsSettingsOpen(!isSettingsOpen)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 1.65 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-              </svg>
-            </div>
-            <div className="mode-indicator">
-              <div className="mode-dot"></div>
-              <span className="mode-text">MODE: {activeMode}</span>
-            </div>
-            <div className="status-indicator">
-              <div className="status-dot"></div>
-              <span className="status-text">ONLINE</span>
-            </div>
-            <div className="clock-display">{timeStr}</div>
-          </div>
         </div>
 
-        {/* ROW 2: LEFT PANEL */}
-        <div className="grid-left">
-          <div className="panel-section">
-            <div className="section-label">ACTIVE MODE</div>
-            <div className="mode-buttons">
-              {modes.map(mode => (
-                <div
-                  key={mode}
-                  className={`mode-btn ${activeMode === mode ? 'active' : ''}`}
-                  onClick={() => handleModeChange(mode)}
-                  style={activeMode === mode ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : {}}
-                >
-                  <span className="mode-text">{mode}</span>
-                  {activeMode === mode && <div className="mode-dot" style={{ background: 'var(--primary)' }}></div>}
-                </div>
-              ))}
-            </div>
+        <div className="panel-section">
+          <div className="section-label">
+            {activeMode === 'JARVIS' && 'SYSTEM VITALS'}
+            {activeMode === 'TRADER' && 'PORTFOLIO'}
+            {activeMode === 'PROFESSOR' && 'STUDY TRACKER'}
+            {activeMode === 'ENGINEER' && 'ACTIVE PROJECT'}
           </div>
 
-          <div className="panel-section">
-            <div className="section-label">
-              {activeMode === 'JARVIS' && 'SYSTEM VITALS'}
-              {activeMode === 'TRADER' && 'PORTFOLIO'}
-              {activeMode === 'PROFESSOR' && 'STUDY TRACKER'}
-              {activeMode === 'ENGINEER' && 'ACTIVE PROJECT'}
-            </div>
-            
-            {activeMode === 'JARVIS' && (
-              <div className="vitals-bars">
-                <div className="vital-row">
-                  <span className="vital-label">CPU</span>
-                  <div className="vital-bar"><div className="vital-fill" style={{ width: '62%' }}></div></div>
-                </div>
-                <div className="vital-row">
-                  <span className="vital-label">MEM</span>
-                  <div className="vital-bar"><div className="vital-fill" style={{ width: '78%' }}></div></div>
-                </div>
-                <div className="vital-row">
-                  <span className="vital-label gpu">GPU</span>
-                  <div className="vital-bar gpu"><div className="vital-fill" style={{ width: '45%' }}></div></div>
-                </div>
-                <div className="vital-row">
-                  <span className="vital-label net">NET</span>
-                  <div className="vital-bar net"><div className="vital-fill" style={{ width: '33%' }}></div></div>
-                </div>
+          {activeMode === 'JARVIS' && (
+            <div className="vitals-bars">
+              <div className="vital-row">
+                <span className="vital-label">CPU</span>
+                <div className="vital-bar"><div className="vital-fill" style={{ width: '62%' }}></div></div>
               </div>
-            )}
-
-            {activeMode === 'TRADER' && specialistData && (
-              <div className="specialist-hud trader-hud">
-                <div className="mini-holdings">
-                  {specialistData.portfolio?.map(h => (
-                    <div key={h.asset} className="holding-row">
-                      <span>{h.asset}</span>
-                      <span className="holding-val">{parseFloat(h.free).toFixed(4)}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="market-pulse">
-                  <div className="pulse-item">
-                    <span>BTC</span>
-                    <span className={specialistData.market?.btc?.usd_24h_change > 0 ? 'up' : 'down'}>
-                      ${specialistData.market?.btc?.usd?.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="pulse-item">
-                    <span>SENTIMENT</span>
-                    <span className="sentiment">{specialistData.market?.sentiment}</span>
-                  </div>
-                </div>
+              <div className="vital-row">
+                <span className="vital-label">MEM</span>
+                <div className="vital-bar"><div className="vital-fill" style={{ width: '78%' }}></div></div>
               </div>
-            )}
-
-            {activeMode === 'PROFESSOR' && specialistData && (
-              <div className="specialist-hud professor-hud">
-                <div className="study-stats">
-                  <div className="stat-box">
-                    <span className="stat-label">TOPICS WK</span>
-                    <span className="stat-val">{specialistData.stats?.topics_week}</span>
-                  </div>
-                  <div className="stat-box">
-                    <span className="stat-label">STREAK</span>
-                    <span className="stat-val">{specialistData.stats?.streak}d</span>
-                  </div>
-                </div>
-                <div className="curriculum-dots">
-                  {specialistData.curriculum?.map(c => (
-                    <div key={c.name} className="curr-item">
-                      <div className={`curr-dot ${c.status}`}></div>
-                      <span>{c.name}</span>
-                    </div>
-                  ))}
-                </div>
+              <div className="vital-row">
+                <span className="vital-label gpu">GPU</span>
+                <div className="vital-bar gpu"><div className="vital-fill" style={{ width: '45%' }}></div></div>
               </div>
-            )}
-
-            {activeMode === 'ENGINEER' && specialistData && (
-              <div className="specialist-hud engineer-hud">
-                <div className="project-header">
-                  <span className="proj-name">{specialistData.name}</span>
-                  <span className={`status-tag ${specialistData.server === 'RUNNING' ? 'alive' : ''}`}>{specialistData.server}</span>
-                </div>
-                <div className="git-mini">
-                  <div className="git-row">
-                    <span className="label">BRANCH</span>
-                    <span className="val">{specialistData.git?.branch}</span>
-                  </div>
-                  <div className="git-row">
-                    <span className="label">CHANGES</span>
-                    <span className="val">{specialistData.git?.changes}</span>
-                  </div>
-                </div>
+              <div className="vital-row">
+                <span className="vital-label net">NET</span>
+                <div className="vital-bar net"><div className="vital-fill" style={{ width: '33%' }}></div></div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          <div className="panel-section">
-            <div className="section-label">MODULE STATUS</div>
-            <div className="module-list">
-              {modules.map(mod => (
-                <div key={mod.name} className="module-row">
-                  <span className="module-name">{mod.name}</span>
-                  <span className={`module-status ${mod.status === 'OFFLINE' ? 'offline' : ''}`}>{mod.status}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="panel-section">
-            <div className="section-label">VOICE MONITOR</div>
-            <canvas ref={voiceWaveformRef} className="voice-waveform"></canvas>
-          </div>
-
-          {/* ── MEMORY CORE ── */}
-          <div className={`panel-section memory-panel ${memoryFlash ? 'memory-flash' : ''}`}>
-            <div className="section-label memory-label">
-              <span>MEMORY CORE</span>
-              <span className="memory-count">{storedMemories.length} STORED</span>
-            </div>
-            <div className="memory-list">
-              {storedMemories.length === 0 && (
-                <div className="memory-empty">— NO MEMORIES YET —</div>
-              )}
-              {storedMemories.map((m, i) => (
-                <div key={m.id || i} className="memory-item">
-                  <span className="memory-dot">◆</span>
-                  <span className="memory-text">{m.text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="panel-section">
-            <div className="section-label">LAST COMMAND</div>
-            <div className="last-command" style={{ minHeight: '60px' }}>
-              <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
-            </div>
-          </div>
-
-          {/* ── PREMIUM RESPONSE TRANSCRIPT ── */}
-          <div className={`jarvis-transcript-container ${showResponsePanel ? 'visible' : ''}`}>
-            <div className="transcript-header">
-              <span className="transcript-dot"></span>
-              <span className="transcript-label">JARVIS VOCAL OUTPUT</span>
-            </div>
-            <div className="transcript-content">
-              {jarvisResponseStream || '...'}
-            </div>
-            <div className="transcript-footer">
-              <div className="audio-bars">
-                {[...Array(8)].map((_, i) => (
-                  <div key={i} className="audio-bar" style={{ height: `${2 + Math.random() * 8}px` }}></div>
+          {activeMode === 'TRADER' && specialistData && (
+            <div className="specialist-hud trader-hud">
+              <div className="mini-holdings">
+                {specialistData.portfolio?.map(h => (
+                  <div key={h.asset} className="holding-row">
+                    <span>{h.asset}</span>
+                    <span className="holding-val">{parseFloat(h.free).toFixed(4)}</span>
+                  </div>
                 ))}
               </div>
-              <span className="encoding-tag">PCM-STREAM: ACTIVE</span>
+              <div className="market-pulse">
+                <div className="pulse-item">
+                  <span>BTC</span>
+                  <span className={specialistData.market?.btc?.usd_24h_change > 0 ? 'up' : 'down'}>
+                    ${specialistData.market?.btc?.usd?.toLocaleString()}
+                  </span>
+                </div>
+                <div className="pulse-item">
+                  <span>SENTIMENT</span>
+                  <span className="sentiment">{specialistData.market?.sentiment}</span>
+                </div>
+              </div>
             </div>
+          )}
+
+          {activeMode === 'PROFESSOR' && specialistData && (
+            <div className="specialist-hud professor-hud">
+              <div className="study-stats">
+                <div className="stat-box">
+                  <span className="stat-label">TOPICS WK</span>
+                  <span className="stat-val">{specialistData.stats?.topics_week}</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-label">STREAK</span>
+                  <span className="stat-val">{specialistData.stats?.streak}d</span>
+                </div>
+              </div>
+              <div className="curriculum-dots">
+                {specialistData.curriculum?.map(c => (
+                  <div key={c.name} className="curr-item">
+                    <div className={`curr-dot ${c.status}`}></div>
+                    <span>{c.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeMode === 'ENGINEER' && specialistData && (
+            <div className="specialist-hud engineer-hud">
+              <div className="project-header">
+                <span className="proj-name">{specialistData.name}</span>
+                <span className={`status-tag ${specialistData.server === 'RUNNING' ? 'alive' : ''}`}>{specialistData.server}</span>
+              </div>
+              <div className="git-mini">
+                <div className="git-row">
+                  <span className="label">BRANCH</span>
+                  <span className="val">{specialistData.git?.branch}</span>
+                </div>
+                <div className="git-row">
+                  <span className="label">CHANGES</span>
+                  <span className="val">{specialistData.git?.changes}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="panel-section">
+          <div className="section-label">MODULE STATUS</div>
+          <div className="module-list">
+            {modules.map(mod => (
+              <div key={mod.name} className="module-row">
+                <span className="module-name">{mod.name}</span>
+                <span className={`module-status ${mod.status === 'OFFLINE' ? 'offline' : ''}`}>{mod.status}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* ROW 2: CENTER (ORB) */}
-        {/* <div className="grid-center">
+        <div className="panel-section">
+          <div className="section-label">VOICE MONITOR</div>
+          <canvas ref={voiceWaveformRef} className="voice-waveform"></canvas>
+        </div>
+
+        {/* ── MEMORY CORE ── */}
+        <div className={`panel-section memory-panel ${memoryFlash ? 'memory-flash' : ''}`}>
+          <div className="section-label memory-label">
+            <span>MEMORY CORE</span>
+            <span className="memory-count">{storedMemories.length} STORED</span>
+          </div>
+          <div className="memory-list">
+            {storedMemories.length === 0 && (
+              <div className="memory-empty">— NO MEMORIES YET —</div>
+            )}
+            {storedMemories.map((m, i) => (
+              <div key={m.id || i} className="memory-item">
+                <span className="memory-dot">◆</span>
+                <span className="memory-text">{m.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="panel-section">
+          <div className="section-label">LAST COMMAND</div>
+          <div className="last-command" style={{ minHeight: '60px' }}>
+            <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
+          </div>
+        </div>
+
+        {/* ── PREMIUM RESPONSE TRANSCRIPT ── */}
+        <div className={`jarvis-transcript-container ${showResponsePanel ? 'visible' : ''}`}>
+          <div className="transcript-header">
+            <span className="transcript-dot"></span>
+            <span className="transcript-label">JARVIS VOCAL OUTPUT</span>
+          </div>
+          <div className="transcript-content">
+            {jarvisResponseStream || '...'}
+          </div>
+          <div className="transcript-footer">
+            <div className="audio-bars">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="audio-bar" style={{ height: `${2 + Math.random() * 8}px` }}></div>
+              ))}
+            </div>
+            <span className="encoding-tag">PCM-STREAM: ACTIVE</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ROW 2: CENTER (ORB) */}
+      {/* <div className="grid-center">
           <div className="orb-container">
             <div className="target-ring ring-1"></div>
             <div className="target-ring ring-2"></div>
@@ -1494,250 +1528,289 @@ function App() {
           </div>
         </div> */}
 
-        {/* ROW 2: RIGHT PANEL */}
-        <div className="grid-right">
+      {/* ROW 2: RIGHT PANEL */}
+      <div className="grid-right">
 
-          {/* ── BIOMETRIC HUD PANEL ── */}
-          <div className={`panel-section biometric-panel ${biometricData.detected ? 'detected' : ''}`}>
-            <div className="section-label">BIOMETRIC SCAN</div>
-            <div className="biometric-hud">
-              <div className="bio-status-row">
-                <span className="bio-label">IDENTITY:</span>
-                <span className={`bio-value ${biometricData.name === 'Master' ? 'master' : (biometricData.detected ? 'alert' : '')}`}>
-                  {biometricData.detected ? biometricData.name.toUpperCase() : 'ABSENT'}
-                </span>
-              </div>
-              <div className="bio-status-row">
-                <span className="bio-label">SCAN LOCK:</span>
-                <div className="bio-lock-bar">
-                  <div className={`bio-lock-fill ${biometricData.detected ? 'active' : ''}`} style={{ width: biometricData.detected ? '100%' : '0%' }}></div>
-                </div>
-              </div>
-              <div className="bio-meta">
-                <span className="meta-tag">SECURE LINK</span>
-                <span className="meta-tag pulse">ENCRYPTED</span>
-              </div>
-            </div>
-          </div>
-
-          {/* ── VISION INDICATOR ── */}
-          <div className={`panel-section vision-panel ${isVisionScanning ? 'vision-active' : ''}`}>
-            <div className="section-label vision-label">
-              <span>SCREEN VISION</span>
-              <span className={`vision-status ${isVisionScanning ? 'scanning' : 'standby'}`}>
-                {isVisionScanning ? '● SCANNING' : '○ STANDBY'}
+        {/* ── BIOMETRIC HUD PANEL ── */}
+        <div className={`panel-section biometric-panel ${biometricData.detected ? 'detected' : ''}`}>
+          <div className="section-label">BIOMETRIC SCAN</div>
+          <div className="biometric-hud">
+            <div className="bio-status-row">
+              <span className="bio-label">IDENTITY:</span>
+              <span className={`bio-value ${biometricData.name === 'Master' ? 'master' : (biometricData.detected ? 'alert' : '')}`}>
+                {biometricData.detected ? biometricData.name.toUpperCase() : 'ABSENT'}
               </span>
             </div>
-            <div className="vision-hint">
-              Say: <em>"What's on my screen?"</em>
-            </div>
-          </div>
-
-          {/* ── SYSTEM ACTIONS LOG ── */}
-          {systemActionLog.length > 0 && (
-            <div className="panel-section">
-              <div className="section-label">SYSTEM ACTIONS</div>
-              <div className="action-log">
-                {systemActionLog.map((a, i) => (
-                  <div key={i} className="action-log-item">
-                    <span className="action-time">{a.time}</span>
-                    <span className="action-label">{a.label}</span>
-                  </div>
-                ))}
+            <div className="bio-status-row">
+              <span className="bio-label">SCAN LOCK:</span>
+              <div className="bio-lock-bar">
+                <div className={`bio-lock-fill ${biometricData.detected ? 'active' : ''}`} style={{ width: biometricData.detected ? '100%' : '0%' }}></div>
               </div>
             </div>
-          )}
-
-          <div className="panel-section">
-            <div className="section-label">SYSTEM METRICS</div>
-            <div className="metrics-grid">
-              <div className="metric-card">
-                <span className="metric-value">4ms</span>
-                <span className="metric-label">LATENCY</span>
-              </div>
-              <div className="metric-card">
-                <span className="metric-value good">99%</span>
-                <span className="metric-label">UPTIME</span>
-              </div>
-              <div className="metric-card">
-                <span className="metric-value">12</span>
-                <span className="metric-label">NODES</span>
-              </div>
-              <div className="metric-card">
-                <span className="metric-value">8.2GB</span>
-                <span className="metric-label">MEM</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="panel-section">
-            <div className="section-label">RECENT ACTIVITY</div>
-            <div className="activity-feed">
-              {activityFeed.map((item, idx) => (
-                <div key={idx} className="activity-item">
-                  <span className="activity-time">{item.time}</span>
-                  <span className="activity-message">{item.message}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="panel-section">
-            <div className="section-label">QUICK ACCESS</div>
-            <div className="quick-list">
-              {quickAccess.map(item => (
-                <div key={item} className="quick-item">
-                  <span>{item}</span>
-                  <span className="quick-arrow">›</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="panel-section">
-            <div className="section-label">NEURAL LOAD</div>
-            <div className="neural-gauge">
-              <canvas ref={neuralGaugeRef} width="80" height="80"></canvas>
-              <div className="neural-text">
-                <span className="neural-percent">74%</span>
-                <span className="neural-label">NEURAL</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="panel-section">
-            <div className="section-label">SESSION UPTIME</div>
-            <div className="uptime-display">
-              <span className="uptime-value">{formatUptime(sessionUptime)}</span>
-              <span className="uptime-label">ACTIVE SINCE BOOT</span>
+            <div className="bio-meta">
+              <span className="meta-tag">SECURE LINK</span>
+              <span className="meta-tag pulse">ENCRYPTED</span>
+              {lastCommand && <span className="meta-tag blue">CMD: {lastCommand.toUpperCase()}</span>}
             </div>
           </div>
         </div>
 
-        {/* ROW 3: BOTTOM BAR */}
-        <div className="grid-bottom">
-          <div className="bottom-left">
-            <div className="location-info">
-              <span className="location-row">CITY: KARACHI</span>
-              <span className="location-row">TZ: PKT +5</span>
+        {/* ── VISION INDICATOR ── */}
+        <div className={`panel-section vision-panel ${isVisionScanning ? 'vision-active' : ''}`}>
+          <div className="section-label vision-label">
+            <span>SCREEN VISION</span>
+            <span className={`vision-status ${isVisionScanning ? 'scanning' : 'standby'}`}>
+              {isVisionScanning ? '● SCANNING' : '○ STANDBY'}
+            </span>
+          </div>
+          <div className="vision-hint">
+            Say: <em>"What's on my screen?"</em>
+          </div>
+        </div>
+
+        {/* ── SYSTEM ACTIONS LOG ── */}
+        {systemActionLog.length > 0 && (
+          <div className="panel-section">
+            <div className="section-label">SYSTEM ACTIONS</div>
+            <div className="action-log">
+              {systemActionLog.map((a, i) => (
+                <div key={i} className="action-log-item">
+                  <span className="action-time">{a.time}</span>
+                  <span className="action-label">{a.label}</span>
+                </div>
+              ))}
             </div>
           </div>
+        )}
 
-          <div className="bottom-center">
-            <div className="single-command-box">
-              <div className="command-header">
-                <span>COMMAND INTERFACE</span>
-                <div className="header-controls">
-                  <button
-                    className={`engine-toggle ${useGroqSpeech ? 'groq' : 'browser'}`}
-                    onClick={() => setUseGroqSpeech(!useGroqSpeech)}
-                    title={useGroqSpeech ? 'Using Groq AI (Whisper)' : 'Using Browser Speech'}
-                  >
-                    {useGroqSpeech ? 'GROQ' : 'BROWSER'}
-                  </button>
-                  <span className="groq-status">{groqStatus}</span>
-                  <div className={`mic-indicator ${isMicrophoneActive ? 'active' : ''}`}>
-                    <span className="mic-dot"></span>
-                    <span>{isMicrophoneActive ? 'LISTENING' : 'VOICE READY'}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="command-row">
-                <div className={`command-input-wrapper ${isMicrophoneActive ? 'voice-mode' : (isTyping ? 'typing-mode' : '')}`}>
-                  <input
-                    type="text"
-                    className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
-                    placeholder={isMicrophoneActive ? 'LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
-                    value={isMicrophoneActive ? (recognizedText || '') : inputValue}
-                    onChange={(e) => {
-                      if (!isMicrophoneActive) {
-                        setInputValue(e.target.value);
-                        setIsTyping(e.target.value.length > 0);
-                      }
-                    }}
-                    onFocus={() => setIsTyping(true)}
-                    onBlur={() => setIsTyping(false)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && e.target.value.trim()) {
-                        const now = new Date();
-                        const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
-                        setTerminalLog(prev => [...prev, { time, type: 'input', content: e.target.value.toUpperCase() }]);
-                        setInputValue('');
-                        setIsTyping(false);
-
-                        setJarvisResponseStream('');
-                        if (socketRef.current) {
-                          socketRef.current.emit('user_message', e.target.value);
-                        }
-                      }
-                    }}
-                    disabled={isMicrophoneActive}
-                  />
-                </div>
-                <button
-                  className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`}
-                  onClick={toggleMicrophone}
-                  title={isMicrophoneActive ? 'Stop Listening' : 'Start Listening'}
-                >
-                  <svg className="mic-icon" viewBox="0 0 24 24">
-                    <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
-                  </svg>
-                </button>
-              </div>
+        <div className="panel-section">
+          <div className="section-label">SYSTEM METRICS</div>
+          <div className="metrics-grid">
+            <div className="metric-card">
+              <span className="metric-value">4ms</span>
+              <span className="metric-label">LATENCY</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-value good">99%</span>
+              <span className="metric-label">UPTIME</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-value">{lastSystemAction ? 'ACTIVE' : 'IDLE'}</span>
+              <span className="metric-label">SYS ACTION</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-value">{(audioFrequency * 100).toFixed(0)}%</span>
+              <span className="metric-label">VOICE PULSE</span>
+            </div>
+            <div className="metric-card">
+              <span className="metric-value">8.2GB</span>
+              <span className="metric-label">MEM</span>
             </div>
           </div>
+        </div>
 
-          <div className="bottom-right">
-            <div className="version-info">
-              <span className="version-row">VERSION: 0.1.0</span>
-              <span className="version-row verified">AUTH: VERIFIED</span>
+        <div className="panel-section">
+          <div className="section-label">RECENT ACTIVITY</div>
+          <div className="activity-feed">
+            {activityFeed.map((item, idx) => (
+              <div key={idx} className="activity-item">
+                <span className="activity-time">{item.time}</span>
+                <span className="activity-message">{item.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="panel-section">
+          <div className="section-label">QUICK ACCESS</div>
+          <div className="quick-list">
+            {quickAccess.map(item => (
+              <div key={item} className="quick-item">
+                <span>{item}</span>
+                <span className="quick-arrow">›</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="panel-section">
+          <div className="section-label">NEURAL LOAD</div>
+          <div className="neural-gauge">
+            <canvas ref={neuralGaugeRef} width="80" height="80"></canvas>
+            <div className="neural-text">
+              <span className="neural-percent">74%</span>
+              <span className="neural-label">NEURAL</span>
             </div>
+          </div>
+        </div>
+
+        <div className="panel-section">
+          <div className="section-label">SESSION UPTIME</div>
+          <div className="uptime-display">
+            <span className="uptime-value">{formatUptime(sessionUptime)}</span>
+            <span className="uptime-label">ACTIVE SINCE BOOT</span>
           </div>
         </div>
       </div>
 
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        blobColor={blobColor}
-        setBlobColor={setBlobColor}
-        blobSize={blobSize}
-        setBlobSize={setBlobSize}
-        onEnterDragMode={() => {
-          setIsSettingsOpen(false);
-          setIsDragging(true);
-          dragStateRef.current.isPointerDown = false;
-        }}
-      />
-
-      {isDragging && (
-        <div
-          className="drag-overlay"
-          onPointerDown={handleDragPointerDown}
-          onPointerMove={handleDragPointerMove}
-          onPointerUp={handleDragPointerUp}
-          onPointerCancel={handleDragPointerUp}
-          onPointerLeave={handleDragPointerUp}
-        >
-          <div className="drag-helper-text">
-            <span>DRAG ANYWHERE TO REPOSITION</span>
-            <button
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                setBlobPosition(dragStateRef.current.tempPosition);
-                dragStateRef.current.isPointerDown = false;
-                setIsDragging(false);
-              }}
-            >
-              SAVE POSITION
-            </button>
+      {/* ROW 3: BOTTOM BAR */}
+      <div className="grid-bottom">
+        <div className="bottom-left">
+          <div className="location-info">
+            <span className="location-row">CITY: KARACHI</span>
+            <span className="location-row">TZ: PKT +5</span>
           </div>
         </div>
-      )}
+
+        <div className="bottom-center">
+          <div className="single-command-box">
+            <div className="command-header">
+              <span>COMMAND INTERFACE</span>
+              <div className="header-controls">
+                <button
+                  className={`engine-toggle ${useGroqSpeech ? 'groq' : 'browser'}`}
+                  onClick={() => setUseGroqSpeech(!useGroqSpeech)}
+                  title={useGroqSpeech ? 'Using Groq AI (Whisper)' : 'Using Browser Speech'}
+                >
+                  {useGroqSpeech ? 'GROQ' : 'BROWSER'}
+                </button>
+                <span className="groq-status">{groqStatus}</span>
+                <div className={`mic-indicator ${isMicrophoneActive ? 'active' : ''}`}>
+                  <span className="mic-dot"></span>
+                  <span>{isMicrophoneActive ? 'LISTENING' : 'VOICE READY'}</span>
+                </div>
+              </div>
+            </div>
+
+            {isDigesting && (
+              <div className="digestion-progress-bar">
+                <div className="digestion-fill" style={{ width: `${digestionProgress}%` }}></div>
+                <div className="digestion-label">DIGESTING ARTIFACTS... {digestionProgress}%</div>
+              </div>
+            )}
+
+            {artifactTokens.length > 0 && (
+              <div className="artifact-token-list">
+                {artifactTokens.map((token, i) => (
+                  <div key={i} className="artifact-token">
+                    <span className="token-icon">■</span>
+                    <span className="token-name">{token.substring(0, 15)}{token.length > 15 ? '...' : ''}</span>
+                    <button className="token-remove" onClick={() => removeArtifact(i)}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="command-row">
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                multiple
+                onChange={handleFileUpload}
+              />
+              <button
+                className="uplink-btn"
+                onClick={() => fileInputRef.current.click()}
+                title="Tactical Uplink (Upload Files/Folders)"
+              >
+                <svg className="uplink-icon" viewBox="0 0 24 24">
+                  <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-2.48-2.02-4.5-4.5-4.5S7 2.52 7 5v12.5c0 3.59 2.91 6.5 6.5 6.5s6.5-2.91 6.5-6.5V6h-1.5z" />
+                </svg>
+              </button>
+              <div className={`command-input-wrapper ${isMicrophoneActive ? 'voice-mode' : (isTyping ? 'typing-mode' : '')}`}>
+                <input
+                  type="text"
+                  className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
+                  placeholder={isMicrophoneActive ? 'LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
+                  value={isMicrophoneActive ? (recognizedText || '') : inputValue}
+                  onChange={(e) => {
+                    if (!isMicrophoneActive) {
+                      setInputValue(e.target.value);
+                      setIsTyping(e.target.value.length > 0);
+                    }
+                  }}
+                  onFocus={() => setIsTyping(true)}
+                  onBlur={() => setIsTyping(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.target.value.trim()) {
+                      // setLastCommand(e.target.value);
+                      // setLastCommand(e.target.value);
+                      setInputValue('');
+                      setIsTyping(false);
+
+                      setJarvisResponseStream('');
+                      if (socketRef.current) {
+                        socketRef.current.emit('user_message', e.target.value, { artifactTokens });
+                      }
+                    }
+                  }}
+                  disabled={isMicrophoneActive}
+                />
+              </div>
+              <button
+                className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`}
+                onClick={toggleMicrophone}
+                title={isMicrophoneActive ? 'Stop Listening' : 'Start Listening'}
+              >
+                <svg className="mic-icon" viewBox="0 0 24 24">
+                  <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="bottom-right">
+          <div className="version-info">
+            <span className="version-row">VERSION: 0.1.0</span>
+            <span className="version-row verified">AUTH: VERIFIED</span>
+          </div>
+        </div>
+      </div>
     </div>
-  );
+
+    <SettingsModal
+      isOpen={isSettingsOpen}
+      onClose={() => setIsSettingsOpen(false)}
+      blobColor={blobColor}
+      setBlobColor={setBlobColor}
+      blobSize={blobSize}
+      setBlobSize={setBlobSize}
+      onEnterDragMode={() => {
+        setIsSettingsOpen(false);
+        setIsDragging(true);
+        dragStateRef.current.isPointerDown = false;
+      }}
+    />
+
+    {isDragging && (
+      <div
+        className="drag-overlay"
+        onPointerDown={handleDragPointerDown}
+        onPointerMove={handleDragPointerMove}
+        onPointerUp={handleDragPointerUp}
+        onPointerCancel={handleDragPointerUp}
+        onPointerLeave={handleDragPointerUp}
+      >
+        <div className="drag-helper-text">
+          <span>DRAG ANYWHERE TO REPOSITION</span>
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setBlobPosition(dragStateRef.current.tempPosition);
+              dragStateRef.current.isPointerDown = false;
+              setIsDragging(false);
+            }}
+          >
+            SAVE POSITION
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+);
 }
 
 export default App;
