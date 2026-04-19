@@ -97,7 +97,46 @@ function App() {
   const audioQueueRef = useRef({}); // Using object keyed by index for O(1) lookups
   const isPlayingAudioRef = useRef(false);
   const hudVideoRef = useRef(null);
+  const [cameraStatus, setCameraStatus] = useState('pending'); // 'pending', 'authorized', 'denied'
   const nextExpectedIndexRef = useRef(0);
+
+  const handleModeChange = React.useCallback((newMode) => {
+    setActiveMode(newMode);
+    if (socketRef.current) {
+      socketRef.current.emit('MODE_CHANGE', { mode: newMode });
+    }
+
+    const modeThemes = {
+      'M.M.S.': { primary: '#00d4ff', accent: '#00d4ff', bg: 'rgba(0, 212, 255, 0.03)' },
+      'TRADER': { primary: '#00ff88', accent: '#ffaa00', bg: 'rgba(0, 255, 136, 0.03)' },
+      'PROFESSOR': { primary: '#a78bfa', accent: '#60a5fa', bg: 'rgba(167, 139, 250, 0.03)' },
+      'ENGINEER': { primary: '#f97316', accent: '#facc15', bg: 'rgba(249, 115, 22, 0.03)' }
+    };
+
+    const theme = modeThemes[newMode] || modeThemes['M.M.S.'];
+    setBlobColor(theme.primary);
+
+    // Update CSS variables globally
+    document.documentElement.style.setProperty('--primary', theme.primary);
+    document.documentElement.style.setProperty('--accent', theme.accent);
+    document.documentElement.style.setProperty('--bg-glow', theme.bg);
+  }, []);
+
+  const handleModeSync = React.useCallback((newMode) => {
+    setActiveMode(newMode);
+
+    const modeColors = {
+      'M.M.S.': { primary: '#00d4ff', accent: '#00d4ff' },
+      'TRADER': { primary: '#00ff88', accent: '#ffaa00' },
+      'PROFESSOR': { primary: '#a78bfa', accent: '#60a5fa' },
+      'ENGINEER': { primary: '#f97316', accent: '#facc15' }
+    };
+
+    const colors = modeColors[newMode] || modeColors['M.M.S.'];
+    setBlobColor(colors.primary);
+    document.documentElement.style.setProperty('--primary', colors.primary);
+    document.documentElement.style.setProperty('--accent', colors.accent);
+  }, []);
 
   // Sync to LOCALSTORAGE for persistence on change
   useEffect(() => {
@@ -105,6 +144,27 @@ function App() {
     localStorage.setItem('blobSize', blobSize);
     localStorage.setItem('blobPosition', JSON.stringify(blobPosition));
   }, [blobColor, blobSize, blobPosition]);
+
+  // Function to fetch TTS audio via HTTP
+  const fetchTTSAudio = React.useCallback(async (text) => {
+    try {
+      const response = await fetch('http://127.0.0.1:3001/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, pitch: '+0Hz', rate: '+5%' })
+      });
+
+      if (!response.ok) {
+        throw new Error(`TTS HTTP error: ${response.status}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      return new Uint8Array(arrayBuffer);
+    } catch (err) {
+      console.error('[TTS HTTP] Failed:', err);
+      return null;
+    }
+  }, []);
 
   const playNextAudioChunk = React.useCallback(async () => {
     if (isPlayingAudioRef.current) return;
@@ -169,37 +229,16 @@ function App() {
     }
   }, [fetchTTSAudio]);
 
-  // Function to fetch TTS audio via HTTP
-  const fetchTTSAudio = React.useCallback(async (text) => {
-    try {
-      const response = await fetch('http://localhost:3001/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, pitch: '+0Hz', rate: '+5%' })
-      });
-
-      if (!response.ok) {
-        throw new Error(`TTS HTTP error: ${response.status}`);
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-      return new Uint8Array(arrayBuffer);
-    } catch (err) {
-      console.error('[TTS HTTP] Failed:', err);
-      return null;
-    }
-  }, []);
-
   // Load memories and system config from backend on startup
   useEffect(() => {
-    fetch('http://localhost:3001/memories')
+    fetch('http://127.0.0.1:3001/memories')
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) setStoredMemories(data.slice(0, 5));
       })
       .catch(() => { });
 
-    fetch('http://localhost:3001/config') 
+    fetch('http://127.0.0.1:3001/config') 
       .then(r => r.json())
       .then(res => {
          if (res.success && res.data) {
@@ -213,8 +252,9 @@ function App() {
   }, []);
 
   useEffect(() => {
-    socketRef.current = io('http://localhost:3001', {
-      transports: ['polling', 'websocket'],
+    socketRef.current = io('http://127.0.0.1:3001', {
+      transports: ['websocket'],
+      upgrade: false,
       forceNew: true,
       reconnection: true,
       reconnectionAttempts: 5,
@@ -336,12 +376,15 @@ function App() {
     let stream = null;
     const startCamera = async () => {
       try {
+        setCameraStatus('pending');
         stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+        setCameraStatus('authorized');
         if (hudVideoRef.current) {
           hudVideoRef.current.srcObject = stream;
         }
       } catch (err) {
         console.error("[HUD] Camera access denied or not found:", err);
+        setCameraStatus('denied');
       }
     };
     startCamera();
@@ -353,7 +396,7 @@ function App() {
   useEffect(() => {
     const pollBiometrics = async () => {
       try {
-        const res = await fetch('http://localhost:3003/status');
+        const res = await fetch('http://127.0.0.1:3003/status');
         const data = await res.json();
         setBiometricData(data);
 
@@ -399,7 +442,7 @@ function App() {
 
     const fetchSpecialistData = async () => {
       try {
-        const res = await fetch(`http://localhost:3002/agent/mode_data?mode=${activeMode}`);
+        const res = await fetch(`http://127.0.0.1:3002/agent/mode_data?mode=${activeMode}`);
         const data = await res.json();
         if (data.success) {
           setSpecialistData(data.data);
@@ -414,44 +457,6 @@ function App() {
     return () => clearInterval(interval);
   }, [activeMode]);
 
-  // Handle Mode Change with Color Shift
-  const handleModeChange = (newMode) => {
-    setActiveMode(newMode);
-    if (socketRef.current) {
-      socketRef.current.emit('MODE_CHANGE', { mode: newMode });
-    }
-
-    const modeThemes = {
-      'M.M.S.': { primary: '#00d4ff', accent: '#00d4ff', bg: 'rgba(0, 212, 255, 0.03)' },
-      'TRADER': { primary: '#00ff88', accent: '#ffaa00', bg: 'rgba(0, 255, 136, 0.03)' },
-      'PROFESSOR': { primary: '#a78bfa', accent: '#60a5fa', bg: 'rgba(167, 139, 250, 0.03)' },
-      'ENGINEER': { primary: '#f97316', accent: '#facc15', bg: 'rgba(249, 115, 22, 0.03)' }
-    };
-
-    const theme = modeThemes[newMode] || modeThemes['M.M.S.'];
-    setBlobColor(theme.primary);
-
-    // Update CSS variables globally
-    document.documentElement.style.setProperty('--primary', theme.primary);
-    document.documentElement.style.setProperty('--accent', theme.accent);
-    document.documentElement.style.setProperty('--bg-glow', theme.bg);
-  };
-
-  const handleModeSync = (newMode) => {
-    setActiveMode(newMode);
-
-    const modeColors = {
-      'M.M.S.': { primary: '#00d4ff', accent: '#00d4ff' },
-      'TRADER': { primary: '#00ff88', accent: '#ffaa00' },
-      'PROFESSOR': { primary: '#a78bfa', accent: '#60a5fa' },
-      'ENGINEER': { primary: '#f97316', accent: '#facc15' }
-    };
-
-    const colors = modeColors[newMode] || modeColors['M.M.S.'];
-    setBlobColor(colors.primary);
-    document.documentElement.style.setProperty('--primary', colors.primary);
-    document.documentElement.style.setProperty('--accent', colors.accent);
-  };
   useEffect(() => {
     localStorage.setItem('blobColor', blobColor);
     localStorage.setItem('blobSize', blobSize.toString());
@@ -735,31 +740,14 @@ function App() {
     const files = Array.from(e.target.files);
     if (!files.length) return;
 
-    setIsDigesting(true);
-    setDigestionProgress(0);
-
     const formData = new FormData();
     files.forEach(file => formData.append('artifacts', file));
 
     try {
-      // Simulate/Show progress
-      const interval = setInterval(() => {
-        setDigestionProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(interval);
-            return 90;
-          }
-          return prev + 10;
-        });
-      }, 200);
-
       const response = await fetch('http://localhost:3001/upload', {
         method: 'POST',
         body: formData,
       });
-
-      clearInterval(interval);
-      setDigestionProgress(100);
 
       const result = await response.json();
       if (result.success) {
@@ -772,11 +760,6 @@ function App() {
       }
     } catch (err) {
       console.error('[UPLINK] Upload failed:', err);
-    } finally {
-      setTimeout(() => {
-        setIsDigesting(false);
-        setDigestionProgress(0);
-      }, 1000);
     }
   };
 
@@ -1805,13 +1788,24 @@ return (
               <div className="hud-corner-brackets"></div>
               <div className="scanline-overlay"></div>
               <div className="hud-video-container">
-                <video 
-                  ref={hudVideoRef} 
-                  autoPlay 
-                  playsInline 
-                  muted 
-                  className="hud-video-feed"
-                />
+                {cameraStatus === 'authorized' ? (
+                  <video 
+                    ref={hudVideoRef} 
+                    autoPlay 
+                    playsInline 
+                    muted 
+                    className="hud-video-feed"
+                  />
+                ) : (
+                  <div className="camera-auth-overlay">
+                    <div className="auth-glitch-text">
+                      {cameraStatus === 'denied' ? 'SIGNAL_BLOCKED' : 'AWAITING_AUTH'}
+                    </div>
+                    <div className="auth-subtext">
+                      {cameraStatus === 'denied' ? 'AUTHORIZATION DENIED BY MASTER' : 'TACTICAL UPLINK PENDING...'}
+                    </div>
+                  </div>
+                )}
                 <div className="face-target-box"></div>
                 <div className="hud-telemetry-top">
                    <span className="telemetry-item">REC ●</span>

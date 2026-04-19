@@ -2687,3 +2687,49 @@ html {
   z-index: 20;
   pointer-events: none;
 }
+
+/* Camera Auth Overlay */
+.camera-auth-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 5, 10, 0.9);
+  z-index: 10;
+  text-align: center;
+  padding: 15px;
+  overflow: hidden;
+}
+
+.auth-glitch-text {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.9rem;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #00d4ff;
+  text-shadow: 0 0 8px #00d4ff;
+  margin-bottom: 8px;
+  animation: auth-glitch 2.5s infinite;
+}
+
+.auth-subtext {
+  font-size: 0.55rem;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+@keyframes auth-glitch {
+  0% { transform: skew(0deg); opacity: 1; }
+  10% { transform: skew(3deg); opacity: 0.8; }
+  11% { transform: skew(0deg); opacity: 1; }
+  50% { transform: skew(0deg); opacity: 1; }
+  51% { transform: skew(-5deg); opacity: 1; }
+  52% { transform: skew(0deg); opacity: 1; }
+  100% { transform: skew(3deg); opacity: 1; }
+}
