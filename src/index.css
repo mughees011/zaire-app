@@ -1,10 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
 
 :root {
-  --jarvis-cyan: #00d4ff;
-  --jarvis-teal: #00ff88;
-  --jarvis-blue: #0084ff;
-  --jarvis-dark: #000814;
+  --mms-cyan: #00d4ff;
+  --mms-teal: #00ff88;
+  --mms-blue: #0084ff;
+  --mms-dark: #000814;
 }
 
 * {
@@ -16,7 +16,7 @@
 body {
   margin: 0;
   background-color: #000;
-  color: var(--jarvis-cyan);
+  color: var(--mms-cyan);
   font-family: 'Share Tech Mono', monospace;
   overflow: hidden;
   height: 100vh;
@@ -44,8 +44,8 @@ body {
   left: 0;
   width: 100%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--jarvis-cyan), transparent);
-  box-shadow: 0 0 15px var(--jarvis-cyan);
+  background: linear-gradient(90deg, transparent, var(--mms-cyan), transparent);
+  box-shadow: 0 0 15px var(--mms-cyan);
   z-index: 2;
   opacity: 0.4;
   pointer-events: none;

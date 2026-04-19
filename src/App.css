@@ -7,11 +7,15 @@
   --accent-red: #ff4040;
   --accent-amber: rgba(255, 180, 0, 0.7);
   --bg-dark: #000;
-  --panel-bg: rgba(0, 6, 16, 0.85);
+  --bg-glow: rgba(0, 212, 255, 0.03);
+  --panel-bg: rgba(0, 10, 20, 0.85);
   --border-subtle: rgba(0, 212, 255, 0.08);
   --border-active: rgba(0, 212, 255, 0.2);
+  --border-muted: rgba(0, 212, 255, 0.2);
+  --text-dim: #446677;
   --font-orbitron: 'Orbitron', monospace;
   --font-share: 'Share Tech Mono', monospace;
+  --font-mono: 'Share Tech Mono', 'Courier New', Courier, monospace;
 }
 
 * {
@@ -31,6 +35,14 @@ body {
 body {
   font-family: var(--font-share);
   -webkit-font-smoothing: antialiased;
+  background-color: #000;
+  color: #fff;
+  background-image: radial-gradient(circle at center, var(--bg-glow) 0%, transparent 70%);
+}
+
+/* Dynamic Root Transitions */
+html {
+    transition: --primary 0.5s ease, --bg-glow 0.8s ease;
 }
 
 #root {
@@ -38,13 +50,124 @@ body {
   height: 100%;
 }
 
-.jarvis-container {
-  position: relative;
+.mms-container {
   width: 100vw;
   height: 100vh;
+  position: relative;
   overflow: hidden;
+  transition: background 0.5s ease;
   background: var(--bg-dark);
   animation: crtFlicker 0.15s infinite;
+}
+
+/* VISION PANEL FIX */
+.vision-panel {
+  overflow: visible !important;
+  border: 1px solid var(--border-muted);
+  background: rgba(0, 5, 10, 0.4);
+  position: relative;
+}
+
+.vision-hint {
+   font-size: 10px;
+   color: var(--text-dim);
+   margin-top: 5px;
+}
+
+/* CAMERA SCANLINE HUD FEED */
+.camera-scan-container {
+  width: 240px;
+  height: 140px;
+  background: #000;
+  border: 1px solid var(--primary);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.1);
+}
+
+.scanline-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%,
+    rgba(0, 0, 0, 0.1) 50%
+  ), linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.02),
+    rgba(0, 255, 0, 0.01),
+    rgba(0, 0, 255, 0.02)
+  );
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.face-target-box {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border: 1px solid var(--primary);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.face-target-box::before, .face-target-box::after {
+   content: '';
+   position: absolute;
+   width: 10px;
+   height: 10px;
+   border: 2px solid var(--primary);
+}
+
+.face-target-box::before { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
+.face-target-box::after { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
+
+.camera-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  opacity: 0.6;
+}
+
+.camera-dot {
+  width: 12px;
+  height: 12px;
+  background: var(--primary);
+  border-radius: 50%;
+  margin-bottom: 10px;
+  box-shadow: 0 0 10px var(--primary);
+  animation: pulse 2s infinite;
+}
+
+.camera-label {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--primary);
+}
+
+.location-info-hud {
+   position: absolute;
+   bottom: 10px;
+   left: 10px;
+   font-size: 8px;
+   color: var(--text-dim);
+   display: flex;
+   flex-direction: column;
+   gap: 2px;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 @keyframes crtFlicker {
@@ -140,7 +263,7 @@ body {
   }
 }
 
-.jarvis-container::before {
+.mms-container::before {
   content: '';
   position: fixed;
   inset: 0;
@@ -153,7 +276,7 @@ body {
   z-index: 4;
 }
 
-.jarvis-container::after {
+.mms-container::after {
   content: '';
   position: fixed;
   inset: 0;
@@ -2154,8 +2277,8 @@ body {
   animation: opacityPulse 2s ease-in-out infinite;
 }
 
-/* ── JARVIS TRANSCRIPT ── */
-.jarvis-transcript-container {
+/* ── M.M.S. TRANSCRIPT ── */
+.mms-transcript-container {
   position: absolute;
   bottom: 20px;
   right: 20px;
@@ -2172,7 +2295,7 @@ body {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
 }
 
-.jarvis-transcript-container.visible {
+.mms-transcript-container.visible {
   opacity: 1;
   transform: translateY(0) scale(1);
   pointer-events: auto;
@@ -2245,7 +2368,7 @@ body {
 }
 
 /* ── SECURITY ALERT ── */
-.jarvis-container.security-alert {
+.mms-container.security-alert {
   background: radial-gradient(circle at center, rgba(139, 0, 0, 0.1) 0%, transparent 80%);
 }
 
@@ -2437,4 +2560,130 @@ body {
 @keyframes popIn {
   from { opacity: 0; transform: scale(0.8); }
   to { opacity: 1; transform: scale(1); }
+}
+
+/* Tactical HUD Video Feed Overhaul */
+.camera-scan-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  background: rgba(0, 0, 0, 0.2);
+  padding: 5px;
+  box-sizing: border-box;
+}
+
+.hud-corner-brackets {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.hud-corner-brackets::before,
+.hud-corner-brackets::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.hud-corner-brackets::before {
+  border-top: 2px solid var(--primary);
+  border-bottom: 2px solid var(--primary);
+  mask: linear-gradient(90deg, #fff 15px, transparent 15px, transparent calc(100% - 15px), #fff calc(100% - 15px));
+}
+
+.hud-corner-brackets::after {
+  border-left: 2px solid var(--primary);
+  border-right: 2px solid var(--primary);
+  mask: linear-gradient(180deg, #fff 15px, transparent 15px, transparent calc(100% - 15px), #fff calc(100% - 15px));
+}
+
+.hud-video-container {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
+}
+
+.hud-video-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(0.4) brightness(0.9) contrast(1.1) hue-rotate(160deg) saturate(1.2);
+  opacity: 0.9;
+  transform: scale(1.02); /* Slight overscan */
+}
+
+.hud-video-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%,
+    rgba(0, 212, 255, 0.05) 50%
+  );
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 10;
+  animation: scan-flicker 0.1s infinite;
+}
+
+@keyframes scan-flicker {
+  0% { opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+
+.hud-telemetry-top,
+.hud-telemetry-bottom {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-share);
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: var(--primary);
+  text-shadow: 0 0 5px var(--primary);
+  z-index: 15;
+  pointer-events: none;
+}
+
+.hud-telemetry-top { top: 8px; }
+.hud-telemetry-bottom { bottom: 8px; }
+
+.telemetry-item {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 1px 4px;
+}
+
+.blink {
+  animation: telemetry-blink 1s steps(2, start) infinite;
+}
+
+@keyframes telemetry-blink {
+  to { visibility: hidden; }
+}
+
+.face-target-box {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 70px;
+  height: 70px;
+  border: 1px dashed rgba(0, 212, 255, 0.4);
+  z-index: 20;
+  pointer-events: none;
 }

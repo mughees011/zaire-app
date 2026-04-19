@@ -20,7 +20,7 @@ function App() {
   const cameraRef = useRef(null);
   const dragStateRef = useRef({ isPointerDown: false, tempPosition: { x: 0, y: 0 } });
 
-  const [activeMode, setActiveMode] = useState('JARVIS');
+  const [activeMode, setActiveMode] = useState('M.M.S.');
   const [timeStr, setTimeStr] = useState('00:00:00');
   const [navItem, setNavItem] = useState('HOME');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -47,7 +47,7 @@ function App() {
     { time: '15:47', message: 'System boot complete' },
     { time: '15:46', message: 'Neural core initialized' },
     { time: '15:45', message: 'Voice synthesis online' },
-    { time: '15:44', message: 'Loading JARVIS protocol' },
+    { time: '15:44', message: 'Loading M.M.S. protocol' },
     { time: '15:43', message: 'Mounting file system' },
   ]);
 
@@ -80,7 +80,7 @@ function App() {
 
   // Real-time Socket states
   const socketRef = useRef(null);
-  const [jarvisResponseStream, setJarvisResponseStream] = useState('');
+  const [mmsResponseStream, setMmsResponseStream] = useState('');
   const [showResponsePanel, setShowResponsePanel] = useState(false);
   const responseTimeoutRef = useRef(null);
 
@@ -89,8 +89,6 @@ function App() {
   const [isSecurityAlert, setIsSecurityAlert] = useState(false);
   const [specialistData, setSpecialistData] = useState(null);
   const [isGlitchActive, setIsGlitchActive] = useState(false);
-  const [isDigesting, setIsDigesting] = useState(false);
-  const [digestionProgress, setDigestionProgress] = useState(0);
   const [artifactTokens, setArtifactTokens] = useState([]);
   const [pendingArtifactTokens, setPendingArtifactTokens] = useState([]);
   const fileInputRef = useRef(null);
@@ -98,9 +96,17 @@ function App() {
 
   const audioQueueRef = useRef({}); // Using object keyed by index for O(1) lookups
   const isPlayingAudioRef = useRef(false);
+  const hudVideoRef = useRef(null);
   const nextExpectedIndexRef = useRef(0);
 
-  const playNextAudioChunk = async () => {
+  // Sync to LOCALSTORAGE for persistence on change
+  useEffect(() => {
+    localStorage.setItem('blobColor', blobColor);
+    localStorage.setItem('blobSize', blobSize);
+    localStorage.setItem('blobPosition', JSON.stringify(blobPosition));
+  }, [blobColor, blobSize, blobPosition]);
+
+  const playNextAudioChunk = React.useCallback(async () => {
     if (isPlayingAudioRef.current) return;
 
     const nextIndex = nextExpectedIndexRef.current;
@@ -161,10 +167,10 @@ function App() {
       nextExpectedIndexRef.current++;
       playNextAudioChunk();
     }
-  };
+  }, [fetchTTSAudio]);
 
   // Function to fetch TTS audio via HTTP
-  const fetchTTSAudio = async (text) => {
+  const fetchTTSAudio = React.useCallback(async (text) => {
     try {
       const response = await fetch('http://localhost:3001/tts', {
         method: 'POST',
@@ -182,14 +188,26 @@ function App() {
       console.error('[TTS HTTP] Failed:', err);
       return null;
     }
-  };
+  }, []);
 
-  // Load memories from backend on startup
+  // Load memories and system config from backend on startup
   useEffect(() => {
     fetch('http://localhost:3001/memories')
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) setStoredMemories(data.slice(0, 5));
+      })
+      .catch(() => { });
+
+    fetch('http://localhost:3001/config') 
+      .then(r => r.json())
+      .then(res => {
+         if (res.success && res.data) {
+            console.log('[SYSTEM] Restored HUD config from core.');
+            if (res.data.blobColor) setBlobColor(res.data.blobColor);
+            if (res.data.blobSize) setBlobSize(res.data.blobSize);
+            if (res.data.blobPosition) setBlobPosition(res.data.blobPosition);
+         }
       })
       .catch(() => { });
   }, []);
@@ -227,14 +245,14 @@ function App() {
     });
 
     socketRef.current.on('ai_text_delta', (delta) => {
-      setJarvisResponseStream(prev => prev + delta);
+      setMmsResponseStream(prev => prev + delta);
       setShowResponsePanel(true);
 
       // Reset fade timeout
       if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
       responseTimeoutRef.current = setTimeout(() => {
         setShowResponsePanel(false);
-        setJarvisResponseStream('');
+        setMmsResponseStream('');
       }, 12000); // Fade after 12s of silence
     });
 
@@ -272,7 +290,7 @@ function App() {
     });
 
     // Vision status
-    socketRef.current.on('jarvis_status', (status) => {
+    socketRef.current.on('mms_status', (status) => {
       if (status === 'scanning') {
         setIsVisionScanning(true);
       } else {
@@ -312,7 +330,27 @@ function App() {
       setIsDiagnosticActive(active);
     });
 
-    // Biometric Polling (Observer Daemon on Port 3003)
+  }, [playNextAudioChunk, handleModeSync]);
+
+  useEffect(() => {
+    let stream = null;
+    const startCamera = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+        if (hudVideoRef.current) {
+          hudVideoRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        console.error("[HUD] Camera access denied or not found:", err);
+      }
+    };
+    startCamera();
+    return () => {
+      if (stream) stream.getTracks().forEach(track => track.stop());
+    };
+  }, []);
+
+  useEffect(() => {
     const pollBiometrics = async () => {
       try {
         const res = await fetch('http://localhost:3003/status');
@@ -332,16 +370,29 @@ function App() {
 
     const biometricInterval = setInterval(pollBiometrics, 3000);
 
+    // PERSISTENCE LISTENER
+    const handlePersist = (e) => {
+      if (socketRef.current) {
+        socketRef.current.emit('SAVE_CONFIG', {
+          blobColor: normalizeHexColor(localStorage.getItem('blobColor')),
+          blobSize: parseInt(localStorage.getItem('blobSize') || '60'),
+          blobPosition: JSON.parse(localStorage.getItem('blobPosition') || '{}')
+        });
+      }
+    };
+    window.addEventListener('MMS_PERSIST_CONFIG', handlePersist);
+
     return () => {
       if (socketRef.current) socketRef.current.disconnect();
       clearInterval(biometricInterval);
+      window.removeEventListener('MMS_PERSIST_CONFIG', handlePersist);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Poll for specialist data
   useEffect(() => {
-    if (activeMode === 'JARVIS') {
+    if (activeMode === 'M.M.S.') {
       setSpecialistData(null);
       return;
     }
@@ -370,33 +421,33 @@ function App() {
       socketRef.current.emit('MODE_CHANGE', { mode: newMode });
     }
 
-    // Color Mapping
-    const modeColors = {
-      'JARVIS': { primary: '#00d4ff', accent: '#00d4ff' },
-      'TRADER': { primary: '#00ff88', accent: '#ffaa00' },
-      'PROFESSOR': { primary: '#a78bfa', accent: '#60a5fa' },
-      'ENGINEER': { primary: '#f97316', accent: '#facc15' }
+    const modeThemes = {
+      'M.M.S.': { primary: '#00d4ff', accent: '#00d4ff', bg: 'rgba(0, 212, 255, 0.03)' },
+      'TRADER': { primary: '#00ff88', accent: '#ffaa00', bg: 'rgba(0, 255, 136, 0.03)' },
+      'PROFESSOR': { primary: '#a78bfa', accent: '#60a5fa', bg: 'rgba(167, 139, 250, 0.03)' },
+      'ENGINEER': { primary: '#f97316', accent: '#facc15', bg: 'rgba(249, 115, 22, 0.03)' }
     };
 
-    const colors = modeColors[newMode] || modeColors['JARVIS'];
-    setBlobColor(colors.primary);
+    const theme = modeThemes[newMode] || modeThemes['M.M.S.'];
+    setBlobColor(theme.primary);
 
     // Update CSS variables globally
-    document.documentElement.style.setProperty('--primary', colors.primary);
-    document.documentElement.style.setProperty('--accent', colors.accent);
+    document.documentElement.style.setProperty('--primary', theme.primary);
+    document.documentElement.style.setProperty('--accent', theme.accent);
+    document.documentElement.style.setProperty('--bg-glow', theme.bg);
   };
 
   const handleModeSync = (newMode) => {
     setActiveMode(newMode);
 
     const modeColors = {
-      'JARVIS': { primary: '#00d4ff', accent: '#00d4ff' },
+      'M.M.S.': { primary: '#00d4ff', accent: '#00d4ff' },
       'TRADER': { primary: '#00ff88', accent: '#ffaa00' },
       'PROFESSOR': { primary: '#a78bfa', accent: '#60a5fa' },
       'ENGINEER': { primary: '#f97316', accent: '#facc15' }
     };
 
-    const colors = modeColors[newMode] || modeColors['JARVIS'];
+    const colors = modeColors[newMode] || modeColors['M.M.S.'];
     setBlobColor(colors.primary);
     document.documentElement.style.setProperty('--primary', colors.primary);
     document.documentElement.style.setProperty('--accent', colors.accent);
@@ -483,7 +534,7 @@ function App() {
 
             // Send to Real-time Backend - include pending artifacts
             console.log('[DEBUG] Voice (Groq) sending with artifacts:', pendingArtifactTokens.length, pendingArtifactTokens);
-            setJarvisResponseStream('');
+            setMmsResponseStream('');
             const allArtifacts = [...artifactTokens, ...pendingArtifactTokens];
             if (socketRef.current) {
               socketRef.current.emit('user_message', text, { artifactTokens: allArtifacts });
@@ -625,7 +676,7 @@ function App() {
 
         // Send to Real-time Backend - include pending artifacts
         console.log('[DEBUG] Voice (browser) sending with artifacts:', pendingArtifactTokens.length, pendingArtifactTokens);
-        setJarvisResponseStream('');
+        setMmsResponseStream('');
         const allArtifacts = [...artifactTokens, ...pendingArtifactTokens];
         if (socketRef.current) {
           socketRef.current.emit('user_message', text, { artifactTokens: allArtifacts });
@@ -729,16 +780,6 @@ function App() {
     }
   };
 
-  const removeArtifact = (index) => {
-    setArtifactTokens(prev => prev.filter((_, i) => i !== index));
-    if (activeMode === 'ARTIFACT' && artifactTokens.length <= 1) {
-      handleModeChange('JARVIS');
-    }
-  };
-
-  const removePendingArtifact = (index) => {
-    setPendingArtifactTokens(prev => prev.filter((_, i) => i !== index));
-  };
 
 const stopMicrophone = () => {
   setGroqStatus('');
@@ -1281,19 +1322,16 @@ useEffect(() => {
   return () => cancelAnimationFrame(animationId);
 }, []);
 
-const modes = ['JARVIS', 'TRADER', 'PROFESSOR', 'ENGINEER'];
+const modes = ['M.M.S.', 'TRADER', 'PROFESSOR', 'ENGINEER'];
 const navItems = ['HOME', 'DASHBOARD', 'COMMAND', 'MEMORY', 'NEURAL'];
-const modules = [
-  { name: 'VISION', status: 'READY' },
-  { name: 'VOICE', status: 'ACTIVE' },
-  { name: 'WEB', status: 'LIVE' },
-  { name: 'FILES', status: 'MOUNTED' },
-  { name: 'CAMERA', status: 'OFFLINE' },
+const quickAccess = [
+  { label: 'SCREEN CAPTURE', action: 'capture' },
+  { label: 'OPEN BROWSER', action: 'browser' },
+  { label: 'FILE MANAGER', action: 'files' }
 ];
-const quickAccess = ['SCREEN CAPTURE', 'OPEN BROWSER', 'FILE MANAGER'];
 
 return (
-  <div className={`jarvis-container ${isDiagnosticActive ? 'diagnostic-active' : ''} ${isSecurityAlert ? 'security-alert' : ''} ${isGlitchActive ? 'glitch-active' : ''}`}>
+  <div className={`mms-container ${isDiagnosticActive ? 'diagnostic-active' : ''} ${isSecurityAlert ? 'security-alert' : ''} ${isGlitchActive ? 'glitch-active' : ''}`}>
     <canvas id="three-canvas" ref={threeCanvasRef}></canvas>
     <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
 
@@ -1306,8 +1344,8 @@ return (
       {/* ROW 1: NAVBAR */}
       <div className="grid-navbar">
         <div className="nav-logo">
-          <span className="logo-text">J·A·R·V·I·S</span>
-          <span className="logo-sub">PERSONAL AI · v0.1</span>
+          <span className="logo-text">M·M·S</span>
+          <span className="logo-sub">MUGHEES MANAGEMENT SYSTEM · v2.0</span>
         </div>
 
         <div className="nav-links">
@@ -1363,13 +1401,13 @@ return (
 
         <div className="panel-section">
           <div className="section-label">
-            {activeMode === 'JARVIS' && 'SYSTEM VITALS'}
+            {activeMode === 'M.M.S.' && 'SYSTEM VITALS'}
             {activeMode === 'TRADER' && 'PORTFOLIO'}
             {activeMode === 'PROFESSOR' && 'STUDY TRACKER'}
             {activeMode === 'ENGINEER' && 'ACTIVE PROJECT'}
           </div>
 
-          {activeMode === 'JARVIS' && (
+          {activeMode === 'M.M.S.' && (
             <div className="vitals-bars">
               <div className="vital-row">
                 <span className="vital-label">CPU</span>
@@ -1461,10 +1499,16 @@ return (
         <div className="panel-section">
           <div className="section-label">MODULE STATUS</div>
           <div className="module-list">
-            {modules.map(mod => (
+            {[
+              { name: 'VISION', status: 'READY' },
+              { name: 'VOICE', status: 'ACTIVE' },
+              { name: 'WEB', status: 'LIVE' },
+              { name: 'FILES', status: 'MOUNTED' },
+              { name: 'CAMERA', status: biometricData.error ? 'OFFLINE' : 'LIVE' },
+            ].map(mod => (
               <div key={mod.name} className="module-row">
                 <span className="module-name">{mod.name}</span>
-                <span className={`module-status ${mod.status === 'OFFLINE' ? 'offline' : ''}`}>{mod.status}</span>
+                <span className={`module-status ${mod.status === 'OFFLINE' ? 'offline' : 'online'}`}>{mod.status}</span>
               </div>
             ))}
           </div>
@@ -1502,13 +1546,13 @@ return (
         </div>
 
         {/* ── PREMIUM RESPONSE TRANSCRIPT ── */}
-        <div className={`jarvis-transcript-container ${showResponsePanel ? 'visible' : ''}`}>
+        <div className={`mms-transcript-container ${showResponsePanel ? 'visible' : ''}`}>
           <div className="transcript-header">
             <span className="transcript-dot"></span>
-            <span className="transcript-label">JARVIS VOCAL OUTPUT</span>
+            <span className="transcript-label">M.M.S. VOCAL OUTPUT</span>
           </div>
           <div className="transcript-content">
-            {jarvisResponseStream || '...'}
+            {mmsResponseStream || '...'}
           </div>
           <div className="transcript-footer">
             <div className="audio-bars">
@@ -1647,8 +1691,20 @@ return (
           <div className="section-label">QUICK ACCESS</div>
           <div className="quick-list">
             {quickAccess.map(item => (
-              <div key={item} className="quick-item">
-                <span>{item}</span>
+              <div 
+                key={item.label} 
+                className="quick-item clickable"
+                onClick={() => {
+                  if (socketRef.current) {
+                    socketRef.current.emit('QUICK_ACTION', { action: item.action });
+                    setSystemActionLog(prev => [{ 
+                      time: new Date().toLocaleTimeString(), 
+                      label: `[QUICK] EXEC: ${item.label}` 
+                    }, ...prev].slice(0, 6));
+                  }
+                }}
+              >
+                <span>{item.label}</span>
                 <span className="quick-arrow">›</span>
               </div>
             ))}
@@ -1678,16 +1734,16 @@ return (
       {/* ROW 3: BOTTOM BAR */}
       <div className="grid-bottom">
         <div className="bottom-left">
-          <div className="location-info">
-            <span className="location-row">CITY: KARACHI</span>
-            <span className="location-row">TZ: PKT +5</span>
+          <div className="version-info">
+            <span className="version-row">M.M.S. CORE: v2.0.0</span>
+            <span className="version-row verified">AUTH: MUGHEES [VERIFIED]</span>
           </div>
         </div>
 
         <div className="bottom-center">
           <div className="single-command-box">
             <div className="command-header">
-              <span>COMMAND INTERFACE</span>
+              <span>M.M.S. COMMAND INTERFACE</span>
               <div className="header-controls">
                 <button
                   className={`engine-toggle ${useGroqSpeech ? 'groq' : 'browser'}`}
@@ -1703,69 +1759,18 @@ return (
                 </div>
               </div>
             </div>
-
-            {isDigesting && (
-              <div className="digestion-progress-bar">
-                <div className="digestion-fill" style={{ width: `${digestionProgress}%` }}></div>
-                <div className="digestion-label">DIGESTING ARTIFACTS... {digestionProgress}%</div>
-              </div>
-            )}
-
-            {/* Pending artifacts (waiting to be sent) */}
-            {pendingArtifactTokens.length > 0 && (
-              <div className="artifact-token-list pending">
-                {pendingArtifactTokens.map((token, i) => {
-                  const tokenStr = typeof token === 'string' ? token : (token.name || token.fileName || JSON.stringify(token));
-                  return (
-                    <div key={`pending-${i}`} className="artifact-token pending-token">
-                      <span className="token-icon">◐</span>
-                      <span className="token-name">{tokenStr.substring(0, 15)}{tokenStr.length > 15 ? '...' : ''}</span>
-                      <span className="pending-badge">WAITING</span>
-                      <button className="token-remove" onClick={() => removePendingArtifact(i)}>×</button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Active artifacts (already sent) */}
-            {artifactTokens.length > 0 && (
-              <div className="artifact-token-list">
-                {artifactTokens.map((token, i) => {
-                  const tokenStr = typeof token === 'string' ? token : (token.name || token.fileName || JSON.stringify(token));
-                  return (
-                    <div key={i} className="artifact-token">
-                      <span className="token-icon">■</span>
-                      <span className="token-name">{tokenStr.substring(0, 15)}{tokenStr.length > 15 ? '...' : ''}</span>
-                      <button className="token-remove" onClick={() => removeArtifact(i)}>×</button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
+            
+            {/* ... (Existing Command Box Logic) ... */}
             <div className="command-row">
-              <input
-                type="file"
-                ref={fileInputRef}
-                style={{ display: 'none' }}
-                multiple
-                onChange={handleFileUpload}
-              />
-              <button
-                className="uplink-btn"
-                onClick={() => fileInputRef.current.click()}
-                title="Tactical Uplink (Upload Files/Folders)"
-              >
-                <svg className="uplink-icon" viewBox="0 0 24 24">
-                  <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-2.48-2.02-4.5-4.5-4.5S7 2.52 7 5v12.5c0 3.59 2.91 6.5 6.5 6.5s6.5-2.91 6.5-6.5V6h-1.5z" />
-                </svg>
+              <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={handleFileUpload} />
+              <button className="uplink-btn" onClick={() => fileInputRef.current.click()} title="Tactical Uplink">
+                 <svg className="uplink-icon" viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-2.48-2.02-4.5-4.5-4.5S7 2.52 7 5v12.5c0 3.59 2.91 6.5 6.5 6.5s6.5-2.91 6.5-6.5V6h-1.5z" /></svg>
               </button>
               <div className={`command-input-wrapper ${isMicrophoneActive ? 'voice-mode' : (isTyping ? 'typing-mode' : '')}`}>
                 <input
                   type="text"
                   className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
-                  placeholder={isMicrophoneActive ? 'LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
+                  placeholder={isMicrophoneActive ? 'M.M.S. LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
                   value={isMicrophoneActive ? (recognizedText || '') : inputValue}
                   onChange={(e) => {
                     if (!isMicrophoneActive) {
@@ -1777,48 +1782,47 @@ return (
                   onBlur={() => setIsTyping(false)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && e.target.value.trim()) {
-                      // setLastCommand(e.target.value);
-                      // setLastCommand(e.target.value);
                       const userText = e.target.value;
                       setInputValue('');
                       setIsTyping(false);
-
-                      // Include pending artifacts with the message
-                      const allArtifacts = [...artifactTokens, ...pendingArtifactTokens];
-                      console.log('[DEBUG] Sending message with artifacts:', allArtifacts.length, allArtifacts);
-                      setJarvisResponseStream('');
-                      if (socketRef.current) {
-                        socketRef.current.emit('user_message', userText, { artifactTokens: allArtifacts });
-                      }
-
-                      // Move pending artifacts to active
-                      if (pendingArtifactTokens.length > 0) {
-                        setArtifactTokens(prev => [...prev, ...pendingArtifactTokens]);
-                        setPendingArtifactTokens([]);
-                      }
+                      setMmsResponseStream('');
+                      if (socketRef.current) socketRef.current.emit('user_message', userText, { artifactTokens: [...artifactTokens, ...pendingArtifactTokens] });
+                      if (pendingArtifactTokens.length > 0) { setArtifactTokens(prev => [...prev, ...pendingArtifactTokens]); setPendingArtifactTokens([]); }
                     }
                   }}
                   disabled={isMicrophoneActive}
                 />
               </div>
-              <button
-                className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`}
-                onClick={toggleMicrophone}
-                title={isMicrophoneActive ? 'Stop Listening' : 'Start Listening'}
-              >
-                <svg className="mic-icon" viewBox="0 0 24 24">
-                  <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
-                </svg>
+              <button className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`} onClick={toggleMicrophone} title="Toggle Mic">
+                <svg className="mic-icon" viewBox="0 0 24 24"><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" /></svg>
               </button>
             </div>
           </div>
         </div>
 
         <div className="bottom-right">
-          <div className="version-info">
-            <span className="version-row">VERSION: 0.1.0</span>
-            <span className="version-row verified">AUTH: VERIFIED</span>
-          </div>
+           <div className="camera-scan-container">
+              <div className="hud-corner-brackets"></div>
+              <div className="scanline-overlay"></div>
+              <div className="hud-video-container">
+                <video 
+                  ref={hudVideoRef} 
+                  autoPlay 
+                  playsInline 
+                  muted 
+                  className="hud-video-feed"
+                />
+                <div className="face-target-box"></div>
+                <div className="hud-telemetry-top">
+                   <span className="telemetry-item">REC ●</span>
+                   <span className="telemetry-item blink">SYNC_[88%]</span>
+                </div>
+                <div className="hud-telemetry-bottom">
+                   <span className="telemetry-item">60 FPS</span>
+                   <span className="telemetry-item">4.2 Mbps</span>
+                </div>
+              </div>
+           </div>
         </div>
       </div>
     </div>

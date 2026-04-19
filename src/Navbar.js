@@ -137,8 +137,8 @@ function Navbar() {
                 <canvas ref={logoCanvasRef} width="60" height="60"></canvas>
               </div>
               <div>
-                <div className="logo-text">J·A·R·V·I·S</div>
-                <div className="logo-sub">PERSONAL AI · v0.1</div>
+                <div className="logo-text">M·M·S</div>
+                <div className="logo-sub">MUGHEES MANAGEMENT SYSTEM · v2.0</div>
               </div>
             </div>
 
@@ -177,14 +177,14 @@ function Navbar() {
 
       <div className="sec-strip">
         <div className="sec-left">
-          <span className="sec-item">SYSTEM</span>
+          <span className="sec-item">M.M.S. CORE</span>
           <span className="breadcrumb-sep">›</span>
-          <span className="sec-item" style={{ color: 'rgba(0,212,255,0.38)' }}>DASHBOARD</span>
+          <span className="sec-item" style={{ color: 'rgba(0,212,255,0.7)' }}>v2.0.0</span>
+          <span className="sec-item" style={{ marginLeft: '15px', color: 'var(--accent-green)' }}>AUTH: VERIFIED</span>
           <span className="breadcrumb-sep">›</span>
           <span className="sec-item" style={{ color: 'rgba(0,212,255,0.55)' }}>{activeItem}</span>
         </div>
         <div className="sec-right">
-          <span className="sec-item">BUILD 0.1.0</span>
           <span className="sec-item">KARACHI · PKT</span>
           <span className="clock-val">{dateStr}</span>
         </div>

@@ -112,6 +112,24 @@ function SettingsModal({ isOpen, onClose, blobColor, setBlobColor, blobSize, set
             ENTER DRAG MODE
           </button>
         </div>
+
+        {/* Persist to Core */}
+        <div className="control-row full-width">
+          <button 
+            className="persist-core-btn"
+            onClick={() => {
+              // Trigger a save event (passed as prop or handled via global sync)
+              window.dispatchEvent(new CustomEvent('MMS_PERSIST_CONFIG'));
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{width: '12px', height: '12px', marginRight: '6px'}}>
+               <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
+               <polyline points="17 21 17 13 7 13 7 21" />
+               <polyline points="7 3 7 8 15 8" />
+            </svg>
+            PERSIST TO CORE
+          </button>
+        </div>
       </div>
 
       {/* Close Button */}
