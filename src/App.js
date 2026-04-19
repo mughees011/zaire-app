@@ -92,6 +92,7 @@ function App() {
   const [isDigesting, setIsDigesting] = useState(false);
   const [digestionProgress, setDigestionProgress] = useState(0);
   const [artifactTokens, setArtifactTokens] = useState([]);
+  const [pendingArtifactTokens, setPendingArtifactTokens] = useState([]);
   const fileInputRef = useRef(null);
 
 
@@ -480,10 +481,18 @@ function App() {
             setGroqStatus('Transcribed!');
             setFinalRecognizedText(text);
 
-            // Send to Real-time Backend
+            // Send to Real-time Backend - include pending artifacts
+            console.log('[DEBUG] Voice (Groq) sending with artifacts:', pendingArtifactTokens.length, pendingArtifactTokens);
             setJarvisResponseStream('');
+            const allArtifacts = [...artifactTokens, ...pendingArtifactTokens];
             if (socketRef.current) {
-              socketRef.current.emit('user_message', text, { artifactTokens });
+              socketRef.current.emit('user_message', text, { artifactTokens: allArtifacts });
+            }
+
+            // Move pending artifacts to active
+            if (pendingArtifactTokens.length > 0) {
+              setArtifactTokens(prev => [...prev, ...pendingArtifactTokens]);
+              setPendingArtifactTokens([]);
             }
 
             setLastCommand(text);
@@ -614,10 +623,18 @@ function App() {
         const text = finalTranscript.trim();
         setFinalRecognizedText(text);
 
-        // Send to Real-time Backend
+        // Send to Real-time Backend - include pending artifacts
+        console.log('[DEBUG] Voice (browser) sending with artifacts:', pendingArtifactTokens.length, pendingArtifactTokens);
         setJarvisResponseStream('');
+        const allArtifacts = [...artifactTokens, ...pendingArtifactTokens];
         if (socketRef.current) {
-          socketRef.current.emit('user_message', text, { artifactTokens });
+          socketRef.current.emit('user_message', text, { artifactTokens: allArtifacts });
+        }
+
+        // Move pending artifacts to active
+        if (pendingArtifactTokens.length > 0) {
+          setArtifactTokens(prev => [...prev, ...pendingArtifactTokens]);
+          setPendingArtifactTokens([]);
         }
 
         setLastCommand(text);
@@ -695,7 +712,8 @@ function App() {
 
       const result = await response.json();
       if (result.success) {
-        setArtifactTokens(prev => [...prev, ...result.manifest]);
+        // Store as pending - will be sent with next user message
+        setPendingArtifactTokens(prev => [...prev, ...result.manifest]);
         // Switch mode to ARTIFACT if it's the first upload
         if (activeMode !== 'ARTIFACT') {
           handleModeChange('ARTIFACT');
@@ -716,6 +734,10 @@ function App() {
     if (activeMode === 'ARTIFACT' && artifactTokens.length <= 1) {
       handleModeChange('JARVIS');
     }
+  };
+
+  const removePendingArtifact = (index) => {
+    setPendingArtifactTokens(prev => prev.filter((_, i) => i !== index));
   };
 
 const stopMicrophone = () => {
@@ -764,41 +786,41 @@ useEffect(() => {
   // Use the state blobColor, not localStorage - this is reactively updated when color picker changes
   const blobColorToUse = blobColor || DEFAULT_BLOB_COLOR;
 
-  const noiseFunctions = `
-      vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
-      vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
-      vec4 permute(vec4 x){return mod289(((x*34.)+1.)*x);}
+const noiseFunctions = `
+      vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
+      vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
+      vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}
       vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
       float snoise(vec3 v){
-        const vec2 C=vec2(1./6.,1./3.);
-        const vec4 D=vec4(0.,.5,1.,2.);
-        vec3 i=floor(v+dot(v,C.yyy));
+        vec2 C=vec2(1.0/6.0,1.0/3.0);
+        vec4 D=vec4(0.0,0.5,1.0,2.0);
+        vec3 i=mod289(floor(v+dot(v,C.yyy)));
         vec3 x0=v-i+dot(i,C.xxx);
         vec3 g=step(x0.yzx,x0.xyz);
-        vec3 l=1.-g;
+        vec3 l=1.0-g;
         vec3 i1=min(g.xyz,l.zxy);
         vec3 i2=max(g.xyz,l.zxy);
         vec3 x1=x0-i1+C.xxx;
         vec3 x2=x0-i2+C.yyy;
         vec3 x3=x0-D.yyy;
-        i=mod289(i);
         vec4 p=permute(permute(permute(
-          i.z+vec4(0.,i1.z,i2.z,1.))
-          +i.y+vec4(0.,i1.y,i2.y,1.))
-          +i.x+vec4(0.,i1.x,i2.x,1.)));
+          i.z+vec4(0.0,i1.z,i2.z,1.0)
+          +i.y+vec4(0.0,i1.y,i2.y,1.0)
+          +i.x+vec4(0.0,i1.x,i2.x,1.0))
+        ));
         float n_=0.142857142857;
-        vec3 ns=n_*D.wyz-D.xzx;
-        vec4 j=p-49.*floor(p*ns.z*ns.z);
+        vec4 ns=vec4(n_*D.w,n_*D.y,n_*D.z,n_*D.x)-vec4(0.0,0.0,D.x,D.x);
+        vec4 j=p-ns.z*ns.z*floor(p*ns.z*ns.z);
         vec4 x_=floor(j*ns.z);
-        vec4 y_=floor(j-7.*x_);
-        vec4 x=x_*ns.x+ns.yyyy;
-        vec4 y=y_*ns.x+ns.yyyy;
-        vec4 h=1.-abs(x)-abs(y);
+        vec4 y_=floor(j-ns.w*7.0*x_);
+        vec4 x=x_+0.5*floor(y_*ns.x+vec4(0.0,ns.x,0.0,0.0));
+        vec4 y=y_+0.5*floor(x_*ns.x+vec4(0.0,ns.x,0.0,0.0));
+        vec4 h=1.0-abs(x)-abs(y);
         vec4 b0=vec4(x.xy,y.xy);
         vec4 b1=vec4(x.zw,y.zw);
-        vec4 s0=floor(b0)*2.+1.;
-        vec4 s1=floor(b1)*2.+1.;
-        vec4 sh=-step(h,vec4(0.));
+        vec4 s0=floor(b0)*2.0+1.0;
+        vec4 s1=floor(b1)*2.0+1.0;
+        vec4 sh=-step(h,vec4(0.0));
         vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;
         vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
         vec3 p0=vec3(a0.xy,h.x);
@@ -807,13 +829,13 @@ useEffect(() => {
         vec3 p3=vec3(a1.zw,h.w);
         vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
         p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
-        vec4 m=max(.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.);
+        vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0);
         m=m*m;
-        return 42.*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+        return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
       }
       float fbm(vec3 p){
-        float total=0.;float amplitude=.5;float frequency=1.;
-        for(int i=0;i<3;i++){total+=snoise(p*frequency)*amplitude;amplitude*=.5;frequency*=2.;}
+        float total=0.0;float amplitude=0.5;float frequency=1.0;
+        for(int i=0;i<3;i++){total+=snoise(p*frequency)*amplitude;amplitude*=0.5;frequency*=2.0;}
         return total;
       }
     `;
@@ -854,7 +876,7 @@ useEffect(() => {
       varying vec3 vViewPosition;
       void main(){
         vNormal=normalize(normalMatrix*normal);
-        vec4 mvPosition=modelViewMatrix*vec4(position,1.);
+        vec4 mvPosition=modelViewMatrix*vec4(position,1.0);
         vViewPosition=-mvPosition.xyz;
         gl_Position=projectionMatrix*mvPosition;
       }`;
@@ -864,7 +886,7 @@ useEffect(() => {
       uniform vec3 uColor;
       uniform float uOpacity;
       void main(){
-        float fresnel=pow(1.-dot(normalize(vNormal),normalize(vViewPosition)),2.5);
+        float fresnel=pow(1.0-dot(normalize(vNormal),normalize(vViewPosition)),2.5);
         gl_FragColor=vec4(uColor,fresnel*uOpacity);
       }`;
 
@@ -908,11 +930,11 @@ useEffect(() => {
         void main(){
           vec3 pos=position;
           float angle=atan(pos.y,pos.x);
-          float audioInfluence=sin(angle*8.+uTime)*uAudioBass*0.15+sin(angle*12.+uTime*0.5)*uAudioMid*0.12+sin(angle*16.)*uAudioTreble*0.1;
-          pos=normalize(pos)*(1.+audioInfluence*uAudioIntensity);
+          float audioInfluence=sin(angle*8.0+uTime)*uAudioBass*0.15+sin(angle*12.0+uTime*0.5)*uAudioMid*0.12+sin(angle*16.0)*uAudioTreble*0.1;
+          pos=normalize(pos)*(1.0+audioInfluence*uAudioIntensity);
           vPosition=pos;
           vNormal=normalize(normalMatrix*pos);
-          vec4 mvPosition=modelViewMatrix*vec4(pos,1.);
+          vec4 mvPosition=modelViewMatrix*vec4(pos,1.0);
           vViewPosition=-mvPosition.xyz;
           gl_Position=projectionMatrix*mvPosition;
         }`,
@@ -935,23 +957,23 @@ useEffect(() => {
         void main(){
           vec3 p=vPosition*uScale;
           vec3 q=vec3(
-            fbm(p+vec3(0.,uTime*.05,0.)),
-            fbm(p+vec3(5.2,1.3,2.8)+uTime*.05),
-            fbm(p+vec3(2.2,8.4,.5)-uTime*.02)
+            fbm(p+vec3(0.0,uTime*0.05,0.0)),
+            fbm(p+vec3(5.2,1.3,2.8)+uTime*0.05),
+            fbm(p+vec3(2.2,8.4,0.5)-uTime*0.02)
           );
-          float density=fbm(p+2.*q);
-          float audioWave=sin(atan(vPosition.y,vPosition.x)*8.)*uAudioBass+sin(atan(vPosition.y,vPosition.x)*12.)*uAudioMid;
-          float t=(density+.4+audioWave*0.3)*.8;
-          float alpha=smoothstep(uThreshold,.7,t);
+          float density=fbm(p+2.0*q);
+          float audioWave=sin(atan(vPosition.y,vPosition.x)*8.0)*uAudioBass+sin(atan(vPosition.y,vPosition.x)*12.0)*uAudioMid;
+          float t=(density+0.4+audioWave*0.3)*0.8;
+          float alpha=smoothstep(uThreshold,0.7,t);
           float audioBoost=uAudioBass*0.4+uAudioMid*0.3+uAudioTreble*0.2;
-          vec3 cWhite=vec3(1.);
-          vec3 color=mix(uColorDeep,uColorMid,smoothstep(uThreshold,.5,t));
-          color=mix(color,uColorBright,smoothstep(.5,.8,t));
-          color=mix(color,cWhite,smoothstep(.8,1.,t)*audioBoost);
+          vec3 cWhite=vec3(1.0,1.0,1.0);
+          vec3 color=mix(uColorDeep,uColorMid,smoothstep(uThreshold,0.5,t));
+          color=mix(color,uColorBright,smoothstep(0.5,0.8,t));
+          color=mix(color,cWhite,smoothstep(0.8,1.0,t)*audioBoost);
           float facing=dot(normalize(vNormal),normalize(vViewPosition));
-          float depthFactor=(facing+1.)*.5;
-          float finalAlpha=alpha*(.02+.98*depthFactor)*(1.+audioBoost*0.5);
-          gl_FragColor=vec4(color*uBrightness*(1.+audioBoost*0.3),finalAlpha);
+          float depthFactor=(facing+1.0)*0.5;
+          float finalAlpha=alpha*(0.02+0.98*depthFactor)*(1.0+audioBoost*0.5);
+          gl_FragColor=vec4(color*uBrightness*(1.0+audioBoost*0.3),finalAlpha);
         }`,
     transparent: true, blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide, depthWrite: false
@@ -995,21 +1017,21 @@ useEffect(() => {
         varying float vAlpha;
         void main(){
           vec3 pos=position;
-          pos.y+=sin(uTime*.2+pos.x)*.02;
-          pos.x+=cos(uTime*.15+pos.z)*.02;
-          vec4 mvPosition=modelViewMatrix*vec4(pos,1.);
+          pos.y+=sin(uTime*0.2+pos.x)*0.02;
+          pos.x+=cos(uTime*0.15+pos.z)*0.02;
+          vec4 mvPosition=modelViewMatrix*vec4(pos,1.0);
           gl_Position=projectionMatrix*mvPosition;
-          float baseSize=8.*aSize+4.;
-          gl_PointSize=baseSize*(1./-mvPosition.z);
-          vAlpha=.8+.2*sin(uTime+aSize*10.);
+          float baseSize=8.0*aSize+4.0;
+          gl_PointSize=baseSize*(1.0/-mvPosition.z);
+          vAlpha=0.8+0.2*sin(uTime+aSize*10.0);
         }`,
     fragmentShader: `
         uniform vec3 uColor;
         varying float vAlpha;
         void main(){
-          vec2 uv=gl_PointCoord-vec2(.5);
-          if(length(uv)>.5)discard;
-          float glow=pow(1.-length(uv)*2.,1.8);
+          vec2 uv=gl_PointCoord-vec2(0.5);
+          if(length(uv)>0.5)discard;
+          float glow=pow(1.0-length(uv)*2.0,1.8);
           gl_FragColor=vec4(uColor,glow*vAlpha);
         }`,
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
@@ -1068,12 +1090,12 @@ useEffect(() => {
   window.addEventListener('resize', handleResize);
 
   initGrid();
-  const clock = new THREE.Clock();
+  const startTime = performance.now();
   let animationId;
 
   const animate = () => {
     animationId = requestAnimationFrame(animate);
-    const t = clock.getElapsedTime();
+    const t = (performance.now() - startTime) * 0.001;
 
     // Get audio frequency data if microphone is active
     let audioIntensity = 0;
@@ -1689,15 +1711,36 @@ return (
               </div>
             )}
 
+            {/* Pending artifacts (waiting to be sent) */}
+            {pendingArtifactTokens.length > 0 && (
+              <div className="artifact-token-list pending">
+                {pendingArtifactTokens.map((token, i) => {
+                  const tokenStr = typeof token === 'string' ? token : (token.name || token.fileName || JSON.stringify(token));
+                  return (
+                    <div key={`pending-${i}`} className="artifact-token pending-token">
+                      <span className="token-icon">◐</span>
+                      <span className="token-name">{tokenStr.substring(0, 15)}{tokenStr.length > 15 ? '...' : ''}</span>
+                      <span className="pending-badge">WAITING</span>
+                      <button className="token-remove" onClick={() => removePendingArtifact(i)}>×</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Active artifacts (already sent) */}
             {artifactTokens.length > 0 && (
               <div className="artifact-token-list">
-                {artifactTokens.map((token, i) => (
-                  <div key={i} className="artifact-token">
-                    <span className="token-icon">■</span>
-                    <span className="token-name">{token.substring(0, 15)}{token.length > 15 ? '...' : ''}</span>
-                    <button className="token-remove" onClick={() => removeArtifact(i)}>×</button>
-                  </div>
-                ))}
+                {artifactTokens.map((token, i) => {
+                  const tokenStr = typeof token === 'string' ? token : (token.name || token.fileName || JSON.stringify(token));
+                  return (
+                    <div key={i} className="artifact-token">
+                      <span className="token-icon">■</span>
+                      <span className="token-name">{tokenStr.substring(0, 15)}{tokenStr.length > 15 ? '...' : ''}</span>
+                      <button className="token-remove" onClick={() => removeArtifact(i)}>×</button>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1736,12 +1779,22 @@ return (
                     if (e.key === 'Enter' && e.target.value.trim()) {
                       // setLastCommand(e.target.value);
                       // setLastCommand(e.target.value);
+                      const userText = e.target.value;
                       setInputValue('');
                       setIsTyping(false);
 
+                      // Include pending artifacts with the message
+                      const allArtifacts = [...artifactTokens, ...pendingArtifactTokens];
+                      console.log('[DEBUG] Sending message with artifacts:', allArtifacts.length, allArtifacts);
                       setJarvisResponseStream('');
                       if (socketRef.current) {
-                        socketRef.current.emit('user_message', e.target.value, { artifactTokens });
+                        socketRef.current.emit('user_message', userText, { artifactTokens: allArtifacts });
+                      }
+
+                      // Move pending artifacts to active
+                      if (pendingArtifactTokens.length > 0) {
+                        setArtifactTokens(prev => [...prev, ...pendingArtifactTokens]);
+                        setPendingArtifactTokens([]);
                       }
                     }
                   }}

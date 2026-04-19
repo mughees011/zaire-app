@@ -2407,6 +2407,19 @@ body {
   animation: pulse 2s infinite;
 }
 
+.pending-token {
+  border-color: rgba(255, 200, 0, 0.5);
+  background: rgba(255, 200, 0, 0.08);
+  border-left: 3px solid #ffc800;
+}
+
+.pending-badge {
+  font-size: 7px;
+  color: #ffc800;
+  font-weight: bold;
+  animation: blink 1s infinite;
+}
+
 .token-remove {
   background: transparent;
   border: none;
