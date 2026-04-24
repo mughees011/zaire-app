@@ -52,6 +52,9 @@ function App() {
   ]);
 
   const mainGroupRef = useRef(null);
+  const blobSizeRef = useRef(blobSize);
+  const blobColorRef = useRef(blobColor);
+  const blobPositionRef = useRef(blobPosition);
   const uniformsRef = useRef(null);
   const voiceWaveformRef = useRef(null);
   const neuralGaugeRef = useRef(null);
@@ -457,13 +460,18 @@ function App() {
     return () => clearInterval(interval);
   }, [activeMode]);
 
+  // Sync refs so the animation loop and blob-update effect always read latest values
   useEffect(() => {
+    blobSizeRef.current = blobSize;
+    blobColorRef.current = blobColor;
+    blobPositionRef.current = blobPosition;
+
     localStorage.setItem('blobColor', blobColor);
     localStorage.setItem('blobSize', blobSize.toString());
     localStorage.setItem('blobPosition', JSON.stringify(blobPosition));
 
+    // Push position update immediately (not dependent on animation loop)
     if (mainGroupRef.current) {
-      mainGroupRef.current.scale.set(blobSize, blobSize, blobSize);
       mainGroupRef.current.position.set(blobPosition.x, blobPosition.y, 0);
     }
 
@@ -1159,8 +1167,9 @@ const noiseFunctions = `
     mainGroup.rotation.x += params.rotationSpeedX;
     mainGroup.rotation.y += params.rotationSpeedY;
 
-    // Apply audio-based scaling with smoother animation
-    const targetScale = 1 + audioIntensity * 0.08;
+    // Apply audio-based scaling on top of user's chosen blob size
+    const userScale = blobSizeRef.current || 1.0;
+    const targetScale = userScale + audioIntensity * 0.08 * userScale;
     mainGroup.scale.x += (targetScale - mainGroup.scale.x) * 0.1;
     mainGroup.scale.y += (targetScale - mainGroup.scale.y) * 0.1;
     mainGroup.scale.z += (targetScale - mainGroup.scale.z) * 0.1;
@@ -1177,7 +1186,8 @@ const noiseFunctions = `
     renderer.dispose();
     cameraRef.current = null;
   };
-}, [blobColor, blobSize, blobPosition]);
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
 // Boot sequence handled elsewhere
 
