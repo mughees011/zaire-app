@@ -90,7 +90,12 @@ function App() {
   // Biometric State
   const [biometricData, setBiometricData] = useState({ detected: false, name: 'ABSENT', confidence: 0 });
   const [isSecurityAlert, setIsSecurityAlert] = useState(false);
+  const [intruderSnapshots, setIntruderSnapshots] = useState([]);
+  const [showSecurityOverlay, setShowSecurityOverlay] = useState(false);
+  const [activeIntruder, setActiveIntruder] = useState(null);
   const [specialistData, setSpecialistData] = useState(null);
+  const [liveMetrics, setLiveMetrics] = useState({ cpu: 0, ram: 0, gpu: 0, latency: 4 });
+  const [mmsActionFeed, setMmsActionFeed] = useState([]);
   const [isGlitchActive, setIsGlitchActive] = useState(false);
   const [artifactTokens, setArtifactTokens] = useState([]);
   const [pendingArtifactTokens, setPendingArtifactTokens] = useState([]);
@@ -373,6 +378,34 @@ function App() {
       setIsDiagnosticActive(active);
     });
 
+    // Tier 5: Intruder Detection
+    socketRef.current.on('intruder_detected', (data) => {
+      console.log('[SECURITY] 🚨 INTRUDER DETECTED!!', data);
+      setIsSecurityAlert(true);
+      setShowSecurityOverlay(true);
+      setActiveIntruder(data);
+      setMmsResponseStream('🚨 SECURITY ALERT: UNKNOWN USER DETECTED AT YOUR SYSTEM! SNAPSHOT CAPTURED.');
+      setShowResponsePanel(true);
+
+      // Flash threat for 10 seconds
+      setTimeout(() => {
+        setShowSecurityOverlay(false);
+      }, 10000);
+    });
+
+    socketRef.current.on('intruder_snapshots', (data) => {
+      if (data.snapshots) setIntruderSnapshots(data.snapshots);
+    });
+
+    // Tier 7: HUD Live Telemetry
+    socketRef.current.on('system_metrics', (metrics) => {
+      setLiveMetrics(prev => ({ ...prev, ...metrics }));
+    });
+
+    socketRef.current.on('mms_action_feed', (actions) => {
+      setMmsActionFeed(actions);
+    });
+
   }, [playNextAudioChunk, handleModeSync]);
 
   useEffect(() => {
@@ -399,18 +432,26 @@ function App() {
   useEffect(() => {
     const pollBiometrics = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:3003/status');
+        // Updated to port 3001 proxy for the new Tier 5 daemon
+        const res = await fetch('http://127.0.0.1:3001/security/status');
         const data = await res.json();
-        setBiometricData(data);
+        if (data.success) {
+           setBiometricData({
+             detected:   data.master_present || data.running,
+             name:       data.master_present ? 'Master' : (data.running ? 'Scanning...' : 'Offline'),
+             locked:     data.pc_locked,
+             enabled:    data.face_lock_enabled,
+             intruders:  data.total_intruders
+           });
 
-        // Security Alert if Unknown detected
-        if (data.detected && (data.name === 'Unknown' || data.name === 'Security Alert')) {
-          setIsSecurityAlert(true);
-        } else {
-          setIsSecurityAlert(false);
+           // If master present, clear alerts
+           if (data.master_present) {
+             setIsSecurityAlert(false);
+             setShowSecurityOverlay(false);
+           }
         }
       } catch (e) {
-        // Observer not running?
+        // Security daemon offline?
       }
     };
 
@@ -1591,25 +1632,29 @@ return (
       <div className="grid-right">
 
         {/* ── BIOMETRIC HUD PANEL ── */}
-        <div className={`panel-section biometric-panel ${biometricData.detected ? 'detected' : ''}`}>
+        <div className={`panel-section biometric-panel ${biometricData.detected ? 'detected' : ''} ${isSecurityAlert ? 'threat' : ''}`}>
           <div className="section-label">BIOMETRIC SCAN</div>
           <div className="biometric-hud">
             <div className="bio-status-row">
               <span className="bio-label">IDENTITY:</span>
-              <span className={`bio-value ${biometricData.name === 'Master' ? 'master' : (biometricData.detected ? 'alert' : '')}`}>
-                {biometricData.detected ? biometricData.name.toUpperCase() : 'ABSENT'}
+              <span className={`bio-value ${biometricData.name === 'Master' ? 'master' : (isSecurityAlert ? 'alert' : '')}`}>
+                {isSecurityAlert ? 'UNKNOWN_THREAT' : (biometricData.detected ? biometricData.name.toUpperCase() : 'ABSENT')}
               </span>
             </div>
             <div className="bio-status-row">
               <span className="bio-label">SCAN LOCK:</span>
               <div className="bio-lock-bar">
-                <div className={`bio-lock-fill ${biometricData.detected ? 'active' : ''}`} style={{ width: biometricData.detected ? '100%' : '0%' }}></div>
+                <div className={`bio-lock-fill ${biometricData.detected ? 'active' : ''} ${isSecurityAlert ? 'threat' : ''}`} style={{ width: biometricData.detected || isSecurityAlert ? '100%' : '0%' }}></div>
               </div>
             </div>
+            <div className="bio-status-row">
+              <span className="bio-label">FACE-LOCK:</span>
+              <span className={`bio-value ${biometricData.enabled ? 'online' : 'offline'}`}>{biometricData.enabled ? 'ACTIVE' : 'DISABLED'}</span>
+            </div>
             <div className="bio-meta">
-              <span className="meta-tag">SECURE LINK</span>
+              <span className={`meta-tag ${biometricData.locked ? 'red' : 'green'}`}>{biometricData.locked ? 'LOCK_ENGAGED' : 'SYSTEM_READY'}</span>
               <span className="meta-tag pulse">ENCRYPTED</span>
-              {lastCommand && <span className="meta-tag blue">CMD: {lastCommand.toUpperCase()}</span>}
+              {biometricData.intruders > 0 && <span className="meta-tag alert">INTRUDERS: {biometricData.intruders}</span>}
             </div>
           </div>
         </div>
@@ -1646,37 +1691,38 @@ return (
           <div className="section-label">SYSTEM METRICS</div>
           <div className="metrics-grid">
             <div className="metric-card">
-              <span className="metric-value">4ms</span>
+              <span className="metric-value">{liveMetrics.latency}ms</span>
               <span className="metric-label">LATENCY</span>
             </div>
             <div className="metric-card">
-              <span className="metric-value good">99%</span>
-              <span className="metric-label">UPTIME</span>
+              <span className="metric-value good">{liveMetrics.cpu}%</span>
+              <span className="metric-label">CPU LOAD</span>
             </div>
             <div className="metric-card">
-              <span className="metric-value">{lastSystemAction ? 'ACTIVE' : 'IDLE'}</span>
-              <span className="metric-label">SYS ACTION</span>
+              <span className="metric-value">{liveMetrics.ram}%</span>
+              <span className="metric-label">RAM USAGE</span>
             </div>
             <div className="metric-card">
               <span className="metric-value">{(audioFrequency * 100).toFixed(0)}%</span>
               <span className="metric-label">VOICE PULSE</span>
             </div>
             <div className="metric-card">
-              <span className="metric-value">8.2GB</span>
-              <span className="metric-label">MEM</span>
+              <span className="metric-value">{liveMetrics.gpu}%</span>
+              <span className="metric-label">GPU LOAD</span>
             </div>
           </div>
         </div>
 
         <div className="panel-section">
-          <div className="section-label">RECENT ACTIVITY</div>
+          <div className="section-label">LIVE ACTION FEED</div>
           <div className="activity-feed">
-            {activityFeed.map((item, idx) => (
+            {mmsActionFeed.map((item, idx) => (
               <div key={idx} className="activity-item">
                 <span className="activity-time">{item.time}</span>
                 <span className="activity-message">{item.message}</span>
               </div>
             ))}
+            {mmsActionFeed.length === 0 && <div className="activity-empty">— SYSTEM IDLE —</div>}
           </div>
         </div>
 
@@ -1830,6 +1876,33 @@ return (
         </div>
       </div>
     </div>
+
+    {/* ── SECURITY ALERT OVERLAY ── */}
+    {showSecurityOverlay && activeIntruder && (
+      <div className="security-alert-overlay">
+        <div className="glitch-background"></div>
+        <div className="threat-container">
+          <div className="threat-header">🚨 SECURITY BREACH DETECTED 🚨</div>
+          <div className="intruder-card">
+            {activeIntruder.snapshot_b64 ? (
+              <img 
+                src={`data:image/jpeg;base64,${activeIntruder.snapshot_b64}`} 
+                alt="Intruder" 
+                className="intruder-face"
+              />
+            ) : (
+              <div className="intruder-placeholder">IMAGE_LOST</div>
+            )}
+            <div className="intruder-meta">
+              <div className="meta-row"><span className="L">TIMESTAMP:</span> <span className="V">{activeIntruder.timestamp}</span></div>
+              <div className="meta-row"><span className="L">THREAT_LVL:</span> <span className="V red">CRITICAL</span></div>
+              <div className="meta-row"><span className="L">ACTION:</span> <span className="V">PUSH_SENT</span></div>
+            </div>
+          </div>
+          <button className="threat-dismiss" onClick={() => setShowSecurityOverlay(false)}>ACKNOWLEDGE RISK</button>
+        </div>
+      </div>
+    )}
 
     <SettingsModal
       isOpen={isSettingsOpen}

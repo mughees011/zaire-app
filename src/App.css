@@ -2733,3 +2733,147 @@ html {
   52% { transform: skew(0deg); opacity: 1; }
   100% { transform: skew(3deg); opacity: 1; }
 }
+/* ── TIER 5: SECURITY ALERT STYLES ── */
+.security-alert-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  animation: bgFlash 0.5s infinite alternate;
+}
+
+@keyframes bgFlash {
+  from { background: rgba(50, 0, 0, 0.4); }
+  to { background: rgba(100, 0, 0, 0.6); }
+}
+
+.glitch-background {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, rgba(255,0,0,0.05) 0px, transparent 1px, transparent 2px);
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+.threat-container {
+  width: 400px;
+  background: #050000;
+  border: 2px solid #ff0000;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 0 50px rgba(255, 0, 0, 0.3);
+  position: relative;
+  animation: glitchShake 0.4s infinite;
+}
+
+@keyframes glitchShake {
+  0% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(-2px, -2px); }
+  60% { transform: translate(2px, 2px); }
+  80% { transform: translate(2px, -2px); }
+  100% { transform: translate(0); }
+}
+
+.threat-header {
+  font-family: var(--font-orbitron);
+  font-size: 14px;
+  font-weight: 900;
+  color: #ff0000;
+  text-align: center;
+  letter-spacing: 4px;
+  text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+}
+
+.intruder-card {
+  display: flex;
+  gap: 16px;
+  background: rgba(255, 0, 0, 0.05);
+  border: 1px solid rgba(255, 0, 0, 0.2);
+  padding: 12px;
+}
+
+.intruder-face {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border: 1px solid #ff0000;
+  filter: sepia(1) hue-rotate(-50deg) saturate(2);
+}
+
+.intruder-placeholder {
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #ff0000;
+  color: #ff0000;
+  font-size: 10px;
+}
+
+.intruder-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+
+.meta-row .L { color: rgba(255,0,0,0.6); }
+.meta-row .V { color: #fff; }
+.meta-row .V.red { color: #ff0000; font-weight: 900; }
+
+.threat-dismiss {
+  background: #ff0000;
+  color: #fff;
+  border: none;
+  padding: 10px;
+  font-family: var(--font-orbitron);
+  font-weight: 900;
+  font-size: 10px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.threat-dismiss:hover {
+  background: #fff;
+  color: #ff0000;
+  box-shadow: 0 0 20px #fff;
+}
+
+/* Biometric Panel Threat State */
+.biometric-panel.threat {
+  border-color: #ff0000 !important;
+  background: rgba(255, 0, 0, 0.1) !important;
+  animation: panelGlowRed 1s infinite alternate;
+}
+
+@keyframes panelGlowRed {
+  from { box-shadow: 0 0 5px rgba(255,0,0,0.2); }
+  to { box-shadow: 0 0 15px rgba(255,0,0,0.5); }
+}
+
+.bio-value.alert { color: #ff0000; font-weight: 900; animation: blink 0.5s infinite; }
+.bio-lock-fill.threat { background: #ff0000 !important; }
+.meta-tag.alert { color: #ff0000; border-color: #ff0000; background: rgba(255,0,0,0.1); }
+.meta-tag.red { color: #ff0000; border-color: #ff0000; }
+.meta-tag.green { color: #00ff88; border-color: #00ff88; }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
