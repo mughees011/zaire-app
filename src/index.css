@@ -110,3 +110,48 @@ body {
 .shadow-teal-glow {
   box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
 }
+
+/* ENGAGEMENT OVERLAY */
+.engagement-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(15px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.engagement-content {
+  text-align: center;
+  position: relative;
+  max-width: 400px;
+}
+
+.power-icon {
+  font-size: 5rem;
+  margin-bottom: 2rem;
+  color: var(--mms-cyan);
+  filter: drop-shadow(0 0 20px var(--mms-cyan));
+  animation: pulseGlow 2s infinite ease-in-out;
+}
+
+.engagement-content h2 {
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.3rem;
+  margin-bottom: 1rem;
+}
+
+.engagement-content p {
+  opacity: 0.6;
+  font-size: 0.9rem;
+  letter-spacing: 0.1rem;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; transform: scale(0.95); }
+  50% { opacity: 1; transform: scale(1.05); }
+}

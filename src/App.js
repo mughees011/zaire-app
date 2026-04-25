@@ -99,6 +99,17 @@ function App() {
   const [isGlitchActive, setIsGlitchActive] = useState(false);
   const [artifactTokens, setArtifactTokens] = useState([]);
   const [pendingArtifactTokens, setPendingArtifactTokens] = useState([]);
+  const [isMinigameActive, setIsMinigameActive] = useState(false);
+  const [minigameScore, setMinigameScore] = useState(0);
+  const [gameNodes, setGameNodes] = useState([]);
+  
+  // Neural Video State
+  const [neuralVideoData, setNeuralVideoData] = useState(null);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [currentVideoScene, setCurrentVideoScene] = useState(null);
+  const [attentionTimer, setAttentionTimer] = useState(0);
+  const [isNeuralPulseActive, setIsNeuralPulseActive] = useState(false);
+  const [particles, setParticles] = useState([]);
   const fileInputRef = useRef(null);
 
 
@@ -144,7 +155,72 @@ function App() {
     setBlobColor(colors.primary);
     document.documentElement.style.setProperty('--primary', colors.primary);
     document.documentElement.style.setProperty('--accent', colors.accent);
+
+    // Auto-trigger minigame if in Engineer mode and a build is likely starting
+    if (newMode === 'ENGINEER') {
+      setIsMinigameActive(true);
+      spawnGameNodes();
+    } else {
+      setIsMinigameActive(false);
+      setGameNodes([]);
+    }
   }, []);
+
+  const spawnKnowledgeParticles = React.useCallback(() => {
+    const newParticles = [];
+    for (let i = 0; i < 15; i++) {
+      const startX = Math.random() * window.innerWidth;
+      const startY = Math.random() * window.innerHeight;
+      const targetX = window.innerWidth / 2 - startX;
+      const targetY = window.innerHeight / 2 - startY;
+      
+      newParticles.push({
+        id: Math.random(),
+        x: startX,
+        y: startY,
+        tx: targetX,
+        ty: targetY
+      });
+    }
+    setParticles(prev => [...prev, ...newParticles]);
+    setTimeout(() => {
+      setParticles(prev => prev.filter(p => !newParticles.find(np => np.id === p.id)));
+    }, 2000);
+  }, []);
+
+  const spawnGameNodes = () => {
+    const nodes = [];
+    for (let i = 0; i < 5; i++) {
+      nodes.push({
+        id: Math.random(),
+        top: Math.random() * 80 + 10 + '%',
+        left: Math.random() * 80 + 10 + '%',
+        size: Math.random() * 20 + 20 + 'px',
+        delay: Math.random() * 5 + 's'
+      });
+    }
+    setGameNodes(nodes);
+  };
+
+  const handleNodeClick = (id) => {
+    setMinigameScore(prev => prev + 100);
+    setGameNodes(prev => prev.filter(n => n.id !== id));
+    
+    // Ripple effect
+    setIsGlitchActive(true);
+    setTimeout(() => setIsGlitchActive(false), 200);
+
+    // Spawn new node after a delay
+    setTimeout(() => {
+      setGameNodes(prev => [...prev, {
+        id: Math.random(),
+        top: Math.random() * 80 + 10 + '%',
+        left: Math.random() * 80 + 10 + '%',
+        size: Math.random() * 20 + 20 + 'px',
+        delay: '0s'
+      }]);
+    }, 1000);
+  };
 
   // Sync to LOCALSTORAGE for persistence on change
   useEffect(() => {
@@ -152,6 +228,37 @@ function App() {
     localStorage.setItem('blobSize', blobSize);
     localStorage.setItem('blobPosition', JSON.stringify(blobPosition));
   }, [blobColor, blobSize, blobPosition]);
+
+  // ── PHASE 3: NEURAL THEME SYNC ─────────────────────
+  useEffect(() => {
+    const updateNeuralAesthetics = () => {
+      const hour = new Date().getHours();
+      const isNight = hour >= 19 || hour <= 6;
+      
+      // 1. Temporal Shift: Deepen colors at night
+      if (isNight) {
+        document.documentElement.style.setProperty('--bg-gradient', 'radial-gradient(circle at 50% 50%, #050505 0%, #000000 100%)');
+      } else {
+        document.documentElement.style.setProperty('--bg-gradient', 'radial-gradient(circle at 50% 50%, #0a0a0a 0%, #020202 100%)');
+      }
+
+      // 2. System Telemetry Sync: Glow intensity based on CPU load
+      const cpuLoad = liveMetrics.cpu || 0;
+      const glowIntensity = 0.3 + (cpuLoad / 100) * 0.7; // Scale 0.3 to 1.0
+      document.documentElement.style.setProperty('--glow-opacity', glowIntensity.toFixed(2));
+      
+      // 3. Critical Alert: Red shift if CPU > 90%
+      if (cpuLoad > 90) {
+        document.documentElement.style.setProperty('--primary-glow', 'rgba(255, 0, 51, 0.6)');
+      } else {
+        document.documentElement.style.setProperty('--primary-glow', 'var(--bg-glow)');
+      }
+    };
+
+    updateNeuralAesthetics();
+    const interval = setInterval(updateNeuralAesthetics, 5000);
+    return () => clearInterval(interval);
+  }, [liveMetrics, timeStr]);
 
   // Function to fetch TTS audio via HTTP
   const fetchTTSAudio = React.useCallback(async (text) => {
@@ -231,6 +338,10 @@ function App() {
       await audio.play();
     } catch (err) {
       console.error(`[TTS] Critical error playing chunk ${nextIndex}:`, err);
+      // If error is related to user-gesture, we can flag the system as disengaged
+      if (err.name === 'NotAllowedError') {
+        setIsSystemEngaged(false);
+      }
       isPlayingAudioRef.current = false;
       nextExpectedIndexRef.current++;
       playNextAudioChunk();
@@ -261,12 +372,11 @@ function App() {
 
   useEffect(() => {
     socketRef.current = io('http://127.0.0.1:3001', {
-      transports: ['websocket'],
-      upgrade: false,
-      forceNew: true,
+      transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
+      timeout: 10000
     });
 
     socketRef.current.on('connect', () => {
@@ -293,7 +403,35 @@ function App() {
     });
 
     socketRef.current.on('ai_text_delta', (delta) => {
-      setMmsResponseStream(prev => prev + delta);
+      setMmsResponseStream(prev => {
+        const next = prev + delta;
+        // Check for Neural Video Payload
+        if (next.includes('[NEURAL_VIDEO_PAYLOAD]')) {
+          const parts = next.split('[NEURAL_VIDEO_PAYLOAD]');
+          try {
+            const jsonStr = parts[1].trim().split('\n')[0];
+            const data = JSON.parse(jsonStr);
+            setNeuralVideoData(data);
+            setIsVideoPlaying(true);
+            console.log('[PROFESSOR] Neural Video Payload Received:', data);
+          } catch (e) {
+            console.error('Failed to parse video payload:', e);
+          }
+          return parts[0]; 
+        }
+
+        if (next.includes('[NEURAL_PULSE_TRIGGER]')) {
+          setIsNeuralPulseActive(true);
+          setTimeout(() => setIsNeuralPulseActive(false), 2000);
+          return next.replace('[NEURAL_PULSE_TRIGGER]', '');
+        }
+
+        if (next.includes('breakthrough') || next.includes('correct') || next.includes('excellent')) {
+           spawnKnowledgeParticles();
+        }
+
+        return next;
+      });
       setShowResponsePanel(true);
 
       // Reset fade timeout
@@ -408,25 +546,11 @@ function App() {
 
   }, [playNextAudioChunk, handleModeSync]);
 
+  // NOTE: Direct browser camera access is disabled to prevent hardware contention 
+  // with the Tier 5 Face Security Daemon (Python). Only one process can hold the camera lock.
   useEffect(() => {
-    let stream = null;
-    const startCamera = async () => {
-      try {
-        setCameraStatus('pending');
-        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
-        setCameraStatus('authorized');
-        if (hudVideoRef.current) {
-          hudVideoRef.current.srcObject = stream;
-        }
-      } catch (err) {
-        console.error("[HUD] Camera access denied or not found:", err);
-        setCameraStatus('denied');
-      }
-    };
-    startCamera();
-    return () => {
-      if (stream) stream.getTracks().forEach(track => track.stop());
-    };
+    setCameraStatus('authorized'); // Assume authorized since backend daemon is handling it
+    return () => {};
   }, []);
 
   useEffect(() => {
@@ -456,6 +580,21 @@ function App() {
     };
 
     const biometricInterval = setInterval(pollBiometrics, 3000);
+
+    // ── ATTENTION MONITORING ──
+    const attentionInterval = setInterval(() => {
+      if (activeMode === 'PROFESSOR' && !biometricData.detected) {
+        setAttentionTimer(prev => {
+          if (prev >= 30) { // 30 seconds of absence
+            if (socketRef.current) socketRef.current.emit('user_message', 'ATTENTION_DRIFT');
+            return 0; 
+          }
+          return prev + 5;
+        });
+      } else {
+        setAttentionTimer(0);
+      }
+    }, 5000);
 
     // PERSISTENCE LISTENER
     const handlePersist = (e) => {
@@ -1365,9 +1504,33 @@ const quickAccess = [
 ];
 
 return (
-  <div className={`mms-container ${isDiagnosticActive ? 'diagnostic-active' : ''} ${isSecurityAlert ? 'security-alert' : ''} ${isGlitchActive ? 'glitch-active' : ''}`}>
+  <div className={`mms-container ${isDiagnosticActive ? 'diagnostic-active' : ''} ${isSecurityAlert ? 'security-alert' : ''} ${isGlitchActive ? 'glitch-active' : ''} ${isNeuralPulseActive ? 'neural-pulse-active' : ''}`}>
     <canvas id="three-canvas" ref={threeCanvasRef}></canvas>
     <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
+
+    {/* Neural Pulse Arena Overlay */}
+    {isMinigameActive && (
+      <div className="neural-pulse-arena">
+        <div className="arena-score">SYNC: {minigameScore}</div>
+        {gameNodes.map(node => (
+          <div 
+            key={node.id} 
+            className="neural-node"
+            style={{ 
+              top: node.top, 
+              left: node.left, 
+              width: node.size, 
+              height: node.size,
+              animationDelay: node.delay
+            }}
+            onClick={() => handleNodeClick(node.id)}
+          >
+            <div className="node-core"></div>
+            <div className="node-ring"></div>
+          </div>
+        ))}
+      </div>
+    )}
 
     <div className="grid-overlay"></div>
     <div className="vignette"></div>
@@ -1507,6 +1670,14 @@ return (
                   </div>
                 ))}
               </div>
+              <div className="professor-actions">
+                <button className="action-btn video-btn" onClick={() => {
+                  if (socketRef.current) socketRef.current.emit('user_message', 'Generate a video explanation for our current study material.');
+                }}>
+                  <span className="btn-icon">🎬</span>
+                  <span className="btn-text">VIDEO EXPLANATION</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -1525,6 +1696,10 @@ return (
                   <span className="label">CHANGES</span>
                   <span className="val">{specialistData.git?.changes}</span>
                 </div>
+              </div>
+              <div className="forge-arena-stats">
+                 <span className="label">MANIFESTATION SYNC</span>
+                 <span className="val">{minigameScore}</span>
               </div>
             </div>
           )}
@@ -1940,6 +2115,53 @@ return (
           >
             SAVE POSITION
           </button>
+        </div>
+      </div>
+    )}
+    {/* Engagement Overlay (Audio Context Fix) */}
+    {/* ── NEURAL VIDEO OVERLAY ── */}
+    {isVideoPlaying && neuralVideoData && (
+      <div className="neural-video-overlay">
+        <div className="video-header">
+          <span className="video-title">{neuralVideoData.title}</span>
+          <button className="video-close" onClick={() => setIsVideoPlaying(false)}>✕</button>
+        </div>
+        <div className="video-stage">
+          <div className="three-manifest-layer">
+            {/* Real 3D content would be rendered into a Three.js sub-canvas here */}
+            <div className="manifestation-label">3D_MANIFEST: ACTIVE</div>
+          </div>
+          <div className="subtitles-layer">
+            {mmsResponseStream}
+          </div>
+        </div>
+        <div className="video-timeline">
+           <div className="timeline-progress" style={{ width: '45%' }}></div>
+        </div>
+      </div>
+    )}
+
+    {/* ── KNOWLEDGE PARTICLES ── */}
+    {particles.map(p => (
+      <div 
+        key={p.id} 
+        className="knowledge-particle"
+        style={{ 
+          left: p.x, 
+          top: p.y, 
+          '--target-x': `${p.tx}px`, 
+          '--target-y': `${p.ty}px` 
+        }}
+      />
+    ))}
+
+    {!isSystemEngaged && (
+      <div className="engagement-overlay" onClick={() => setIsSystemEngaged(true)}>
+        <div className="engagement-content">
+          <div className="power-icon">⚡</div>
+          <h2>INITIALIZE MMS NEURAL LINK</h2>
+          <p>Click to synchronize sensory arrays and audio core.</p>
+          <div className="scan-line"></div>
         </div>
       </div>
     )}
