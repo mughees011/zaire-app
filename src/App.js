@@ -96,12 +96,89 @@ function App() {
   const [specialistData, setSpecialistData] = useState(null);
   const [liveMetrics, setLiveMetrics] = useState({ cpu: 0, ram: 0, gpu: 0, latency: 4 });
   const [mmsActionFeed, setMmsActionFeed] = useState([]);
+  const [modeLayouts, setModeLayouts] = useState(() => {
+    const saved = localStorage.getItem('mms_mode_layouts_v1');
+    if (saved) return JSON.parse(saved);
+    return {
+      'M.M.S.': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+      'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+      'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+      'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('mms_mode_layouts_v1', JSON.stringify(modeLayouts));
+  }, [modeLayouts]);
+
+  const layoutOffsets = modeLayouts[activeMode] || modeLayouts['M.M.S.'];
+
+  const updateCurrentLayout = (updates) => {
+    setModeLayouts(prev => ({
+      ...prev,
+      [activeMode]: { ...prev[activeMode], ...updates }
+    }));
+  };
+
+  const [componentNudges, setComponentNudges] = useState(() => {
+    const saved = localStorage.getItem('mms_component_nudges_v1');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('mms_component_nudges_v1', JSON.stringify(componentNudges));
+  }, [componentNudges]);
+
+  const [selectedComponent, setSelectedComponent] = useState('');
+
+  const updateComponentNudge = (id, updates) => {
+    setComponentNudges(prev => ({
+      ...prev,
+      [id]: { ...(prev[id] || { x: 0, y: 0 }), ...updates }
+    }));
+  };
+
+  const getComponentStyle = (id) => {
+    const nudge = componentNudges[id] || { x: 0, y: 0 };
+    return {
+      transform: `translate(${nudge.x}px, ${nudge.y}px)`,
+      transition: 'transform 0.3s ease'
+    };
+  };
+
+  // --- RECURSIVE FILE TREE COMPONENT ---
+  const FileTreeNode = ({ node, depth = 0 }) => {
+    const [isOpen, setIsOpen] = useState(depth === 0); // Open root by default
+    const isDir = node.type === 'directory';
+    
+    return (
+      <div className="file-tree-node" style={{ marginLeft: `${depth * 10}px` }}>
+        <div 
+          className={`node-label ${isDir ? 'directory' : 'file'} clickable`}
+          onClick={() => isDir ? setIsOpen(!isOpen) : socketRef.current.emit('SPECIALIST_ACTION', { mode: 'ENGINEER', action: 'OPEN_FILE', payload: { filename: node.name } })}
+        >
+          <span className="node-icon">{isDir ? (isOpen ? '📂' : '📁') : '📄'}</span>
+          <span className="node-name">{node.name}</span>
+          {node.size && <span className="node-size">({(node.size / 1024).toFixed(1)}kb)</span>}
+        </div>
+        {isDir && isOpen && node.children && (
+          <div className="node-children">
+            {node.children.map((child, i) => (
+              <FileTreeNode key={`${child.name}-${i}`} node={child} depth={depth + 1} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const [isGlitchActive, setIsGlitchActive] = useState(false);
   const [artifactTokens, setArtifactTokens] = useState([]);
   const [pendingArtifactTokens, setPendingArtifactTokens] = useState([]);
   const [isMinigameActive, setIsMinigameActive] = useState(false);
   const [minigameScore, setMinigameScore] = useState(0);
   const [gameNodes, setGameNodes] = useState([]);
+  const [isSystemEngaged, setIsSystemEngaged] = useState(false);
   
   // Neural Video State
   const [neuralVideoData, setNeuralVideoData] = useState(null);
@@ -494,13 +571,16 @@ function App() {
     });
 
     // Neural Log events from Agent Daemon
-    socketRef.current.on('neural_log', () => {
-      // Logic for log persistence handled via backend/memory
+    socketRef.current.on('neural_log', (data) => {
+      if (data && data.content) {
+        const now = new Date();
+        const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
+        setMmsActionFeed(prev => [{ time, message: data.content }, ...prev].slice(0, 5));
+      }
     });
 
     // System action events (mouse/keyboard)
     socketRef.current.on('system_action', (action) => {
-
       setLastSystemAction(action);
       const now = new Date();
       const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
@@ -514,6 +594,20 @@ function App() {
     // Proactive Briefing & Diagnostic Pulse
     socketRef.current.on('diagnostic_alert', (active) => {
       setIsDiagnosticActive(active);
+    });
+
+    socketRef.current.on('neural_interrupt', (data) => {
+      const { text, type } = data;
+      console.log(`[PROACTIVE] ${type}: ${text}`);
+      setMmsResponseStream(text);
+      setShowResponsePanel(true);
+      
+      // Auto-hide after 10s
+      if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+      responseTimeoutRef.current = setTimeout(() => {
+        setShowResponsePanel(false);
+        setMmsResponseStream('');
+      }, 10000);
     });
 
     // Tier 5: Intruder Detection
@@ -540,11 +634,21 @@ function App() {
       setLiveMetrics(prev => ({ ...prev, ...metrics }));
     });
 
+    socketRef.current.on('SPECIALIST_DATA', ({ mode, data }) => {
+      setSpecialistData(data);
+    });
+
     socketRef.current.on('mms_action_feed', (actions) => {
       setMmsActionFeed(actions);
     });
 
-  }, [playNextAudioChunk, handleModeSync]);
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current.off();
+      }
+    };
+  }, [playNextAudioChunk, handleModeSync, fetchTTSAudio]);
 
   // NOTE: Direct browser camera access is disabled to prevent hardware contention 
   // with the Tier 5 Face Security Daemon (Python). Only one process can hold the camera lock.
@@ -596,25 +700,24 @@ function App() {
       }
     }, 5000);
 
-    // PERSISTENCE LISTENER
-    const handlePersist = (e) => {
+
+    const handlePersist = () => {
       if (socketRef.current) {
         socketRef.current.emit('SAVE_CONFIG', {
           blobColor: normalizeHexColor(localStorage.getItem('blobColor')),
-          blobSize: parseInt(localStorage.getItem('blobSize') || '60'),
-          blobPosition: JSON.parse(localStorage.getItem('blobPosition') || '{}')
+          blobSize: parseFloat(localStorage.getItem('blobSize') || '1.0'),
+          blobPosition: JSON.parse(localStorage.getItem('blobPosition') || '{"x":0,"y":0}')
         });
       }
     };
     window.addEventListener('MMS_PERSIST_CONFIG', handlePersist);
 
     return () => {
-      if (socketRef.current) socketRef.current.disconnect();
       clearInterval(biometricInterval);
+      clearInterval(attentionInterval);
       window.removeEventListener('MMS_PERSIST_CONFIG', handlePersist);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    };
+  }, [activeMode, biometricData.detected]);
 
   // Poll for specialist data
   useEffect(() => {
@@ -1496,7 +1599,7 @@ useEffect(() => {
 }, []);
 
 const modes = ['M.M.S.', 'TRADER', 'PROFESSOR', 'ENGINEER'];
-const navItems = ['HOME', 'DASHBOARD', 'COMMAND', 'MEMORY', 'NEURAL'];
+const navItems = ['M.M.S.', 'TRADER', 'PROFESSOR', 'ENGINEER'];
 const quickAccess = [
   { label: 'SCREEN CAPTURE', action: 'capture' },
   { label: 'OPEN BROWSER', action: 'browser' },
@@ -1504,7 +1607,21 @@ const quickAccess = [
 ];
 
 return (
-  <div className={`mms-container ${isDiagnosticActive ? 'diagnostic-active' : ''} ${isSecurityAlert ? 'security-alert' : ''} ${isGlitchActive ? 'glitch-active' : ''} ${isNeuralPulseActive ? 'neural-pulse-active' : ''}`}>
+  <div 
+    className={`mms-container ${isDiagnosticActive ? 'diagnostic-active' : ''} ${isSecurityAlert ? 'security-alert' : ''} ${isGlitchActive ? 'glitch-active' : ''} ${isNeuralPulseActive ? 'neural-pulse-active' : ''}`}
+    data-mode={activeMode}
+    style={{
+      '--left-width': `${layoutOffsets.leftWidth}px`,
+      '--right-width': `${layoutOffsets.rightWidth}px`,
+      '--bottom-height': `${layoutOffsets.bottomHeight}px`,
+      '--left-x': `${layoutOffsets.leftX}px`,
+      '--left-y': `${layoutOffsets.leftY}px`,
+      '--right-x': `${layoutOffsets.rightX}px`,
+      '--right-y': `${layoutOffsets.rightY}px`,
+      '--bottom-x': `${layoutOffsets.bottomX}px`,
+      '--bottom-y': `${layoutOffsets.bottomY}px`
+    }}
+  >
     <canvas id="three-canvas" ref={threeCanvasRef}></canvas>
     <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
 
@@ -1549,8 +1666,8 @@ return (
           {navItems.map(item => (
             <div
               key={item}
-              className={`nav-item ${navItem === item ? 'active' : ''}`}
-              onClick={() => setNavItem(item)}
+              className={`nav-item ${activeMode === item ? 'active' : ''}`}
+              onClick={() => handleModeChange(item)}
             >
               <span className="nav-arrow">›</span>
               {item}
@@ -1579,133 +1696,157 @@ return (
 
       {/* ROW 2: LEFT PANEL */}
       <div className="grid-left">
-        <div className="panel-section">
-          <div className="section-label">ACTIVE MODE</div>
-          <div className="mode-buttons">
-            {modes.map(mode => (
-              <div
-                key={mode}
-                className={`mode-btn ${activeMode === mode ? 'active' : ''}`}
-                onClick={() => handleModeChange(mode)}
-                style={activeMode === mode ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : {}}
-              >
-                <span className="mode-text">{mode}</span>
-                {activeMode === mode && <div className="mode-dot" style={{ background: 'var(--primary)' }}></div>}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="panel-section">
-          <div className="section-label">
-            {activeMode === 'M.M.S.' && 'SYSTEM VITALS'}
-            {activeMode === 'TRADER' && 'PORTFOLIO'}
-            {activeMode === 'PROFESSOR' && 'STUDY TRACKER'}
-            {activeMode === 'ENGINEER' && 'ACTIVE PROJECT'}
-          </div>
-
-          {activeMode === 'M.M.S.' && (
-            <div className="vitals-bars">
-              <div className="vital-row">
-                <span className="vital-label">CPU</span>
-                <div className="vital-bar"><div className="vital-fill" style={{ width: '62%' }}></div></div>
-              </div>
-              <div className="vital-row">
-                <span className="vital-label">MEM</span>
-                <div className="vital-bar"><div className="vital-fill" style={{ width: '78%' }}></div></div>
-              </div>
-              <div className="vital-row">
-                <span className="vital-label gpu">GPU</span>
-                <div className="vital-bar gpu"><div className="vital-fill" style={{ width: '45%' }}></div></div>
-              </div>
-              <div className="vital-row">
-                <span className="vital-label net">NET</span>
-                <div className="vital-bar net"><div className="vital-fill" style={{ width: '33%' }}></div></div>
-              </div>
-            </div>
-          )}
-
-          {activeMode === 'TRADER' && specialistData && (
-            <div className="specialist-hud trader-hud">
-              <div className="mini-holdings">
-                {specialistData.portfolio?.map(h => (
-                  <div key={h.asset} className="holding-row">
-                    <span>{h.asset}</span>
-                    <span className="holding-val">{parseFloat(h.free).toFixed(4)}</span>
+        {/* ── M.M.S. MODE PANEL ── */}
+        {activeMode === 'M.M.S.' && (
+          <>
+            <div className="panel-section" style={getComponentStyle('ACTIVE_MODE')}>
+              <div className="section-label">ACTIVE MODE</div>
+              <div className="mode-buttons">
+                {modes.map(mode => (
+                  <div
+                    key={mode}
+                    className={`mode-btn ${activeMode === mode ? 'active' : ''}`}
+                    onClick={() => handleModeChange(mode)}
+                    style={activeMode === mode ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : {}}
+                  >
+                    <span className="mode-text">{mode}</span>
+                    {activeMode === mode && <div className="mode-dot" style={{ background: 'var(--primary)' }}></div>}
                   </div>
                 ))}
               </div>
-              <div className="market-pulse">
-                <div className="pulse-item">
-                  <span>BTC</span>
-                  <span className={specialistData.market?.btc?.usd_24h_change > 0 ? 'up' : 'down'}>
-                    ${specialistData.market?.btc?.usd?.toLocaleString()}
+            </div>
+
+            <div className="panel-section" style={getComponentStyle('SYSTEM_VITALS')}>
+              <div className="section-label">SYSTEM VITALS</div>
+              <div className="vitals-bars">
+                <div className="vital-row">
+                  <span className="vital-label">CPU</span>
+                  <div className="vital-bar"><div className="vital-fill" style={{ width: `${liveMetrics.cpu}%` }}></div></div>
+                </div>
+                <div className="vital-row">
+                  <span className="vital-label">MEM</span>
+                  <div className="vital-bar"><div className="vital-fill" style={{ width: `${liveMetrics.ram}%` }}></div></div>
+                </div>
+                <div className="vital-row">
+                  <span className="vital-label gpu">GPU</span>
+                  <div className="vital-bar gpu"><div className="vital-fill" style={{ width: `${liveMetrics.gpu}%` }}></div></div>
+                </div>
+                <div className="vital-row">
+                  <span className="vital-label net">NET</span>
+                  <div className="vital-bar net"><div className="vital-fill" style={{ width: `${liveMetrics.net}%` }}></div></div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── TRADER MODE PANEL ── */}
+        {activeMode === 'TRADER' && (
+          <>
+            <div className="panel-section" style={getComponentStyle('PORTFOLIO')}>
+              <div className="section-label" style={{ color: '#00ff88' }}>PORTFOLIO</div>
+              <div className="metrics-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                <div className="metric-card" style={{ padding: '8px' }}>
+                  <span className="metric-value" style={{ color: '#00ff88', fontSize: '14px' }}>
+                    ${specialistData?.portfolio?.reduce((acc, curr) => acc + (parseFloat(curr.free) * (curr.asset === 'BTC' ? 67000 : 3200)), 0).toLocaleString() || '2,847'}
                   </span>
+                  <span className="metric-label">TOTAL VALUE</span>
                 </div>
-                <div className="pulse-item">
-                  <span>SENTIMENT</span>
-                  <span className="sentiment">{specialistData.market?.sentiment}</span>
+                <div className="metric-card" style={{ padding: '8px' }}>
+                  <span className="metric-value" style={{ color: '#00ff88', fontSize: '14px' }}>+4.2%</span>
+                  <span className="metric-label">24H CHANGE</span>
                 </div>
               </div>
             </div>
-          )}
-
-          {activeMode === 'PROFESSOR' && specialistData && (
-            <div className="specialist-hud professor-hud">
-              <div className="study-stats">
-                <div className="stat-box">
-                  <span className="stat-label">TOPICS WK</span>
-                  <span className="stat-val">{specialistData.stats?.topics_week}</span>
-                </div>
-                <div className="stat-box">
-                  <span className="stat-label">STREAK</span>
-                  <span className="stat-val">{specialistData.stats?.streak}d</span>
-                </div>
-              </div>
-              <div className="curriculum-dots">
-                {specialistData.curriculum?.map(c => (
-                  <div key={c.name} className="curr-item">
-                    <div className={`curr-dot ${c.status}`}></div>
-                    <span>{c.name}</span>
+            
+            <div className="panel-section" style={getComponentStyle('WATCHLIST')}>
+              <div className="section-label" style={{ color: '#00ff88' }}>HOLDINGS</div>
+              <div className="holding-list" style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                {specialistData?.portfolio?.map(h => (
+                  <div key={h.asset} className="module-row" style={{ borderBottom: '1px solid rgba(0,255,136,0.05)' }}>
+                    <span className="module-name">{h.asset}</span>
+                    <span className="module-status online" style={{ color: '#00ff88' }}>{parseFloat(h.free).toFixed(4)}</span>
                   </div>
                 ))}
               </div>
-              <div className="professor-actions">
-                <button className="action-btn video-btn" onClick={() => {
-                  if (socketRef.current) socketRef.current.emit('user_message', 'Generate a video explanation for our current study material.');
-                }}>
-                  <span className="btn-icon">🎬</span>
-                  <span className="btn-text">VIDEO EXPLANATION</span>
+            </div>
+
+            <div className="panel-section" style={getComponentStyle('HALAL_FILTER')}>
+              <div className="section-label" style={{ color: '#00ff88' }}>HALAL FILTER</div>
+              <div style={{ padding: '8px', background: 'rgba(0,255,136,0.04)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '2px' }}>
+                <div style={{ fontSize: '8px', color: '#00ff88', letterSpacing: '1px' }}>✓ {specialistData?.halal_filter || 'ACTIVE'} — {specialistData?.whitelisted_count || 14} APPROVED</div>
+                <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>LEVERAGE / MARGIN: BLOCKED</div>
+                <button 
+                  className="cmd-btn" 
+                  style={{ width: '100%', marginTop: '10px', borderColor: '#00ff88', color: '#00ff88', fontSize: '9px' }}
+                  onClick={() => socketRef.current.emit('SPECIALIST_ACTION', { mode: 'TRADER', action: 'EXECUTE_TRADE', payload: { symbol: 'BTCUSDT', side: 'BUY' } })}
+                >
+                  EXECUTE TEST TRADE
                 </button>
               </div>
             </div>
-          )}
+          </>
+        )}
 
-          {activeMode === 'ENGINEER' && specialistData && (
-            <div className="specialist-hud engineer-hud">
-              <div className="project-header">
-                <span className="proj-name">{specialistData.name}</span>
-                <span className={`status-tag ${specialistData.server === 'RUNNING' ? 'alive' : ''}`}>{specialistData.server}</span>
-              </div>
-              <div className="git-mini">
-                <div className="git-row">
-                  <span className="label">BRANCH</span>
-                  <span className="val">{specialistData.git?.branch}</span>
-                </div>
-                <div className="git-row">
-                  <span className="label">CHANGES</span>
-                  <span className="val">{specialistData.git?.changes}</span>
-                </div>
-              </div>
-              <div className="forge-arena-stats">
-                 <span className="label">MANIFESTATION SYNC</span>
-                 <span className="val">{minigameScore}</span>
+        {/* ── PROFESSOR MODE PANEL ── */}
+        {activeMode === 'PROFESSOR' && (
+          <>
+            <div className="panel-section" style={getComponentStyle('CURRICULUM')}>
+              <div className="section-label" style={{ color: '#a78bfa' }}>CURRICULUM</div>
+              <div className="curriculum-list">
+                {specialistData?.curriculum?.map(c => (
+                  <div key={c.name} className="curriculum-item">
+                    <div className={`cur-dot ${c.status}`} style={{ background: c.status === 'DONE' ? '#00ff88' : (c.status === 'ACTIVE' ? '#a78bfa' : 'rgba(255,255,255,0.1)') }}></div>
+                    <span className="cur-name" style={{ color: c.status === 'ACTIVE' ? '#a78bfa' : 'inherit' }}>{c.name}</span>
+                    <span className="cur-status" style={{ color: c.status === 'DONE' ? '#00ff88' : (c.status === 'ACTIVE' ? '#a78bfa' : 'inherit') }}>{c.status}</span>
+                  </div>
+                ))}
               </div>
             </div>
-          )}
-        </div>
 
-        <div className="panel-section">
+            <div className="panel-section" style={getComponentStyle('STUDY_METRICS')}>
+              <div className="section-label" style={{ color: '#a78bfa' }}>STUDY METRICS</div>
+              <div className="module-list">
+                <div className="module-row"><span className="module-name">MOOD</span><span className="module-status online" style={{ color: '#a78bfa' }}>{specialistData?.mood || 'ACADEMIC'}</span></div>
+                <div className="module-row"><span className="module-name">STREAK</span><span className="module-status online" style={{ color: '#a78bfa' }}>{specialistData?.streak || 0} SESSIONS</span></div>
+                <div className="module-row"><span className="module-name">LEVEL</span><span className="module-status online" style={{ color: '#00ff88' }}>{specialistData?.mastery_level || 'NOVICE'}</span></div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── ENGINEER MODE PANEL ── */}
+        {activeMode === 'ENGINEER' && (
+          <>
+            <div className="panel-section" style={getComponentStyle('ACTIVE_PROJECT')}>
+              <div className="section-label" style={{ color: '#f97316' }}>ACTIVE PROJECTS</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {(specialistData?.active_projects || ['M.M.S. CORE']).map(proj => (
+                  <div key={proj} style={{ padding: '8px', background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: '2px' }}>
+                    <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '10px', color: '#f97316', letterSpacing: '1.5px' }}>{proj}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.5, marginTop: '4px' }}>
+                      <span>TYPE: NEXT.JS 15</span>
+                      <span>STATUS: {specialistData?.manifestation_sync?.status || 'STABLE'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="panel-section" style={getComponentStyle('FILE_TREE')}>
+              <div className="section-label" style={{ color: '#f97316' }}>LIVE FILE TREE</div>
+              <div className="file-tree" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                {specialistData?.live_file_tree ? (
+                  <FileTreeNode node={specialistData.live_file_tree} />
+                ) : (
+                  <div style={{ fontSize: '9px', opacity: 0.3, textAlign: 'center', padding: '20px' }}>AWAITING MANIFESTATION...</div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        <div className="panel-section" style={getComponentStyle('MODULE_STATUS')}>
           <div className="section-label">MODULE STATUS</div>
           <div className="module-list">
             {[
@@ -1723,13 +1864,13 @@ return (
           </div>
         </div>
 
-        <div className="panel-section">
+        <div className="panel-section" style={getComponentStyle('VOICE_MONITOR')}>
           <div className="section-label">VOICE MONITOR</div>
           <canvas ref={voiceWaveformRef} className="voice-waveform"></canvas>
         </div>
 
         {/* ── MEMORY CORE ── */}
-        <div className={`panel-section memory-panel ${memoryFlash ? 'memory-flash' : ''}`}>
+        <div className={`panel-section memory-panel ${memoryFlash ? 'memory-flash' : ''}`} style={getComponentStyle('MEMORY_CORE')}>
           <div className="section-label memory-label">
             <span>MEMORY CORE</span>
             <span className="memory-count">{storedMemories.length} STORED</span>
@@ -1774,173 +1915,409 @@ return (
         </div>
       </div>
 
-      {/* ROW 2: CENTER (ORB) */}
-      {/* <div className="grid-center">
-          <div className="orb-container">
-            <div className="target-ring ring-1"></div>
-            <div className="target-ring ring-2"></div>
-
-            <div className="hud-label top-left">
-              <span className="hud-line"></span>
-              <span>PLASMA DENSITY</span>
-              <span className="hud-value">4.2 TW</span>
-            </div>
-            <div className="hud-label top-right">
-              <span className="hud-line"></span>
-              <span>ENERGY OUTPUT</span>
-              <span className="hud-value">∞ MJ</span>
-            </div>
-            <div className="hud-label bottom-left">
-              <span className="hud-line"></span>
-              <span>CORE TEMP</span>
-              <span className="hud-value">15,000 K</span>
-            </div>
-            <div className="hud-label bottom-right">
-              <span className="hud-line"></span>
-              <span>FIELD STRENGTH</span>
-              <span className="hud-value">9.4 T</span>
-            </div>
-          </div>
-        </div> */}
-
-      {/* ROW 2: RIGHT PANEL */}
-      <div className="grid-right">
-
-        {/* ── BIOMETRIC HUD PANEL ── */}
-        <div className={`panel-section biometric-panel ${biometricData.detected ? 'detected' : ''} ${isSecurityAlert ? 'threat' : ''}`}>
-          <div className="section-label">BIOMETRIC SCAN</div>
-          <div className="biometric-hud">
-            <div className="bio-status-row">
-              <span className="bio-label">IDENTITY:</span>
-              <span className={`bio-value ${biometricData.name === 'Master' ? 'master' : (isSecurityAlert ? 'alert' : '')}`}>
-                {isSecurityAlert ? 'UNKNOWN_THREAT' : (biometricData.detected ? biometricData.name.toUpperCase() : 'ABSENT')}
+      {/* ROW 2: CENTER (ORB / TACTICAL CONTENT) */}
+      <div className="grid-center" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+        
+        {/* TRADER CENTER: Market Pulse */}
+        {activeMode === 'TRADER' && (
+          <div style={{ width: '100%', maxWidth: '500px', pointerEvents: 'auto' }}>
+            <div className="price-ticker">
+              <span className="ticker-sym">BTC/USD</span>
+              <span className="ticker-price">{specialistData?.live_pulse?.BTC ? `$${specialistData.live_pulse.BTC.price.toLocaleString()}` : (specialistData?.btc || '$67,482.10')}</span>
+              <span className="ticker-change" style={{ color: (specialistData?.live_pulse?.BTC?.percent >= 0) ? '#00ff88' : '#ff3366' }}>
+                {specialistData?.live_pulse?.BTC ? `${specialistData.live_pulse.BTC.percent.toFixed(2)}%` : '+1.42%'}
               </span>
             </div>
-            <div className="bio-status-row">
-              <span className="bio-label">SCAN LOCK:</span>
-              <div className="bio-lock-bar">
-                <div className={`bio-lock-fill ${biometricData.detected ? 'active' : ''} ${isSecurityAlert ? 'threat' : ''}`} style={{ width: biometricData.detected || isSecurityAlert ? '100%' : '0%' }}></div>
-              </div>
+            <div className="price-ticker">
+              <span className="ticker-sym">ETH/USD</span>
+              <span className="ticker-price">{specialistData?.live_pulse?.ETH ? `$${specialistData.live_pulse.ETH.price.toLocaleString()}` : (specialistData?.eth || '$3,241.50')}</span>
+              <span className="ticker-change" style={{ color: (specialistData?.live_pulse?.ETH?.percent >= 0) ? '#00ff88' : '#ff3366' }}>
+                {specialistData?.live_pulse?.ETH ? `${specialistData.live_pulse.ETH.percent.toFixed(2)}%` : '+0.85%'}
+              </span>
             </div>
-            <div className="bio-status-row">
-              <span className="bio-label">FACE-LOCK:</span>
-              <span className={`bio-value ${biometricData.enabled ? 'online' : 'offline'}`}>{biometricData.enabled ? 'ACTIVE' : 'DISABLED'}</span>
-            </div>
-            <div className="bio-meta">
-              <span className={`meta-tag ${biometricData.locked ? 'red' : 'green'}`}>{biometricData.locked ? 'LOCK_ENGAGED' : 'SYSTEM_READY'}</span>
-              <span className="meta-tag pulse">ENCRYPTED</span>
-              {biometricData.intruders > 0 && <span className="meta-tag alert">INTRUDERS: {biometricData.intruders}</span>}
-            </div>
-          </div>
-        </div>
-
-        {/* ── VISION INDICATOR ── */}
-        <div className={`panel-section vision-panel ${isVisionScanning ? 'vision-active' : ''}`}>
-          <div className="section-label vision-label">
-            <span>SCREEN VISION</span>
-            <span className={`vision-status ${isVisionScanning ? 'scanning' : 'standby'}`}>
-              {isVisionScanning ? '● SCANNING' : '○ STANDBY'}
-            </span>
-          </div>
-          <div className="vision-hint">
-            Say: <em>"What's on my screen?"</em>
-          </div>
-        </div>
-
-        {/* ── SYSTEM ACTIONS LOG ── */}
-        {systemActionLog.length > 0 && (
-          <div className="panel-section">
-            <div className="section-label">SYSTEM ACTIONS</div>
-            <div className="action-log">
-              {systemActionLog.map((a, i) => (
-                <div key={i} className="action-log-item">
-                  <span className="action-time">{a.time}</span>
-                  <span className="action-label">{a.label}</span>
-                </div>
-              ))}
+            <div className="verdict-box">
+              <div className="verdict-label">NEURAL MARKET VERDICT</div>
+              <div className="verdict-val">STRONG ACCUMULATE</div>
+              <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '5px' }}>SIGNAL CONFIDENCE: 94%</div>
             </div>
           </div>
         )}
 
-        <div className="panel-section">
-          <div className="section-label">SYSTEM METRICS</div>
-          <div className="metrics-grid">
-            <div className="metric-card">
-              <span className="metric-value">{liveMetrics.latency}ms</span>
-              <span className="metric-label">LATENCY</span>
+        {/* PROFESSOR CENTER: Slide Preview */}
+        {activeMode === 'PROFESSOR' && (
+          <div style={{ width: '100%', maxWidth: '500px', pointerEvents: 'auto' }}>
+            <div className="slide-preview">
+              <div className="slide-title">QUANTUM COMPUTING 101</div>
+              <div className="slide-point">Superposition & Entanglement</div>
+              <div className="slide-point">Qubit State Manifestation</div>
+              <div className="slide-point">Neural Link Optimization</div>
+              <div style={{ marginTop: 'auto', fontSize: '7px', opacity: 0.3, textAlign: 'right' }}>SLIDE 4 / 12</div>
             </div>
-            <div className="metric-card">
-              <span className="metric-value good">{liveMetrics.cpu}%</span>
-              <span className="metric-label">CPU LOAD</span>
-            </div>
-            <div className="metric-card">
-              <span className="metric-value">{liveMetrics.ram}%</span>
-              <span className="metric-label">RAM USAGE</span>
-            </div>
-            <div className="metric-card">
-              <span className="metric-value">{(audioFrequency * 100).toFixed(0)}%</span>
-              <span className="metric-label">VOICE PULSE</span>
-            </div>
-            <div className="metric-card">
-              <span className="metric-value">{liveMetrics.gpu}%</span>
-              <span className="metric-label">GPU LOAD</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="panel-section">
-          <div className="section-label">LIVE ACTION FEED</div>
-          <div className="activity-feed">
-            {mmsActionFeed.map((item, idx) => (
-              <div key={idx} className="activity-item">
-                <span className="activity-time">{item.time}</span>
-                <span className="activity-message">{item.message}</span>
+            <div className="quiz-area">
+              <div className="quiz-q">What is the primary benefit of quantum parallelism in Shor's algorithm?</div>
+              <div className="quiz-opts">
+                <div className="quiz-opt">A) Linear data processing</div>
+                <div className="quiz-opt" style={{ borderColor: '#a78bfa', opacity: 1 }}>B) Exponential factorization speedup</div>
+                <div className="quiz-opt">C) Increased storage capacity</div>
               </div>
-            ))}
-            {mmsActionFeed.length === 0 && <div className="activity-empty">— SYSTEM IDLE —</div>}
-          </div>
-        </div>
-
-        <div className="panel-section">
-          <div className="section-label">QUICK ACCESS</div>
-          <div className="quick-list">
-            {quickAccess.map(item => (
-              <div 
-                key={item.label} 
-                className="quick-item clickable"
-                onClick={() => {
-                  if (socketRef.current) {
-                    socketRef.current.emit('QUICK_ACTION', { action: item.action });
-                    setSystemActionLog(prev => [{ 
-                      time: new Date().toLocaleTimeString(), 
-                      label: `[QUICK] EXEC: ${item.label}` 
-                    }, ...prev].slice(0, 6));
-                  }
-                }}
-              >
-                <span>{item.label}</span>
-                <span className="quick-arrow">›</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="panel-section">
-          <div className="section-label">NEURAL LOAD</div>
-          <div className="neural-gauge">
-            <canvas ref={neuralGaugeRef} width="80" height="80"></canvas>
-            <div className="neural-text">
-              <span className="neural-percent">74%</span>
-              <span className="neural-label">NEURAL</span>
             </div>
           </div>
+        )}
+
+        {/* ENGINEER CENTER: Build Log */}
+        {activeMode === 'ENGINEER' && (
+          <div className="forge-arena-container" style={{ width: '100%', maxWidth: '600px', pointerEvents: 'auto' }}>
+            <div className="panel-section" style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(249,115,22,0.15)', padding: '15px' }}>
+              <div className="section-label" style={{ color: '#f97316', borderBottom: '1px solid rgba(249,115,22,0.2)', paddingBottom: '5px', marginBottom: '10px' }}>FORGE_BUILD_LOG</div>
+              <div className="build-log" style={{ height: '220px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '10px' }}>
+                {(specialistData?.forge_build_log || [
+                  { timestamp: '00:00:00', activity: 'Awaiting manifestation core...', status: 'OK' }
+                ]).map((log, i) => (
+                  <div key={i} className="build-log-line" style={{ marginBottom: '4px', opacity: 0.9 }}>
+                    <span style={{ opacity: 0.4, marginRight: '8px' }}>[{log.timestamp}]</span>
+                    <span style={{ color: log.status === 'OK' ? '#00ff88' : '#ff3366', fontWeight: 'bold', marginRight: '8px' }}>[{log.status}]</span>
+                    <span>{log.activity}</span>
+                  </div>
+                ))}
+                <div style={{ height: '20px' }}></div>
+              </div>
+              <div className="forge-meta" style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '8px', opacity: 0.4 }}>
+                <span>THREADPOOL: ACTIVE [5 WORKERS]</span>
+                <span>NEURAL_LINK: STABLE</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* M.M.S. CENTER: The Orb area stays clear for background visualizer */}
+      </div>
+
+      {/* ROW 2: RIGHT PANEL */}
+      <div className="grid-right">
+        {/* ── M.M.S. MODE RIGHT PANEL ── */}
+        {activeMode === 'M.M.S.' && (
+          <>
+            <div className={`panel-section biometric-panel ${biometricData.detected ? 'detected' : ''} ${isSecurityAlert ? 'threat' : ''}`} style={getComponentStyle('BIOMETRIC_SCAN')}>
+              <div className="section-label">BIOMETRIC SCAN</div>
+              <div className="biometric-hud">
+                <div className="bio-status-row">
+                  <span className="bio-label">IDENTITY:</span>
+                  <span className={`bio-value ${biometricData.name === 'Master' ? 'master' : (isSecurityAlert ? 'alert' : '')}`}>
+                    {isSecurityAlert ? 'UNKNOWN_THREAT' : (biometricData.detected ? biometricData.name.toUpperCase() : 'ABSENT')}
+                  </span>
+                </div>
+                <div className="bio-status-row">
+                  <span className="bio-label">SCAN LOCK:</span>
+                  <div className="bio-lock-bar">
+                    <div className={`bio-lock-fill ${biometricData.detected ? 'active' : ''} ${isSecurityAlert ? 'threat' : ''}`} style={{ width: biometricData.detected || isSecurityAlert ? '100%' : '0%' }}></div>
+                  </div>
+                </div>
+                <div className="bio-status-row">
+                  <span className="bio-label">FACE-LOCK:</span>
+                  <span className={`bio-value ${biometricData.enabled ? 'online' : 'offline'}`}>{biometricData.enabled ? 'ACTIVE' : 'DISABLED'}</span>
+                </div>
+                <div className="bio-meta">
+                  <span className={`meta-tag ${biometricData.locked ? 'red' : 'green'}`}>{biometricData.locked ? 'LOCK_ENGAGED' : 'SYSTEM_READY'}</span>
+                  <span className="meta-tag pulse">ENCRYPTED</span>
+                  {biometricData.intruders > 0 && <span className="meta-tag alert">INTRUDERS: {biometricData.intruders}</span>}
+                </div>
+              </div>
+            </div>
+
+            <div className={`panel-section vision-panel ${isVisionScanning ? 'vision-active' : ''}`} style={getComponentStyle('SCREEN_VISION')}>
+              <div className="section-label vision-label">
+                <span>SCREEN VISION</span>
+                <span className={`vision-status ${isVisionScanning ? 'scanning' : 'standby'}`}>
+                  {isVisionScanning ? '● SCANNING' : '○ STANDBY'}
+                </span>
+              </div>
+              <div className="vision-feed">
+                {isVisionScanning ? (
+                  <div className="vision-scan-box">
+                    <div className="scan-line-vision"></div>
+                    <div className="vision-meta">OCR: ENABLED | NEURAL: SYNCING</div>
+                  </div>
+                ) : (
+                  <div className="vision-placeholder">VISION CORE OFFLINE</div>
+                )}
+              </div>
+              <div className="vision-hint">
+                Say: <em>"What's on my screen?"</em>
+              </div>
+            </div>
+
+            <div className="panel-section" style={getComponentStyle('SYSTEM_METRICS')}>
+              <div className="section-label">SYSTEM METRICS</div>
+              <div className="metrics-grid">
+                <div className="metric-card">
+                  <span className="metric-value">{liveMetrics.latency}ms</span>
+                  <span className="metric-label">LATENCY</span>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-value good">{liveMetrics.cpu}%</span>
+                  <span className="metric-label">CPU LOAD</span>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-value">{liveMetrics.ram}%</span>
+                  <span className="metric-label">RAM USAGE</span>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-value">{(audioFrequency * 100).toFixed(0)}%</span>
+                  <span className="metric-label">VOICE PULSE</span>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── TRADER MODE RIGHT PANEL ── */}
+        {activeMode === 'TRADER' && (
+          <>
+            <div className="panel-section" style={getComponentStyle('TOP_OPPORTUNITY')}>
+              <div className="section-label" style={{ color: '#00ff88' }}>TOP OPPORTUNITY</div>
+              <div style={{ padding: '12px', background: 'rgba(0,255,136,0.06)', border: '1px solid rgba(0,255,136,0.2)', borderRadius: '2px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontFamily: 'var(--font-orbitron)', fontSize: '12px', color: '#00ff88' }}>SOL/USDT</span>
+                  <span style={{ fontSize: '10px', color: '#00ff88' }}>LONG</span>
+                </div>
+                <div style={{ fontSize: '8px', opacity: 0.6, lineHeight: '1.4' }}>Breakout detected at $142.50. Target: $158.00. Neural confidence high.</div>
+                <button className="cmd-btn" style={{ width: '100%', marginTop: '10px', borderColor: '#00ff88', color: '#00ff88' }}>EXECUTE TRADE</button>
+              </div>
+            </div>
+
+            <div className="panel-section" style={getComponentStyle('MACRO_SIGNALS')}>
+              <div className="section-label" style={{ color: '#00ff88' }}>MACRO SIGNALS</div>
+              <div className="stat-row"><span className="sk">DXY INDEX</span><span className="sv">104.2 (↓)</span></div>
+              <div className="stat-row"><span className="sk">SPX 500</span><span className="sv">5,124 (↑)</span></div>
+              <div className="stat-row"><span className="sk">VOLATILITY</span><span className="sv">LOW</span></div>
+              <div className="stat-row"><span className="sk">FUNDING</span><span className="sv">NEUTRAL</span></div>
+            </div>
+          </>
+        )}
+
+        {/* ── PROFESSOR MODE RIGHT PANEL ── */}
+        {activeMode === 'PROFESSOR' && (
+          <>
+            <div className="panel-section" style={getComponentStyle('LEARNING_PROGRESS')}>
+              <div className="section-label" style={{ color: '#a78bfa' }}>LEARNING PROGRESS</div>
+              <div className="neural-gauge" style={{ margin: '10px auto' }}>
+                <canvas ref={neuralGaugeRef} width="100" height="100"></canvas>
+                <div className="neural-text">
+                  <span className="neural-percent" style={{ color: '#a78bfa' }}>84%</span>
+                  <span className="neural-label">SYNC</span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', fontSize: '8px', opacity: 0.4 }}>MASTERY: LEVEL 4 (ADVANCED)</div>
+            </div>
+
+            <div className="panel-section" style={getComponentStyle('STUDY_GOALS')}>
+              <div className="section-label" style={{ color: '#a78bfa' }}>STUDY GOALS</div>
+              <div className="stat-row"><span className="sk">DAILY TARGET</span><span className="sv">2h 30m</span></div>
+              <div className="stat-row"><span className="sk">REMAINING</span><span className="sv" style={{ color: '#a78bfa' }}>45m</span></div>
+              <div className="stat-row"><span className="sk">NEXT EXAM</span><span className="sv">IN 2 DAYS</span></div>
+            </div>
+          </>
+        )}
+
+        {/* ── ENGINEER MODE RIGHT PANEL ── */}
+        {activeMode === 'ENGINEER' && (
+          <>
+            <div className="panel-section" style={getComponentStyle('FORGE_TELEMETRY')}>
+              <div className="section-label" style={{ color: '#f97316' }}>FORGE TELEMETRY</div>
+              <div className="metrics-grid">
+                <div className="metric-card">
+                  <span className="metric-value" style={{ color: '#f97316' }}>{specialistData?.forge_telemetry?.hmr_latency || '0.4s'}</span>
+                  <span className="metric-label">HMR LATENCY</span>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-value" style={{ color: specialistData?.forge_telemetry?.errors > 0 ? '#ff3366' : '#00ff88' }}>
+                    {specialistData?.forge_telemetry?.errors || 0} ERR
+                  </span>
+                  <span className="metric-label">LINT STATUS</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="panel-section" style={getComponentStyle('MANIFESTATION_SYNC')}>
+              <div className="section-label" style={{ color: '#f97316' }}>MANIFESTATION SYNC</div>
+              <div style={{ padding: '10px', background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.1)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '5px' }}>
+                  <span>NEURAL ALIGNMENT</span>
+                  <span style={{ color: '#f97316' }}>{specialistData?.manifestation_sync?.alignment || '98%'}</span>
+                </div>
+                <div className="progress-bar" style={{ margin: 0 }}>
+                  <div className="progress-fill" style={{ width: specialistData?.manifestation_sync?.alignment || '98%' }}></div>
+                </div>
+                <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '5px', textAlign: 'right' }}>
+                  CORE: {specialistData?.manifestation_sync?.status || 'SYNCHRONIZED'}
+                </div>
+              </div>
+            </div>
+
+            <div className="panel-section" style={getComponentStyle('SYSTEM_ACTIONS')}>
+              <div className="section-label" style={{ color: '#f97316' }}>SYSTEM ACTIONS</div>
+              <div className="action-log" style={{ maxHeight: '100px' }}>
+                <div className="action-log-item"><span className="action-time">12:44</span> <span className="action-label">Pushed to main</span></div>
+                <div className="action-log-item"><span className="action-time">12:42</span> <span className="action-label">Asset optimized</span></div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── PERSISTENT LAYOUT CALIBRATION ── */}
+        <div className="panel-section" style={{ marginTop: 'auto', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="section-label">{activeMode} LAYOUT CALIBRATION</div>
+          <div className="calibration-controls" style={{ padding: '4px' }}>
+            <div className="calibration-item" style={{ marginBottom: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                <label>LEFT WIDTH</label>
+                <span>{layoutOffsets.leftWidth}px</span>
+              </div>
+              <input type="range" min="150" max="400" value={layoutOffsets.leftWidth} 
+                onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })} 
+                style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
+            </div>
+            <div className="calibration-item" style={{ marginBottom: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                <label>RIGHT WIDTH</label>
+                <span>{layoutOffsets.rightWidth}px</span>
+              </div>
+              <input type="range" min="150" max="400" value={layoutOffsets.rightWidth} 
+                onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })} 
+                style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
+            </div>
+            <div className="calibration-item" style={{ marginBottom: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                <label>CMD HEIGHT</label>
+                <span>{layoutOffsets.bottomHeight}px</span>
+              </div>
+              <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight} 
+                onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })} 
+                style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
+            </div>
+            
+            <div style={{ margin: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+              <div className="cal-col">
+                <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
+                <div style={{ marginBottom: '6px' }}>
+                  <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
+                  <input type="range" min="-100" max="100" value={layoutOffsets.leftX} 
+                    onChange={(e) => updateCurrentLayout({ leftX: parseInt(e.target.value) })} 
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                </div>
+                <div>
+                  <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
+                  <input type="range" min="-100" max="100" value={layoutOffsets.leftY} 
+                    onChange={(e) => updateCurrentLayout({ leftY: parseInt(e.target.value) })} 
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                </div>
+              </div>
+              
+              <div className="cal-col">
+                <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
+                <div style={{ marginBottom: '6px' }}>
+                  <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
+                  <input type="range" min="-100" max="100" value={layoutOffsets.rightX} 
+                    onChange={(e) => updateCurrentLayout({ rightX: parseInt(e.target.value) })} 
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                </div>
+                <div>
+                  <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
+                  <input type="range" min="-100" max="100" value={layoutOffsets.rightY} 
+                    onChange={(e) => updateCurrentLayout({ rightY: parseInt(e.target.value) })} 
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                </div>
+              </div>
+
+              <div className="cal-col">
+                <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
+                <div style={{ marginBottom: '6px' }}>
+                  <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
+                  <input type="range" min="-100" max="100" value={layoutOffsets.bottomX} 
+                    onChange={(e) => updateCurrentLayout({ bottomX: parseInt(e.target.value) })} 
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                </div>
+                <div>
+                  <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
+                  <input type="range" min="-100" max="100" value={layoutOffsets.bottomY} 
+                    onChange={(e) => updateCurrentLayout({ bottomY: parseInt(e.target.value) })} 
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              className="cmd-btn" 
+              style={{ width: '100%', marginTop: '12px', fontSize: '7px', padding: '4px', opacity: 0.6 }}
+              onClick={() => {
+                const defaults = {
+                  'M.M.S.': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                  'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                  'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                  'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
+                };
+                updateCurrentLayout(defaults[activeMode]);
+              }}
+            >
+              RESET {activeMode} LAYOUT
+            </button>
+          </div>
         </div>
 
-        <div className="panel-section">
-          <div className="section-label">SESSION UPTIME</div>
-          <div className="uptime-display">
-            <span className="uptime-value">{formatUptime(sessionUptime)}</span>
-            <span className="uptime-label">ACTIVE SINCE BOOT</span>
+        {/* ── COMPONENT CALIBRATION ── */}
+        <div className="panel-section" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+          <div className="section-label">COMPONENT CALIBRATION</div>
+          <div className="calibration-controls" style={{ padding: '4px' }}>
+            <select 
+              value={selectedComponent} 
+              onChange={(e) => setSelectedComponent(e.target.value)}
+              style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '8px', padding: '4px', marginBottom: '8px' }}
+            >
+              <option value="">SELECT COMPONENT...</option>
+              {(({
+                'M.M.S.': ['ACTIVE_MODE', 'SYSTEM_VITALS', 'BIOMETRIC_SCAN', 'SCREEN_VISION', 'SYSTEM_METRICS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
+                'TRADER': ['PORTFOLIO', 'WATCHLIST', 'HALAL_FILTER', 'TOP_OPPORTUNITY', 'MACRO_SIGNALS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
+                'PROFESSOR': ['CURRICULUM', 'STUDY_METRICS', 'LEARNING_PROGRESS', 'STUDY_GOALS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
+                'ENGINEER': ['ACTIVE_PROJECT', 'FILE_TREE', 'FORGE_TELEMETRY', 'MANIFESTATION_SYNC', 'SYSTEM_ACTIONS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE']
+              })[activeMode] || []).map(id => (
+                <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
+              ))}
+            </select>
+
+            {selectedComponent && (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.4 }}>
+                    <label>X NUDGE</label>
+                    <span>{(componentNudges[selectedComponent]?.x || 0)}px</span>
+                  </div>
+                  <input type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.x || 0} 
+                    onChange={(e) => updateComponentNudge(selectedComponent, { x: parseInt(e.target.value) })} 
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.4 }}>
+                    <label>Y NUDGE</label>
+                    <span>{(componentNudges[selectedComponent]?.y || 0)}px</span>
+                  </div>
+                  <input type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.y || 0} 
+                    onChange={(e) => updateComponentNudge(selectedComponent, { y: parseInt(e.target.value) })} 
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                </div>
+              </div>
+            )}
+            
+            <button 
+              className="cmd-btn" 
+              style={{ width: '100%', marginTop: '10px', fontSize: '7px', padding: '4px', opacity: 0.4 }}
+              onClick={() => {
+                if (window.confirm('RESET ALL COMPONENT NUDGES?')) setComponentNudges({});
+              }}
+            >
+              RESET ALL COMPONENTS
+            </button>
           </div>
         </div>
       </div>
@@ -2020,11 +2397,9 @@ return (
               <div className="scanline-overlay"></div>
               <div className="hud-video-container">
                 {cameraStatus === 'authorized' ? (
-                  <video 
-                    ref={hudVideoRef} 
-                    autoPlay 
-                    playsInline 
-                    muted 
+                  <img 
+                    src="http://127.0.0.1:3001/security/video_feed" 
+                    alt="Camera Feed"
                     className="hud-video-feed"
                   />
                 ) : (
