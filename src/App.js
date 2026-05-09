@@ -5,6 +5,7 @@ import SettingsModal from './SettingsModal';
 import GroqSpeechService from './groqSpeechService';
 import { io } from 'socket.io-client';
 import './App.css';
+import ShadowAssistant from './components/ShadowAssistant';
 
 const DEFAULT_BLOB_COLOR = '#00b4ff';
 
@@ -61,6 +62,8 @@ function App() {
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const dataArrayRef = useRef(null);
+  const outputAnalyserRef = useRef(null);
+  const outputDataArrayRef = useRef(null);
   const audioStreamRef = useRef(null);
   const recognitionRef = useRef(null);
   const [lastCommand, setLastCommand] = useState('');
@@ -85,6 +88,7 @@ function App() {
   const socketRef = useRef(null);
   const [mmsResponseStream, setMmsResponseStream] = useState('');
   const [showResponsePanel, setShowResponsePanel] = useState(false);
+  const [isNeuralInterruptActive, setIsNeuralInterruptActive] = useState(false);
   const responseTimeoutRef = useRef(null);
 
   // Biometric State
@@ -96,6 +100,13 @@ function App() {
   const [specialistData, setSpecialistData] = useState(null);
   const [liveMetrics, setLiveMetrics] = useState({ cpu: 0, ram: 0, gpu: 0, latency: 4 });
   const [mmsActionFeed, setMmsActionFeed] = useState([]);
+  const [liveCodeStream, setLiveCodeStream] = useState('');
+  const [professorSlides, setProfessorSlides] = useState([
+    { title: 'Neural Architectures', content: 'Understanding multi-head attention mechanisms in Transformers.', image: null },
+    { title: 'Latent Space', content: 'Visualizing high-dimensional embeddings in vector databases.', image: null },
+    { title: 'Optimization', content: 'Stochastic Gradient Descent vs Adam: A comparative analysis.', image: null }
+  ]);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [modeLayouts, setModeLayouts] = useState(() => {
     const saved = localStorage.getItem('mms_mode_layouts_v1');
     if (saved) return JSON.parse(saved);
@@ -397,6 +408,23 @@ function App() {
       url = URL.createObjectURL(blob);
       const audio = new Audio(url);
 
+      if (!audioContextRef.current) {
+         audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (!outputAnalyserRef.current) {
+         outputAnalyserRef.current = audioContextRef.current.createAnalyser();
+         outputAnalyserRef.current.fftSize = 256;
+         outputDataArrayRef.current = new Uint8Array(outputAnalyserRef.current.frequencyBinCount);
+      }
+      
+      try {
+        const source = audioContextRef.current.createMediaElementSource(audio);
+        source.connect(outputAnalyserRef.current);
+        outputAnalyserRef.current.connect(audioContextRef.current.destination);
+      } catch (e) {
+        // MediaElementSource might already be created if using same audio element, but we create new Audio() above.
+      }
+
       const onFinished = () => {
         if (url) URL.revokeObjectURL(url);
         delete audioQueueRef.current[nextIndex];
@@ -507,6 +535,19 @@ function App() {
            spawnKnowledgeParticles();
         }
 
+        if (next.includes('```')) {
+           const codeBlocks = next.match(/```[\s\S]*?```/g);
+           if (codeBlocks && codeBlocks.length > 0) {
+              const lastBlock = codeBlocks[codeBlocks.length - 1];
+              const cleaned = lastBlock.replace(/```[a-zA-Z]*\n?/, '').replace(/```$/, '');
+              setLiveCodeStream(cleaned);
+           } else if (next.includes('```')) {
+              // Handle partial block (starting with ``` but not ending)
+              const partial = next.split('```').pop().replace(/^[a-zA-Z]*\n?/, '');
+              setLiveCodeStream(partial);
+           }
+        }
+
         return next;
       });
       setShowResponsePanel(true);
@@ -601,12 +642,14 @@ function App() {
       console.log(`[PROACTIVE] ${type}: ${text}`);
       setMmsResponseStream(text);
       setShowResponsePanel(true);
+      setIsNeuralInterruptActive(true);
       
       // Auto-hide after 10s
       if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
       responseTimeoutRef.current = setTimeout(() => {
         setShowResponsePanel(false);
         setMmsResponseStream('');
+        setIsNeuralInterruptActive(false);
       }, 10000);
     });
 
@@ -1286,6 +1329,13 @@ const noiseFunctions = `
           color=mix(color,uColorBright,smoothstep(0.5,0.8,t));
           color=mix(color,cWhite,smoothstep(0.8,1.0,t)*audioBoost);
           float facing=dot(normalize(vNormal),normalize(vViewPosition));
+          
+          // Hex grid overlay
+          vec2 hexCoord = vPosition.xy * 8.0;
+          vec2 hexPos = abs(mod(hexCoord, 1.0) - 0.5);
+          float hexGrid = 1.0 - smoothstep(0.02, 0.05, max(hexPos.x, hexPos.y));
+          color = mix(color, uColorBright * 1.5, hexGrid * 0.1);
+
           float depthFactor=(facing+1.0)*0.5;
           float finalAlpha=alpha*(0.02+0.98*depthFactor)*(1.0+audioBoost*0.5);
           gl_FragColor=vec4(color*uBrightness*(1.0+audioBoost*0.3),finalAlpha);
@@ -1414,16 +1464,27 @@ const noiseFunctions = `
 
     // Get audio frequency data if microphone is active
     let audioIntensity = 0;
-    if (analyserRef.current && dataArrayRef.current) {
-      analyserRef.current.getByteFrequencyData(dataArrayRef.current);
-      const total = dataArrayRef.current.length;
+    let activeAnalyser = null;
+    let activeDataArray = null;
+
+    if (isPlayingAudioRef.current && outputAnalyserRef.current && outputDataArrayRef.current) {
+        activeAnalyser = outputAnalyserRef.current;
+        activeDataArray = outputDataArrayRef.current;
+    } else if (analyserRef.current && dataArrayRef.current) {
+        activeAnalyser = analyserRef.current;
+        activeDataArray = dataArrayRef.current;
+    }
+
+    if (activeAnalyser && activeDataArray) {
+      activeAnalyser.getByteFrequencyData(activeDataArray);
+      const total = activeDataArray.length;
 
       // Split into frequency bands: bass, low-mid, mid, high-mid, treble
-      const bassBins = dataArrayRef.current.slice(0, Math.floor(total * 0.2));
-      const lowMidBins = dataArrayRef.current.slice(Math.floor(total * 0.2), Math.floor(total * 0.4));
-      const midBins = dataArrayRef.current.slice(Math.floor(total * 0.4), Math.floor(total * 0.6));
-      const highMidBins = dataArrayRef.current.slice(Math.floor(total * 0.6), Math.floor(total * 0.8));
-      const trebleBins = dataArrayRef.current.slice(Math.floor(total * 0.8));
+      const bassBins = activeDataArray.slice(0, Math.floor(total * 0.2));
+      const lowMidBins = activeDataArray.slice(Math.floor(total * 0.2), Math.floor(total * 0.4));
+      const midBins = activeDataArray.slice(Math.floor(total * 0.4), Math.floor(total * 0.6));
+      const highMidBins = activeDataArray.slice(Math.floor(total * 0.6), Math.floor(total * 0.8));
+      const trebleBins = activeDataArray.slice(Math.floor(total * 0.8));
 
       // Average each band
       const bassAvg = (bassBins.reduce((a, b) => a + b, 0) / bassBins.length) / 255;
@@ -1580,13 +1641,13 @@ useEffect(() => {
 
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0,212,255,0.08)';
+    ctx.strokeStyle = activeMode === 'PROFESSOR' ? 'rgba(167, 139, 250, 0.08)' : 'rgba(0,212,255,0.08)';
     ctx.lineWidth = 6;
     ctx.stroke();
 
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-    ctx.strokeStyle = 'rgba(0,212,255,0.8)';
+    ctx.strokeStyle = activeMode === 'PROFESSOR' ? 'rgba(167, 139, 250, 0.8)' : 'rgba(0,212,255,0.8)';
     ctx.lineWidth = 6;
     ctx.lineCap = 'round';
     ctx.stroke();
@@ -1608,7 +1669,14 @@ const quickAccess = [
 
 return (
   <div 
-    className={`mms-container ${isDiagnosticActive ? 'diagnostic-active' : ''} ${isSecurityAlert ? 'security-alert' : ''} ${isGlitchActive ? 'glitch-active' : ''} ${isNeuralPulseActive ? 'neural-pulse-active' : ''}`}
+    className={`
+      mms-container 
+      ${isDiagnosticActive ? 'diagnostic-active' : ''} 
+      ${isSecurityAlert ? 'security-alert' : ''} 
+      ${isGlitchActive ? 'glitch-active' : ''} 
+      ${isNeuralPulseActive ? 'neural-pulse-active' : ''} 
+      ${isNeuralInterruptActive ? 'neural-interrupt-flash' : ''}
+    `.trim()}
     data-mode={activeMode}
     style={{
       '--left-width': `${layoutOffsets.leftWidth}px`,
@@ -1654,7 +1722,7 @@ return (
     <div className="scanline"></div>
     <div className="hex-overlay"></div>
 
-    <div className="main-grid">
+    <div className="main-grid" data-mode={activeMode}>
       {/* ROW 1: NAVBAR */}
       <div className="grid-navbar">
         <div className="nav-logo">
@@ -1854,7 +1922,6 @@ return (
               { name: 'VOICE', status: 'ACTIVE' },
               { name: 'WEB', status: 'LIVE' },
               { name: 'FILES', status: 'MOUNTED' },
-              { name: 'CAMERA', status: biometricData.error ? 'OFFLINE' : 'LIVE' },
             ].map(mod => (
               <div key={mod.name} className="module-row">
                 <span className="module-name">{mod.name}</span>
@@ -1895,93 +1962,80 @@ return (
           </div>
         </div>
 
-        {/* ── PREMIUM RESPONSE TRANSCRIPT ── */}
-        <div className={`mms-transcript-container ${showResponsePanel ? 'visible' : ''}`}>
-          <div className="transcript-header">
-            <span className="transcript-dot"></span>
-            <span className="transcript-label">M.M.S. VOCAL OUTPUT</span>
-          </div>
-          <div className="transcript-content">
-            {mmsResponseStream || '...'}
-          </div>
-          <div className="transcript-footer">
-            <div className="audio-bars">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="audio-bar" style={{ height: `${2 + Math.random() * 8}px` }}></div>
-              ))}
-            </div>
-            <span className="encoding-tag">PCM-STREAM: ACTIVE</span>
-          </div>
-        </div>
+        {/* Removed static transcript to use floating subtitles */}
       </div>
 
       {/* ROW 2: CENTER (ORB / TACTICAL CONTENT) */}
-      <div className="grid-center" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+      <div className={`grid-center ${activeMode !== 'M.M.S.' ? 'has-content' : ''}`}>
         
-        {/* TRADER CENTER: Market Pulse */}
+        {/* ── TRADER CENTER: Market Signal ── */}
         {activeMode === 'TRADER' && (
-          <div style={{ width: '100%', maxWidth: '500px', pointerEvents: 'auto' }}>
-            <div className="price-ticker">
-              <span className="ticker-sym">BTC/USD</span>
-              <span className="ticker-price">{specialistData?.live_pulse?.BTC ? `$${specialistData.live_pulse.BTC.price.toLocaleString()}` : (specialistData?.btc || '$67,482.10')}</span>
-              <span className="ticker-change" style={{ color: (specialistData?.live_pulse?.BTC?.percent >= 0) ? '#00ff88' : '#ff3366' }}>
-                {specialistData?.live_pulse?.BTC ? `${specialistData.live_pulse.BTC.percent.toFixed(2)}%` : '+1.42%'}
-              </span>
+          <div className="center-panel trader-center">
+            <div className="market-pairs">
+              <div className="pair-row">
+                <span className="pair-name">BTC/USDT</span>
+                <span className="pair-price">$67,432.12</span>
+                <span className="pair-change positive">+2.42%</span>
+              </div>
+              <div className="pair-row">
+                <span className="pair-name">ETH/USDT</span>
+                <span className="pair-price">$3,241.53</span>
+                <span className="pair-change negative">-0.85%</span>
+              </div>
             </div>
-            <div className="price-ticker">
-              <span className="ticker-sym">ETH/USD</span>
-              <span className="ticker-price">{specialistData?.live_pulse?.ETH ? `$${specialistData.live_pulse.ETH.price.toLocaleString()}` : (specialistData?.eth || '$3,241.50')}</span>
-              <span className="ticker-change" style={{ color: (specialistData?.live_pulse?.ETH?.percent >= 0) ? '#00ff88' : '#ff3366' }}>
-                {specialistData?.live_pulse?.ETH ? `${specialistData.live_pulse.ETH.percent.toFixed(2)}%` : '+0.85%'}
-              </span>
-            </div>
-            <div className="verdict-box">
+            <div className="neural-verdict-box">
               <div className="verdict-label">NEURAL MARKET VERDICT</div>
-              <div className="verdict-val">STRONG ACCUMULATE</div>
-              <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '5px' }}>SIGNAL CONFIDENCE: 94%</div>
+              <div className="verdict-value">STRONG ACCUMULATE</div>
+              <div className="verdict-confidence">SIGNAL CONFIDENCE: 94%</div>
             </div>
           </div>
         )}
 
-        {/* PROFESSOR CENTER: Slide Preview */}
+        {/* ── PROFESSOR CENTER: Slide Viewer ── */}
         {activeMode === 'PROFESSOR' && (
-          <div style={{ width: '100%', maxWidth: '500px', pointerEvents: 'auto' }}>
-            <div className="slide-preview">
-              <div className="slide-title">QUANTUM COMPUTING 101</div>
-              <div className="slide-point">Superposition & Entanglement</div>
-              <div className="slide-point">Qubit State Manifestation</div>
-              <div className="slide-point">Neural Link Optimization</div>
-              <div style={{ marginTop: 'auto', fontSize: '7px', opacity: 0.3, textAlign: 'right' }}>SLIDE 4 / 12</div>
-            </div>
-            <div className="quiz-area">
-              <div className="quiz-q">What is the primary benefit of quantum parallelism in Shor's algorithm?</div>
-              <div className="quiz-opts">
-                <div className="quiz-opt">A) Linear data processing</div>
-                <div className="quiz-opt" style={{ borderColor: '#a78bfa', opacity: 1 }}>B) Exponential factorization speedup</div>
-                <div className="quiz-opt">C) Increased storage capacity</div>
+          <div className="center-panel professor-center">
+            <div className="slide-box">
+              <div className="slide-box-header">
+                <span className="slide-title">QUANTUM COMPUTING 101</span>
+                <div className="slide-bullets-list">
+                  <div>• Superposition &amp; Entanglement</div>
+                  <div>• Qubit State Manifestation</div>
+                  <div>• Neural Link Optimization</div>
+                </div>
+                <div className="slide-counter">SLIDE 4 / 32</div>
+              </div>
+              <div className="slide-quiz-block">
+                <div className="quiz-question">What is the primary benefit of quantum parallelism in Shor's algorithm?</div>
+                <div className="quiz-answer-list">
+                  <div className="quiz-answer">A) Linear data processing</div>
+                  <div className="quiz-answer selected">B) Exponential factorization speedup</div>
+                  <div className="quiz-answer">C) Increased storage capacity</div>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ENGINEER CENTER: Build Log */}
+        {/* ── ENGINEER CENTER: Forge Build Log ── */}
         {activeMode === 'ENGINEER' && (
-          <div className="forge-arena-container" style={{ width: '100%', maxWidth: '600px', pointerEvents: 'auto' }}>
-            <div className="panel-section" style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(249,115,22,0.15)', padding: '15px' }}>
-              <div className="section-label" style={{ color: '#f97316', borderBottom: '1px solid rgba(249,115,22,0.2)', paddingBottom: '5px', marginBottom: '10px' }}>FORGE_BUILD_LOG</div>
-              <div className="build-log" style={{ height: '220px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '10px' }}>
+          <div className="center-panel engineer-center">
+            <div className="forge-build-panel">
+              <div className="forge-build-header">FORGE_BUILD_LOG</div>
+              <div className="forge-build-body">
                 {(specialistData?.forge_build_log || [
-                  { timestamp: '00:00:00', activity: 'Awaiting manifestation core...', status: 'OK' }
+                  { timestamp: '00:48:23', activity: 'Initiating architectural-sequencing core', status: 'OK' },
+                  { timestamp: '00:48:22', activity: 'Executing Scaffold: npx --yes create-next-app@lts...', status: 'OK' },
+                  { timestamp: '00:47:07', activity: 'Executing Scaffold: npm install frame-motion [ucf...', status: 'OK' },
+                  { timestamp: '00:38:52', activity: 'Engaging parallel manifestation threadpool', status: 'OK' },
                 ]).map((log, i) => (
-                  <div key={i} className="build-log-line" style={{ marginBottom: '4px', opacity: 0.9 }}>
-                    <span style={{ opacity: 0.4, marginRight: '8px' }}>[{log.timestamp}]</span>
-                    <span style={{ color: log.status === 'OK' ? '#00ff88' : '#ff3366', fontWeight: 'bold', marginRight: '8px' }}>[{log.status}]</span>
-                    <span>{log.activity}</span>
+                  <div key={i} className="build-entry">
+                    <span className="build-ts">[{log.timestamp}]</span>
+                    <span className={`build-status ${log.status === 'OK' ? 'ok' : 'err'}`}>[{log.status}]</span>
+                    <span className="build-msg">{log.activity}</span>
                   </div>
                 ))}
-                <div style={{ height: '20px' }}></div>
               </div>
-              <div className="forge-meta" style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '8px', opacity: 0.4 }}>
+              <div className="forge-build-footer">
                 <span>THREADPOOL: ACTIVE [5 WORKERS]</span>
                 <span>NEURAL_LINK: STABLE</span>
               </div>
@@ -1989,7 +2043,7 @@ return (
           </div>
         )}
 
-        {/* M.M.S. CENTER: The Orb area stays clear for background visualizer */}
+        {/* M.M.S. CENTER: Orb fills via fixed canvas */}
       </div>
 
       {/* ROW 2: RIGHT PANEL */}
@@ -2017,9 +2071,12 @@ return (
                   <span className={`bio-value ${biometricData.enabled ? 'online' : 'offline'}`}>{biometricData.enabled ? 'ACTIVE' : 'DISABLED'}</span>
                 </div>
                 <div className="bio-meta">
-                  <span className={`meta-tag ${biometricData.locked ? 'red' : 'green'}`}>{biometricData.locked ? 'LOCK_ENGAGED' : 'SYSTEM_READY'}</span>
-                  <span className="meta-tag pulse">ENCRYPTED</span>
-                  {biometricData.intruders > 0 && <span className="meta-tag alert">INTRUDERS: {biometricData.intruders}</span>}
+                  <div className="bio-btn-group">
+                    <span className="bio-tag-btn active">SYSTEM READY</span>
+                    <span className="bio-tag-btn">LOCKED</span>
+                    <span className="bio-tag-btn">UNLOCKED</span>
+                  </div>
+                  <div className="bio-timer">30.01</div>
                 </div>
               </div>
             </div>
@@ -2027,9 +2084,6 @@ return (
             <div className={`panel-section vision-panel ${isVisionScanning ? 'vision-active' : ''}`} style={getComponentStyle('SCREEN_VISION')}>
               <div className="section-label vision-label">
                 <span>SCREEN VISION</span>
-                <span className={`vision-status ${isVisionScanning ? 'scanning' : 'standby'}`}>
-                  {isVisionScanning ? '● SCANNING' : '○ STANDBY'}
-                </span>
               </div>
               <div className="vision-feed">
                 {isVisionScanning ? (
@@ -2038,11 +2092,25 @@ return (
                     <div className="vision-meta">OCR: ENABLED | NEURAL: SYNCING</div>
                   </div>
                 ) : (
-                  <div className="vision-placeholder">VISION CORE OFFLINE</div>
+                  <div className="vision-placeholder">
+                    <div className="vision-off-text">VISION CORE OFFLINE</div>
+                    <div className="vision-hint-text">Say: "What's on my screen?"</div>
+                  </div>
                 )}
               </div>
-              <div className="vision-hint">
-                Say: <em>"What's on my screen?"</em>
+            </div>
+
+            <div className="panel-section" style={getComponentStyle('SLEEP_AWAKE')}>
+              <div className="section-label">SLEEP / AWAKE</div>
+              <div className="sleep-hud">
+                <div className="sleep-main">
+                  <span className="sleep-val">8</span>
+                  <span className="sleep-unit">H</span>
+                  <span className="sleep-state">STANDBY</span>
+                </div>
+                <div className="sleep-progress">
+                  <div className="sleep-fill" style={{ width: '85%' }}></div>
+                </div>
               </div>
             </div>
 
@@ -2325,6 +2393,23 @@ return (
       {/* ROW 3: BOTTOM BAR */}
       <div className="grid-bottom">
         <div className="bottom-left">
+          {/* ── SECURITY ALERT HUD (IMAGE OVERLAY) ── */}
+          {(isSecurityAlert || biometricData.intruders > 0) && (
+            <div className="security-alert-hud-box">
+              <div className="alert-header">
+                <span className="alert-icon">⚠️</span>
+                <span className="alert-title">ALERT: UNKNOWN USER</span>
+              </div>
+              <div className="alert-content">
+                <div className="alert-msg">SCANNING YOUR SYSTEM! SNAPSHOT...</div>
+                <div className="alert-meta">THREAT_LEVEL: CRITICAL</div>
+              </div>
+              <div className="alert-footer">
+                <span className="blink">NEU-STREAM: ACTIVE</span>
+              </div>
+            </div>
+          )}
+
           <div className="version-info">
             <span className="version-row">M.M.S. CORE: v2.0.0</span>
             <span className="version-row verified">AUTH: MUGHEES [VERIFIED]</span>
@@ -2377,6 +2462,7 @@ return (
                       setInputValue('');
                       setIsTyping(false);
                       setMmsResponseStream('');
+                      setLiveCodeStream('');
                       if (socketRef.current) socketRef.current.emit('user_message', userText, { artifactTokens: [...artifactTokens, ...pendingArtifactTokens] });
                       if (pendingArtifactTokens.length > 0) { setArtifactTokens(prev => [...prev, ...pendingArtifactTokens]); setPendingArtifactTokens([]); }
                     }
@@ -2412,7 +2498,14 @@ return (
                     </div>
                   </div>
                 )}
-                <div className="face-target-box"></div>
+                <div className="face-target-box">
+                    <div className="reticle reticle-tl"></div>
+                    <div className="reticle reticle-tr"></div>
+                    <div className="reticle reticle-bl"></div>
+                    <div className="reticle reticle-br"></div>
+                    <div className="scanning-bar"></div>
+                 </div>
+                 <div className={`biometric-status-flash ${biometricData.detected ? 'confirmed' : (isSecurityAlert ? 'threat' : '')}`}></div>
                 <div className="hud-telemetry-top">
                    <span className="telemetry-item">REC ●</span>
                    <span className="telemetry-item blink">SYNC_[88%]</span>
@@ -2423,6 +2516,14 @@ return (
                 </div>
               </div>
            </div>
+        </div>
+      </div>
+
+      {/* ── FLOATING RESPONSE STREAM (FUTURISTIC SUBTITLES) ── */}
+      <div className={`floating-subtitles ${showResponsePanel && mmsResponseStream ? 'visible' : ''}`}>
+        <div className="subtitles-content">
+           <span className="subtitles-prefix">M.M.S // </span>
+           {mmsResponseStream}
         </div>
       </div>
     </div>
@@ -2453,6 +2554,8 @@ return (
         </div>
       </div>
     )}
+
+    <ShadowAssistant socket={socketRef.current} />
 
     <SettingsModal
       isOpen={isSettingsOpen}
