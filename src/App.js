@@ -37,6 +37,8 @@ function App() {
   }, [isMicrophoneActive]);
 
   const [audioFrequency, setAudioFrequency] = useState(0);
+  const plasmaMatRef = useRef(null);
+  const pMatRef = useRef(null);
   const frequencyBandsRef = useRef([0, 0, 0, 0, 0]);
 
   const [blobColor, setBlobColor] = useState(() => normalizeHexColor(localStorage.getItem('blobColor') || DEFAULT_BLOB_COLOR));
@@ -87,6 +89,140 @@ function App() {
   const [lastSystemAction, setLastSystemAction] = useState(null);
   const [systemActionLog, setSystemActionLog] = useState([]);
   const [isDiagnosticActive, setIsDiagnosticActive] = useState(false);
+  
+  // ── System State Engine ──
+  const [systemState, setSystemState] = useState('IDLE'); // IDLE, LISTENING, THINKING, ALERT, SUCCESS
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [engineerPhase, setEngineerPhase] = useState('IDLE'); // IDLE, BLUEPRINT, RESEARCH, FORGE, AUDIT, DEPLOY
+  const [forgeCode, setForgeCode] = useState('');
+  const [forgeProgress, setForgeProgress] = useState(0);
+
+  const [professorPhase, setProfessorPhase] = useState('IDLE'); // IDLE, ARCHITECTING, SYNCING, LECTURE, QUIZ, GRADUATION
+  const [professorTopic, setProfessorTopic] = useState('QUANTUM PHYSICS');
+  const [quizActive, setQuizActive] = useState(false);
+  const [learningProgress, setLearningProgress] = useState(0);
+
+  const [traderPhase, setTraderPhase] = useState('IDLE'); // IDLE, ANALYSIS, SIGNAL, EXECUTION, AUDIT, HARVEST
+  const [traderProgress, setTraderProgress] = useState(0);
+  const [liveTrades, setLiveTrades] = useState([]);
+
+  // ── Engineer Mode Showcase Simulator ──
+  useEffect(() => {
+    if (activeMode !== 'ENGINEER') {
+      setEngineerPhase('IDLE');
+      setForgeCode('');
+      setForgeProgress(0);
+      return;
+    }
+
+    const phases = ['BLUEPRINT', 'RESEARCH', 'FORGE', 'AUDIT', 'DEPLOY'];
+    let currentIdx = 0;
+    
+    const interval = setInterval(() => {
+      if (currentIdx < phases.length) {
+        setEngineerPhase(phases[currentIdx]);
+        
+        if (phases[currentIdx] === 'FORGE') {
+          // Simulate code streaming
+          const sampleCode = `import React from 'react';\nimport './App.css';\n\nconst AutonomousSite = () => {\n  return (\n    <div className="manifest-container">\n      <h1>M.M.S. ENGINEERED STUDIO</h1>\n      <p>Neural Link Sync: Active</p>\n    </div>\n  );\n};`;
+          let charIdx = 0;
+          const codeInterval = setInterval(() => {
+            if (charIdx < sampleCode.length) {
+              setForgeCode(sampleCode.substring(0, charIdx));
+              setForgeProgress(Math.min(100, (charIdx / sampleCode.length) * 100));
+              charIdx += 2;
+            } else {
+              clearInterval(codeInterval);
+            }
+          }, 30);
+        } else {
+          setForgeProgress((currentIdx + 1) * 20);
+        }
+        
+        currentIdx++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [activeMode]);
+
+  // ── Professor Mode Learning Hall Simulator ──
+  useEffect(() => {
+    if (activeMode !== 'PROFESSOR') {
+      setProfessorPhase('IDLE');
+      setQuizActive(false);
+      setLearningProgress(0);
+      return;
+    }
+
+    const phases = ['ARCHITECTING', 'SYNCING', 'LECTURE', 'QUIZ', 'GRADUATION'];
+    let currentIdx = 0;
+    
+    const interval = setInterval(() => {
+      if (currentIdx < phases.length) {
+        setProfessorPhase(phases[currentIdx]);
+        setLearningProgress((currentIdx + 1) * 20);
+        
+        if (phases[currentIdx] === 'QUIZ') {
+          setQuizActive(true);
+        } else if (phases[currentIdx] === 'LECTURE') {
+          setQuizActive(false);
+        }
+        
+        currentIdx++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [activeMode]);
+
+  // ── Trader Mode Floor Simulator ──
+  useEffect(() => {
+    if (activeMode !== 'TRADER') {
+      setTraderPhase('IDLE');
+      setTraderProgress(0);
+      setLiveTrades([]);
+      return;
+    }
+
+    const phases = ['ANALYSIS', 'SIGNAL', 'EXECUTION', 'AUDIT', 'HARVEST'];
+    let currentIdx = 0;
+    
+    const interval = setInterval(() => {
+      if (currentIdx < phases.length) {
+        setTraderPhase(phases[currentIdx]);
+        setTraderProgress((currentIdx + 1) * 20);
+        
+        if (phases[currentIdx] === 'EXECUTION') {
+          setLiveTrades(prev => [
+            { id: Date.now(), pair: 'BTC/USDT', type: 'BUY', price: '67,432.12', amount: '0.42 BTC', status: 'FILLED' },
+            ...prev
+          ]);
+        }
+        
+        currentIdx++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 4500);
+
+    return () => clearInterval(interval);
+  }, [activeMode]);
+  
+
+
+  // ── HUD Customization States ──
+  const [hudOpacity, setHudOpacity] = useState(() => parseFloat(localStorage.getItem('mms_hud_opacity')) || 0.85);
+  const [neuralGlowEnabled, setNeuralGlowEnabled] = useState(() => localStorage.getItem('mms_neural_glow') !== 'false');
+  const [holographicTiltEnabled, setHolographicTiltEnabled] = useState(() => localStorage.getItem('mms_holographic_tilt') !== 'false');
+  
+  // ── Mode-Specific Advanced Toggles ──
+  const [halalFilterEnabled, setHalalFilterEnabled] = useState(true);
+  const [autoLintEnabled, setAutoLintEnabled] = useState(true);
 
   // Real-time Socket states
   const socketRef = useRef(null);
@@ -144,9 +280,59 @@ function App() {
     localStorage.setItem('mms_component_nudges_v1', JSON.stringify(componentNudges));
   }, [componentNudges]);
 
+  useEffect(() => {
+    localStorage.setItem('mms_hud_opacity', hudOpacity);
+    localStorage.setItem('mms_neural_glow', neuralGlowEnabled);
+    localStorage.setItem('mms_holographic_tilt', holographicTiltEnabled);
+    // Dynamic Color Mapping based on System State
+    let stateColor = '#00d4ff'; // Default IDLE (Cyan)
+    let stateGlow = 'rgba(0, 212, 255, 0.03)';
+    
+    if (systemState === 'LISTENING') {
+      stateColor = '#ffffff'; // LISTENING (White)
+      stateGlow = 'rgba(255, 255, 255, 0.08)';
+    } else if (systemState === 'THINKING') {
+      stateColor = '#a78bfa'; // THINKING (Violet)
+      stateGlow = 'rgba(167, 139, 250, 0.08)';
+    } else if (systemState === 'ALERT') {
+      stateColor = '#ff4040'; // ALERT (Red)
+      stateGlow = 'rgba(255, 64, 64, 0.1)';
+    }
+
+    // Update Three.js Orb Colors if materials are ready
+    if (plasmaMatRef.current) {
+      plasmaMatRef.current.uniforms.uColorBright.value = new THREE.Color(stateColor);
+    }
+    if (pMatRef.current) {
+      pMatRef.current.uniforms.uColor.value = new THREE.Color(stateColor);
+    }
+
+    // Update CSS variables for live preview
+    document.documentElement.style.setProperty('--primary', stateColor);
+    document.documentElement.style.setProperty('--accent', stateColor);
+    document.documentElement.style.setProperty('--bg-glow', stateGlow);
+    document.documentElement.style.setProperty('--panel-bg', `rgba(0, 10, 20, ${hudOpacity})`);
+    document.documentElement.style.setProperty('--hud-dim-opacity', neuralGlowEnabled ? '1' : '0.6');
+    document.documentElement.style.setProperty('--tilt-multiplier', holographicTiltEnabled ? '1' : '0');
+  }, [hudOpacity, neuralGlowEnabled, holographicTiltEnabled, systemState]);
+
   const [selectedComponent, setSelectedComponent] = useState('');
   const [isOmniBoxOpen, setIsOmniBoxOpen] = useState(false);
   const [omniInput, setOmniInput] = useState('');
+
+  useEffect(() => {
+    if (isSecurityAlert || (biometricData && biometricData.intruders > 0)) {
+      setSystemState('ALERT');
+    } else if (isMicrophoneActive) {
+      setSystemState('LISTENING');
+    } else if (isTyping || isOmniBoxOpen) {
+      setSystemState('THINKING');
+    } else if (mmsStatus === 'processing' || mmsResponseStream) {
+      setSystemState('THINKING');
+    } else {
+      setSystemState('IDLE');
+    }
+  }, [isSecurityAlert, biometricData, isMicrophoneActive, isTyping, isOmniBoxOpen, mmsStatus, mmsResponseStream]);
 
   const updateComponentNudge = (id, updates) => {
     setComponentNudges(prev => ({
@@ -239,6 +425,12 @@ function App() {
   };
 
   const handleModeChange = React.useCallback((newMode) => {
+    if (newMode === activeMode) return;
+    
+    // Digital Dissolve Trigger
+    setIsTransitioning(true);
+    setTimeout(() => setIsTransitioning(false), 800);
+    
     setActiveMode(newMode);
     if (socketRef.current) {
       socketRef.current.emit('MODE_CHANGE', { mode: newMode });
@@ -263,7 +455,7 @@ function App() {
     
     // Spatial Audio Feedback
     playSpatialSound('switch', newMode === 'M.M.S.' ? 'center' : (newMode === 'TRADER' ? 'left' : 'right'));
-  }, []);
+  }, [activeMode, playSpatialSound]);
 
   const handleModeSync = React.useCallback((newMode) => {
     setActiveMode(newMode);
@@ -1401,6 +1593,7 @@ const noiseFunctions = `
     transparent: true, blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide, depthWrite: false
   });
+  plasmaMatRef.current = plasmaMat;
   const plasmaMesh = new THREE.Mesh(plasmaGeo, plasmaMat);
   mainGroup.add(plasmaMesh);
 
@@ -1494,6 +1687,7 @@ const noiseFunctions = `
         }`,
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
   });
+  pMatRef.current = pMat;
   mainGroup.add(new THREE.Points(pGeo, pMat));
 
   const gridCanvas = gridCanvasRef.current;
@@ -1930,8 +2124,9 @@ return (
     <div className="hex-overlay"></div>
 
     <div 
-      className="main-grid" 
+      className={`main-grid ${isTransitioning ? 'is-transitioning' : ''}`} 
       data-mode={activeMode}
+      data-state={systemState}
       style={{
         '--left-width': `${layoutOffsets.leftWidth}px`,
         '--right-width': `${layoutOffsets.rightWidth}px`,
@@ -2113,19 +2308,36 @@ return (
             </div>
 
             <div className="panel-section">
-              <div className="section-label" >MACRO SIGNALS</div>
-              <div className="macro-row"><span className="macro-key">DXY INDEX</span><span className="macro-val">104.2 (↓)</span></div>
-              <div className="macro-row"><span className="macro-key">S&P 500</span><span className="macro-val">5,124 (↑)</span></div>
-              <div className="macro-row"><span className="macro-key">GOLD</span><span className="macro-val">$2,145 (↑)</span></div>
-              <div className="macro-row"><span className="macro-key">BTC DOM</span><span className="macro-val">52.4%</span></div>
+              <div className="section-label">TRADING TIMELINE</div>
+              <div className="manifestation-timeline">
+                {[
+                  { phase: 'ANALYSIS', label: 'MARKET ANALYSIS', icon: '🔍' },
+                  { phase: 'SIGNAL', label: 'SIGNAL DETECTION', icon: '⚡' },
+                  { phase: 'EXECUTION', label: 'EXECUTION FORGE', icon: '⚔' },
+                  { phase: 'AUDIT', label: 'RISK AUDIT', icon: '🛡' },
+                  { phase: 'HARVEST', label: 'PROFIT HARVEST', icon: '💰' },
+                ].map((p, i) => (
+                  <div 
+                    key={p.phase} 
+                    className={`timeline-step ${traderPhase === p.phase ? 'active' : ''} ${i < ['ANALYSIS', 'SIGNAL', 'EXECUTION', 'AUDIT', 'HARVEST'].indexOf(traderPhase) ? 'completed' : ''}`}
+                  >
+                    <div className="step-icon" style={{ borderColor: traderPhase === p.phase ? '#00ff88' : '', color: traderPhase === p.phase ? '#00ff88' : '' }}>{p.icon}</div>
+                    <div className="step-info">
+                      <span className="step-name">{p.label}</span>
+                      <span className="step-status">{traderPhase === p.phase ? 'SCANNING' : (i < ['ANALYSIS', 'SIGNAL', 'EXECUTION', 'AUDIT', 'HARVEST'].indexOf(traderPhase) ? 'SUCCESS' : 'AWAITING')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="panel-section">
-                <div className="section-label" >STARK PULSE</div>
-                <div className="ticker-row">
-                    <span className="t-sym" >BINANCE WS</span>
-                    <span className="t-price pulse" >LIVE</span>
-                </div>
+              <div className="section-label" >ALGO SYNC</div>
+              <div className="mini-bar-row">
+                <span className="mbl" style={{ width: '40px' }}>PRECISION</span>
+                <div className="mbt"><div className="mbf" style={{ width: `${traderProgress}%`, background: '#00ff88' }}></div></div>
+                <span className="mbv">{Math.round(traderProgress)}%</span>
+              </div>
             </div>
           </>
         )}
@@ -2147,26 +2359,35 @@ return (
             </div>
 
             <div className="panel-section">
-              <div className="section-label" >STUDY METRICS</div>
-              <div className="mini-bar-row">
-                <span className="mbl">FOCUS</span>
-                <div className="mbt"><div className="mbf" style={{ width: '92%', background: '#a78bfa' }}></div></div>
-                <span className="mbv">92%</span>
-              </div>
-              <div className="mini-bar-row">
-                <span className="mbl">SYNC</span>
-                <div className="mbt"><div className="mbf" style={{ width: '84%', background: '#a78bfa' }}></div></div>
-                <span className="mbv">84%</span>
+              <div className="section-label">LEARNING TIMELINE</div>
+              <div className="manifestation-timeline">
+                {[
+                  { phase: 'ARCHITECTING', label: 'CURRICULUM DESIGN', icon: '✎' },
+                  { phase: 'SYNCING', label: 'KNOWLEDGE SYNC', icon: '❈' },
+                  { phase: 'LECTURE', label: 'LECTURE MANIFEST', icon: '🕮' },
+                  { phase: 'QUIZ', label: 'EVALUATION (QUIZ)', icon: '❓' },
+                  { phase: 'GRADUATION', label: 'CERTIFICATION', icon: '🎓' },
+                ].map((p, i) => (
+                  <div 
+                    key={p.phase} 
+                    className={`timeline-step ${professorPhase === p.phase ? 'active' : ''} ${i < ['ARCHITECTING', 'SYNCING', 'LECTURE', 'QUIZ', 'GRADUATION'].indexOf(professorPhase) ? 'completed' : ''}`}
+                  >
+                    <div className="step-icon" style={{ borderColor: professorPhase === p.phase ? '#a78bfa' : '', color: professorPhase === p.phase ? '#a78bfa' : '' }}>{p.icon}</div>
+                    <div className="step-info">
+                      <span className="step-name">{p.label}</span>
+                      <span className="step-status">{professorPhase === p.phase ? 'IN PROGRESS' : (i < ['ARCHITECTING', 'SYNCING', 'LECTURE', 'QUIZ', 'GRADUATION'].indexOf(professorPhase) ? 'COMPLETE' : 'PENDING')}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
             <div className="panel-section">
-              <div className="section-label" >ARXIV WATCH</div>
-              <div style={{ padding: '8px', fontSize: '7px', color: 'rgba(255,255,255,0.4)', borderLeft: '1px solid #a78bfa' }}>
-                "Attention Is All You Need" — Vaswani et al.
-              </div>
-              <div style={{ padding: '8px', fontSize: '7px', color: 'rgba(255,255,255,0.4)', borderLeft: '1px solid #a78bfa', marginTop: '4px' }}>
-                "Deep Residual Learning..." — He et al.
+              <div className="section-label" >CURRICULUM SYNC</div>
+              <div className="mini-bar-row">
+                <span className="mbl" style={{ width: '40px' }}>OVERALL</span>
+                <div className="mbt"><div className="mbf" style={{ width: `${learningProgress}%`, background: '#a78bfa' }}></div></div>
+                <span className="mbv">{Math.round(learningProgress)}%</span>
               </div>
             </div>
           </>
@@ -2188,8 +2409,32 @@ return (
             </div>
 
             <div className="panel-section">
+              <div className="section-label">MANIFESTATION TIMELINE</div>
+              <div className="manifestation-timeline">
+                {[
+                  { phase: 'BLUEPRINT', label: 'NEURAL ARCHITECT', icon: '◈' },
+                  { phase: 'RESEARCH', label: 'INTELLIGENCE SYNC', icon: '❈' },
+                  { phase: 'FORGE', label: 'ACTIVE MANIFEST', icon: '⚔' },
+                  { phase: 'AUDIT', label: 'VANGUARD AUDIT', icon: '🛡' },
+                  { phase: 'DEPLOY', label: 'CORE DEPLOY', icon: '🚀' },
+                ].map((p, i) => (
+                  <div 
+                    key={p.phase} 
+                    className={`timeline-step ${engineerPhase === p.phase ? 'active' : ''} ${i < ['BLUEPRINT', 'RESEARCH', 'FORGE', 'AUDIT', 'DEPLOY'].indexOf(engineerPhase) ? 'completed' : ''}`}
+                  >
+                    <div className="step-icon">{p.icon}</div>
+                    <div className="step-info">
+                      <span className="step-name">{p.label}</span>
+                      <span className="step-status">{engineerPhase === p.phase ? 'PROCESSING' : (i < ['BLUEPRINT', 'RESEARCH', 'FORGE', 'AUDIT', 'DEPLOY'].indexOf(engineerPhase) ? 'COMPLETE' : 'AWAITING')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="panel-section">
               <div className="section-label" >FILE TREE</div>
-              <div className="file-tree" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+              <div className="file-tree" style={{ maxHeight: '180px', overflowY: 'auto' }}>
                 {['src/App.js', 'src/App.css', 'src/index.js', 'api/core.py'].map(f => (
                     <div key={f} className="file-tree-item">
                         <span className="file-icon">📄</span>
@@ -2197,12 +2442,6 @@ return (
                     </div>
                 ))}
               </div>
-            </div>
-
-            <div className="panel-section">
-              <div className="section-label" >GIT STATUS</div>
-              <div className="macro-row"><span className="macro-key">BRANCH</span><span className="macro-val">main</span></div>
-              <div className="macro-row"><span className="macro-key">COMMITS</span><span className="macro-val">124 (↑)</span></div>
             </div>
           </>
         )}
@@ -2213,75 +2452,171 @@ return (
         
         {/* ── TRADER CENTER: Live Chart ── */}
         {activeMode === 'TRADER' && (
-          <div className="trader-center-container">
-            <div className="chart-header">
-                <div className="chart-title"><span className="live-dot pulse"></span>BTC / USDT — 15MIN</div>
-                <div style={{ fontSize: '10px', color: '#00ff88', fontFamily: 'var(--font-orbitron)' }}>$67,432.12 <span style={{ fontSize: '8px', opacity: 0.6 }}>▲ +2.42%</span></div>
-            </div>
-            <div className="chart-area">
-                <canvas ref={traderChartRef} style={{ width: '100%', height: '100%' }}></canvas>
-                <div style={{ position: 'absolute', top: 20, left: 20, pointerEvents: 'none' }}>
-                    <div style={{ fontSize: '7px', color: 'rgba(0,255,136,0.2)', letterSpacing: '2px' }}>NEURAL OVERLAY ACTIVE</div>
+          <div className="trader-floor">
+            <div className="floor-top">
+              <div className="neural-chart-wrap">
+                <div className="chart-header">
+                  <div className="pair-info">BTC/USDT <span className="live-dot pulse"></span></div>
+                  <div className="chart-controls">
+                    <span>15M</span>
+                    <span>INDICATORS</span>
+                  </div>
                 </div>
-            </div>
-            <div style={{ padding: '4px 0', borderTop: '1px solid rgba(0,255,136,0.1)', background: 'rgba(0,0,0,0.2)' }}>
-                <div style={{ display: 'flex', overflowX: 'auto', gap: '20px', padding: '0 15px' }}>
-                    {['BTC $67K', 'ETH $3.2K', 'SOL $145', 'BNB $590'].map(t => (
-                        <span key={t} style={{ fontSize: '7px', letterSpacing: '1px', whiteSpace: 'nowrap', color: 'rgba(0,255,136,0.5)' }}>{t}</span>
-                    ))}
+                <div className="chart-canvas-area">
+                  <canvas ref={traderChartRef} style={{ width: '100%', height: '100%' }}></canvas>
+                  <div className="neural-overlay-text">NEURAL_SENTIMENT: BULLISH (84%)</div>
                 </div>
+              </div>
+              
+              <div className="execution-side">
+                <div className="side-label">LIVE EXECUTION</div>
+                <div className="execution-log">
+                  {liveTrades.length === 0 && <div className="log-empty">SCANNING FOR SIGNALS...</div>}
+                  {liveTrades.map(trade => (
+                    <div key={trade.id} className="trade-entry">
+                      <div className="t-row">
+                        <span className={`t-type ${trade.type.toLowerCase()}`}>{trade.type}</span>
+                        <span className="t-pair">{trade.pair}</span>
+                      </div>
+                      <div className="t-row sub">
+                        <span>{trade.price}</span>
+                        <span className="t-status">{trade.status}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="floor-bottom">
+              <div className="floor-stats">
+                <div className="f-stat">
+                  <span className="fs-label">24H PROFIT</span>
+                  <span className="fs-val positive">+$1,242.84</span>
+                </div>
+                <div className="f-stat">
+                  <span className="fs-label">ACTIVE RISK</span>
+                  <span className="fs-val">LOW</span>
+                </div>
+                <div className="f-stat">
+                  <span className="fs-label">ALGO_MODE</span>
+                  <span className="fs-val" style={{ color: '#00ff88' }}>AGGRESSIVE</span>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {/* ── PROFESSOR CENTER: Slide Viewer ── */}
         {activeMode === 'PROFESSOR' && (
-          <div className="slide-viewer-new">
-            <div className="slide-header-new">
-                <div className="slide-title-txt">QUANTUM SUPREMACY</div>
-                <div className="slide-nav">
-                    <button className="slide-nav-btn">PREV</button>
-                    <span className="slide-progress-txt">04 / 12</span>
-                    <button className="slide-nav-btn">NEXT</button>
+          <div className="professor-learning-hall">
+            {!quizActive ? (
+              <div className="lecture-manifest">
+                <div className="lecture-header">
+                  <div className="topic-badge">{professorTopic} // MODULE 04</div>
+                  <div className="slide-counter">04 / 12</div>
                 </div>
-            </div>
-            <div className="slide-content-new">
-                <div style={{ fontSize: '14px', color: '#a78bfa', marginBottom: '15px', fontFamily: 'var(--font-orbitron)' }}>Core Principles</div>
-                <div className="slide-point-new">Superposition allows qubits to exist in multiple states.</div>
-                <div className="slide-point-new">Entanglement links qubit states across distances.</div>
-                <div className="slide-point-new">Quantum gates manipulate probability amplitudes.</div>
-            </div>
-            <div className="speaker-note">
-                <div className="speaker-note-label">SPEAKER NOTES</div>
-                Emphasize that superposition is not just "both states at once" but a complex linear combination.
+                <div className="manifest-content">
+                  <div className="concept-title">Neural Entanglement & Superposition</div>
+                  <div className="concept-body">
+                    <p>In the quantum realm, information is not binary. It exists in a state of probability, defined by the wave function Ψ. M.M.S. is currently synchronizing this knowledge core with your neural baseline.</p>
+                    <ul className="learning-points">
+                      <li>✦ Superposition: N-dimensional state vectors.</li>
+                      <li>✦ Interference: Constructive reinforcement of data.</li>
+                      <li>✦ Decoherence: The primary bottleneck in neural sync.</li>
+                    </ul>
+                  </div>
+                </div>
+                <div className="lecture-footer">
+                  <div className="professor-note">
+                    <span className="note-label">PROFESSOR_INSIGHT:</span>
+                    Focus on the relationship between entropy and information density.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="quiz-manifest">
+                <div className="quiz-header">
+                  <div className="quiz-title">NEURAL EVALUATION // STAGE 01</div>
+                  <div className="timer">04:52 REMAINING</div>
+                </div>
+                <div className="quiz-question">
+                  <div className="q-label">QUESTION 01</div>
+                  <div className="q-text">What is the primary cause of decoherence in a neural-sync environment?</div>
+                  <div className="q-options">
+                    <button className="q-opt">A) Atmospheric Pressure</button>
+                    <button className="q-opt correct">B) Quantum Interference</button>
+                    <button className="q-opt">C) Clock Speed Mismatch</button>
+                    <button className="q-opt">D) Thermal Exhaustion</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="research-summary">
+              <div className="summary-label">NEURAL SUMMARY FEED</div>
+              <div className="summary-items">
+                <div className="s-item">✦ Source: Nature Physics // Entanglement detected.</div>
+                <div className="s-item">✦ Source: Arxiv // New transformer architecture found.</div>
+              </div>
             </div>
           </div>
         )}
 
         {/* ── ENGINEER CENTER: Forge Build Log ── */}
         {activeMode === 'ENGINEER' && (
-          <div className="terminal-new">
-            <div className="term-header-new">
-                <div className="term-title-new">FORGE BUILD TERMINAL</div>
-                <div className="term-status-new" >● STABLE</div>
-            </div>
-            <div className="terminal-new" style={{ overflowY: 'auto' }}>
-                <div className="log-line-new"><span className="log-ts-new">[14:22:01]</span> <span >INIT</span> <span style={{ opacity: 0.6 }}>Manifesting React 19 structure...</span></div>
-                <div className="log-line-new"><span className="log-ts-new">[14:22:05]</span> <span >DONE</span> <span style={{ opacity: 0.6 }}>Core architecture synchronized.</span></div>
-                <div className="log-line-new"><span className="log-ts-new">[14:22:08]</span> <span >RUN</span> <span style={{ opacity: 0.6 }}>npm install framer-motion lucide-react</span></div>
-                <div className="log-line-new"><span className="log-ts-new">[14:22:12]</span> <span >OK</span> <span style={{ opacity: 0.6 }}>Dependencies resolved (423 packages).</span></div>
-            </div>
-            <div className="build-progress-new">
-                <div className="bp-row-new">
-                    <span className="bp-label-new">BUILD PROGRESS</span>
-                    <span className="bp-pct-new">84%</span>
+          <div className="engineer-studio">
+            <div className="studio-top">
+              <div className="forge-editor">
+                <div className="editor-header">
+                  <div className="file-tab active">App.js <span className="tab-status-dot pulse"></span></div>
+                  <div className="editor-metrics">
+                    <span>CHARS: {forgeCode.length}</span>
+                    <span>LINT: <span style={{ color: '#00ff88' }}>PASS</span></span>
+                  </div>
                 </div>
-                <div className="mbt"><div className="mbf" style={{ width: '84%', background: '#f97316' }}></div></div>
+                <div className="editor-content">
+                  <pre className="code-block">
+                    <code>{forgeCode || '// AWAITING NEURAL FORGE MANIFESTATION...'}</code>
+                  </pre>
+                  <div className="editor-cursor pulse"></div>
+                </div>
+              </div>
+              
+              <div className="research-panel">
+                <div className="panel-label">RESEARCH INTELLIGENCE</div>
+                <div className="research-log">
+                  <div className="log-item">✦ Analyzing Tailwind configuration...</div>
+                  <div className="log-item">✦ Syncing with Framer Motion documentation...</div>
+                  <div className="log-item">✦ Optimization: Tree-shaking enabled.</div>
+                </div>
+              </div>
             </div>
-            <div className="term-actions-new">
-                <button className="ta-btn-new active-btn">REBUILD</button>
-                <button className="ta-btn-new">DEPLOY</button>
-                <button className="ta-btn-new">LOGS</button>
+
+            <div className="studio-bottom">
+              <div className="studio-console">
+                <div className="console-header">
+                  <span>SYSTEM_CONSOLE // STABLE</span>
+                  <div className="console-actions">
+                    <button className="c-btn">REBUILD</button>
+                    <button className="c-btn">LOGS</button>
+                  </div>
+                </div>
+                <div className="console-output">
+                  <div className="log-line"><span className="log-ts">[17:28:01]</span> <span className="log-tag init">INIT</span> <span className="log-msg">Autonomous Web Studio Manifested.</span></div>
+                  <div className="log-line"><span className="log-ts">[17:28:05]</span> <span className="log-tag ok">OK</span> <span className="log-msg">Neural Link Synchronized.</span></div>
+                  {mmsActionFeed.slice(0, 3).map((f, i) => (
+                    <div key={i} className="log-line"><span className="log-ts">[{f.time}]</span> <span className="log-tag">FEED</span> <span className="log-msg">{f.message}</span></div>
+                  ))}
+                </div>
+              </div>
+              <div className="build-stats">
+                <div className="stat-row">
+                  <span>PROGRESS</span>
+                  <span>{Math.round(forgeProgress)}%</span>
+                </div>
+                <div className="mbt"><div className="mbf" style={{ width: `${forgeProgress}%`, background: '#f97316' }}></div></div>
+              </div>
             </div>
           </div>
         )}
@@ -2951,10 +3286,21 @@ return (
     <SettingsModal
       isOpen={isSettingsOpen}
       onClose={() => setIsSettingsOpen(false)}
+      activeMode={activeMode}
       blobColor={blobColor}
       setBlobColor={setBlobColor}
       blobSize={blobSize}
       setBlobSize={setBlobSize}
+      hudOpacity={hudOpacity}
+      setHudOpacity={setHudOpacity}
+      neuralGlowEnabled={neuralGlowEnabled}
+      setNeuralGlowEnabled={setNeuralGlowEnabled}
+      holographicTiltEnabled={holographicTiltEnabled}
+      setHolographicTiltEnabled={setHolographicTiltEnabled}
+      halalFilterEnabled={halalFilterEnabled}
+      setHalalFilterEnabled={setHalalFilterEnabled}
+      autoLintEnabled={autoLintEnabled}
+      setAutoLintEnabled={setAutoLintEnabled}
       onEnterDragMode={() => {
         setIsSettingsOpen(false);
         setIsDragging(true);
