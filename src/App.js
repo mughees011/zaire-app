@@ -22,6 +22,8 @@ function App() {
   const dragStateRef = useRef({ isPointerDown: false, tempPosition: { x: 0, y: 0 } });
 
   const [activeMode, setActiveMode] = useState('M.M.S.');
+  const [mmsStatus, setMmsStatus] = useState('online'); 
+  const [isDeepThinking, setIsDeepThinking] = useState(false);
   const [timeStr, setTimeStr] = useState('00:00:00');
   const [navItem, setNavItem] = useState('HOME');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -59,6 +61,7 @@ function App() {
   const uniformsRef = useRef(null);
   const voiceWaveformRef = useRef(null);
   const neuralGaugeRef = useRef(null);
+  const faceMeshCanvasRef = useRef(null);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const dataArrayRef = useRef(null);
@@ -101,12 +104,12 @@ function App() {
   const [liveMetrics, setLiveMetrics] = useState({ cpu: 0, ram: 0, gpu: 0, latency: 4 });
   const [mmsActionFeed, setMmsActionFeed] = useState([]);
   const [liveCodeStream, setLiveCodeStream] = useState('');
-  const [professorSlides, setProfessorSlides] = useState([
+  const [professorSlides] = useState([
     { title: 'Neural Architectures', content: 'Understanding multi-head attention mechanisms in Transformers.', image: null },
     { title: 'Latent Space', content: 'Visualizing high-dimensional embeddings in vector databases.', image: null },
     { title: 'Optimization', content: 'Stochastic Gradient Descent vs Adam: A comparative analysis.', image: null }
   ]);
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [currentSlideIndex] = useState(0);
   const [modeLayouts, setModeLayouts] = useState(() => {
     const saved = localStorage.getItem('mms_mode_layouts_v1');
     if (saved) return JSON.parse(saved);
@@ -141,6 +144,8 @@ function App() {
   }, [componentNudges]);
 
   const [selectedComponent, setSelectedComponent] = useState('');
+  const [isOmniBoxOpen, setIsOmniBoxOpen] = useState(false);
+  const [omniInput, setOmniInput] = useState('');
 
   const updateComponentNudge = (id, updates) => {
     setComponentNudges(prev => ({
@@ -207,6 +212,31 @@ function App() {
   const [cameraStatus, setCameraStatus] = useState('pending'); // 'pending', 'authorized', 'denied'
   const nextExpectedIndexRef = useRef(0);
 
+  const playSpatialSound = (type, side = 'center') => {
+    // Spatial mapping: -1.0 (left), 0.0 (center), 1.0 (right)
+    const panMap = { 'left': -0.8, 'center': 0.0, 'right': 0.8 };
+    const pan = panMap[side] || 0.0;
+    
+    if (audioContextRef.current && audioContextRef.current.state === 'running') {
+      const osc = audioContextRef.current.createOscillator();
+      const gain = audioContextRef.current.createGain();
+      const panner = audioContextRef.current.createStereoPanner();
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(type === 'alert' ? 880 : 440, audioContextRef.current.currentTime);
+      gain.gain.setValueAtTime(0.05, audioContextRef.current.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioContextRef.current.currentTime + 0.15);
+      panner.pan.setValueAtTime(pan, audioContextRef.current.currentTime);
+      
+      osc.connect(gain);
+      gain.connect(panner);
+      panner.connect(audioContextRef.current.destination);
+      
+      osc.start();
+      osc.stop(audioContextRef.current.currentTime + 0.15);
+    }
+  };
+
   const handleModeChange = React.useCallback((newMode) => {
     setActiveMode(newMode);
     if (socketRef.current) {
@@ -223,10 +253,15 @@ function App() {
     const theme = modeThemes[newMode] || modeThemes['M.M.S.'];
     setBlobColor(theme.primary);
 
-    // Update CSS variables globally
-    document.documentElement.style.setProperty('--primary', theme.primary);
-    document.documentElement.style.setProperty('--accent', theme.accent);
     document.documentElement.style.setProperty('--bg-glow', theme.bg);
+    
+    // Trigger Neural Transition
+    if (uniformsRef.current) {
+      uniformsRef.current.uTransition.value = 0.0;
+    }
+    
+    // Spatial Audio Feedback
+    playSpatialSound('switch', newMode === 'M.M.S.' ? 'center' : (newMode === 'TRADER' ? 'left' : 'right'));
   }, []);
 
   const handleModeSync = React.useCallback((newMode) => {
@@ -240,9 +275,14 @@ function App() {
     };
 
     const colors = modeColors[newMode] || modeColors['M.M.S.'];
-    setBlobColor(colors.primary);
-    document.documentElement.style.setProperty('--primary', colors.primary);
     document.documentElement.style.setProperty('--accent', colors.accent);
+
+    // Trigger Neural Transition
+    if (uniformsRef.current) {
+      uniformsRef.current.uTransition.value = 0.0;
+    }
+
+    playSpatialSound('sync', 'center');
 
     // Auto-trigger minigame if in Engineer mode and a build is likely starting
     if (newMode === 'ENGINEER') {
@@ -594,12 +634,18 @@ function App() {
     });
 
     // Vision status
+    socketRef.current.on('mms_status', (status) => setMmsStatus(status));
     socketRef.current.on('mms_status', (status) => {
       if (status === 'scanning') {
         setIsVisionScanning(true);
       } else {
         setIsVisionScanning(false);
       }
+    });
+    
+    // Deep thinking status
+    socketRef.current.on('deep_thinking', (isThinking) => {
+      setIsDeepThinking(isThinking);
     });
 
     // Memory stored event
@@ -1265,6 +1311,7 @@ const noiseFunctions = `
   const plasmaMat = new THREE.ShaderMaterial({
     uniforms: {
       uTime: { value: 0 },
+      uTransition: { value: 1.0 },
       uScale: { value: params.plasmaScale },
       uBrightness: { value: params.plasmaBrightness },
       uThreshold: { value: params.voidThreshold },
@@ -1298,6 +1345,7 @@ const noiseFunctions = `
         }`,
     fragmentShader: `
         uniform float uTime;
+        uniform float uTransition;
         uniform float uScale;
         uniform float uBrightness;
         uniform float uThreshold;
@@ -1313,6 +1361,10 @@ const noiseFunctions = `
         varying vec3 vViewPosition;
         ${noiseFunctions}
         void main(){
+          // Transition glitch effect
+          float g = fract(sin(dot(vPosition.xy, vec2(12.9898,78.233))) * 43758.5453);
+          if (g > uTransition) discard;
+
           vec3 p=vPosition*uScale;
           vec3 q=vec3(
             fbm(p+vec3(0.0,uTime*0.05,0.0)),
@@ -1338,13 +1390,53 @@ const noiseFunctions = `
 
           float depthFactor=(facing+1.0)*0.5;
           float finalAlpha=alpha*(0.02+0.98*depthFactor)*(1.0+audioBoost*0.5);
-          gl_FragColor=vec4(color*uBrightness*(1.0+audioBoost*0.3),finalAlpha);
+
+          // Recursive High-Freq Ripples (Voice Sync)
+          float voiceRipple = sin(vPosition.y * 45.0 + uTime * 12.0) * uAudioIntensity * 0.25;
+          color += uColorBright * voiceRipple;
+
+          gl_FragColor=vec4(color*uBrightness*(1.0+audioBoost*0.3),finalAlpha * uTransition);
         }`,
     transparent: true, blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide, depthWrite: false
   });
   const plasmaMesh = new THREE.Mesh(plasmaGeo, plasmaMat);
   mainGroup.add(plasmaMesh);
+
+  // --- MODE-SPECIFIC HOLOGRAMS ---
+  const hologramGroup = new THREE.Group();
+  mainGroup.add(hologramGroup);
+
+  // 1. TRADER: 3D Wave Chart
+  const traderGroup = new THREE.Group();
+  const wavePoints = [];
+  for(let i=0; i<50; i++) wavePoints.push(new THREE.Vector3((i/25-1)*0.6, Math.sin(i*0.3)*0.1, Math.cos(i*0.2)*0.1));
+  const waveCurve = new THREE.CatmullRomCurve3(wavePoints);
+  const waveGeo = new THREE.TubeGeometry(waveCurve, 64, 0.005, 8, false);
+  const waveMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.8 });
+  traderGroup.add(new THREE.Mesh(waveGeo, waveMat));
+  hologramGroup.add(traderGroup);
+
+  // 2. PROFESSOR: Neural Node Graph
+  const professorGroup = new THREE.Group();
+  const nodeGeo = new THREE.SphereGeometry(0.02, 8, 8);
+  const nodeMat = new THREE.MeshBasicMaterial({ color: 0xa78bfa });
+  for(let i=0; i<12; i++) {
+    const node = new THREE.Mesh(nodeGeo, nodeMat);
+    node.position.set((Math.random()-0.5)*0.8, (Math.random()-0.5)*0.8, (Math.random()-0.5)*0.8);
+    professorGroup.add(node);
+  }
+  hologramGroup.add(professorGroup);
+
+  // 3. ENGINEER: Manifestation Tree
+  const engineerGroup = new THREE.Group();
+  const branchMat = new THREE.LineBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.4 });
+  for(let i=0; i<8; i++) {
+    const pts = [new THREE.Vector3(0,0,0), new THREE.Vector3((Math.random()-0.5)*0.6, (Math.random()-0.5)*0.6, (Math.random()-0.5)*0.6)];
+    const bGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    engineerGroup.add(new THREE.Line(bGeo, branchMat));
+  }
+  hologramGroup.add(engineerGroup);
 
   mainGroupRef.current = mainGroup;
   uniformsRef.current = plasmaMat.uniforms;
@@ -1452,7 +1544,29 @@ const noiseFunctions = `
     renderer.setSize(window.innerWidth, window.innerHeight);
     initGrid();
   };
+
+
+  const handleMouseMove = (e) => {
+    const x = (e.clientX / window.innerWidth) - 0.5;
+    const y = (e.clientY / window.innerHeight) - 0.5;
+    document.documentElement.style.setProperty('--mouse-x', x.toFixed(3));
+    document.documentElement.style.setProperty('--mouse-y', y.toFixed(3));
+    
+    // Gaze-aware simulation: dim side panels when mouse is in center zone
+    const centerStart = window.innerWidth * 0.25;
+    const centerEnd = window.innerWidth * 0.75;
+    const isInCenter = e.clientX > centerStart && e.clientX < centerEnd;
+    document.documentElement.style.setProperty('--hud-dim-opacity', isInCenter ? '0.35' : '1');
+  };
+
+  const handleGlobalClick = () => {
+    setIsGlitchActive(true);
+    setTimeout(() => setIsGlitchActive(false), 120);
+  };
+
   window.addEventListener('resize', handleResize);
+  window.addEventListener('mousemove', handleMouseMove);
+  window.addEventListener('click', handleGlobalClick);
 
   initGrid();
   const startTime = performance.now();
@@ -1519,6 +1633,27 @@ const noiseFunctions = `
     mainGroup.scale.z += (targetScale - mainGroup.scale.z) * 0.1;
 
     drawGrid(t);
+    
+    // Animate Mode Holograms
+    traderGroup.visible = activeMode === 'TRADER';
+    professorGroup.visible = activeMode === 'PROFESSOR';
+    engineerGroup.visible = activeMode === 'ENGINEER';
+    
+    if (activeMode === 'TRADER') traderGroup.rotation.y += 0.02;
+    if (activeMode === 'PROFESSOR') professorGroup.rotation.y -= 0.01;
+    if (activeMode === 'ENGINEER') engineerGroup.rotation.z += 0.015;
+
+    // Transition Logic
+    if (plasmaMat.uniforms.uTransition.value < 1.0) {
+      plasmaMat.uniforms.uTransition.value += 0.02;
+    }
+
+    // Deep Thinking Visuals
+    if (mmsStatus === 'deep_thinking') {
+      plasmaMat.uniforms.uAudioIntensity.value = 1.5;
+      plasmaMat.uniforms.uBrightness.value = 1.2 + Math.sin(t * 5.0) * 0.2;
+    }
+
     controls.update();
     renderer.render(scene, camera);
   };
@@ -1526,6 +1661,8 @@ const noiseFunctions = `
 
   return () => {
     window.removeEventListener('resize', handleResize);
+    window.removeEventListener('mousemove', handleMouseMove);
+    window.removeEventListener('click', handleGlobalClick);
     cancelAnimationFrame(animationId);
     renderer.dispose();
     cameraRef.current = null;
@@ -1657,7 +1794,62 @@ useEffect(() => {
 
   drawGauge();
   return () => cancelAnimationFrame(animationId);
-}, []);
+}, [activeMode]);
+
+useEffect(() => {
+  const canvas = faceMeshCanvasRef.current;
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let animationId;
+  let t = 0;
+
+  const drawMesh = () => {
+    const w = canvas.width = canvas.offsetWidth;
+    const h = canvas.height = canvas.offsetHeight;
+    ctx.clearRect(0, 0, w, h);
+    
+    if (biometricData?.detected) {
+      ctx.strokeStyle = 'rgba(0, 212, 255, 0.4)';
+      ctx.lineWidth = 0.5;
+      
+      const centerX = w / 2;
+      const centerY = h / 2;
+      const rows = 12, cols = 12;
+      const size = 50;
+      
+      t += 0.04;
+      
+      for(let i=0; i<rows; i++) {
+        ctx.beginPath();
+        for(let j=0; j<cols; j++) {
+          const x = centerX - size + (j / (cols-1)) * size * 2;
+          const y = centerY - size + (i / (rows-1)) * size * 2;
+          const dist = Math.sqrt(Math.pow(j - (cols-1)/2, 2) + Math.pow(i - (rows-1)/2, 2));
+          const z = Math.sin(dist * 0.8 - t) * 8;
+          if (j === 0) ctx.moveTo(x, y + z);
+          else ctx.lineTo(x, y + z);
+        }
+        ctx.stroke();
+      }
+      for(let j=0; j<cols; j++) {
+        ctx.beginPath();
+        for(let i=0; i<rows; i++) {
+          const x = centerX - size + (j / (cols-1)) * size * 2;
+          const y = centerY - size + (i / (rows-1)) * size * 2;
+          const dist = Math.sqrt(Math.pow(j - (cols-1)/2, 2) + Math.pow(i - (rows-1)/2, 2));
+          const z = Math.sin(dist * 0.8 - t) * 8;
+          if (i === 0) ctx.moveTo(x, y + z);
+          else ctx.lineTo(x, y + z);
+        }
+        ctx.stroke();
+      }
+    }
+    
+    animationId = requestAnimationFrame(drawMesh);
+  };
+  drawMesh();
+  return () => cancelAnimationFrame(animationId);
+}, [biometricData?.detected]);
 
 const modes = ['M.M.S.', 'TRADER', 'PROFESSOR', 'ENGINEER'];
 const navItems = ['M.M.S.', 'TRADER', 'PROFESSOR', 'ENGINEER'];
@@ -1666,6 +1858,20 @@ const quickAccess = [
   { label: 'OPEN BROWSER', action: 'browser' },
   { label: 'FILE MANAGER', action: 'files' }
 ];
+
+useEffect(() => {
+  const handleKeyDown = (e) => {
+    if (e.ctrlKey && e.key === 'k') {
+      e.preventDefault();
+      setIsOmniBoxOpen(prev => !prev);
+    }
+    if (e.key === 'Escape') {
+      setIsOmniBoxOpen(false);
+    }
+  };
+  window.addEventListener('keydown', handleKeyDown);
+  return () => window.removeEventListener('keydown', handleKeyDown);
+}, []);
 
 return (
   <div 
@@ -1755,8 +1961,8 @@ return (
             <span className="mode-text">MODE: {activeMode}</span>
           </div>
           <div className="status-indicator">
-            <div className="status-dot"></div>
-            <span className="status-text">ONLINE</span>
+            <div className={`status-dot ${mmsStatus}`}></div>
+            <span className="status-text">{mmsStatus.toUpperCase().replace('_', ' ')}</span>
           </div>
           <div className="clock-display">{timeStr}</div>
         </div>
@@ -2241,7 +2447,7 @@ return (
                 <label>LEFT WIDTH</label>
                 <span>{layoutOffsets.leftWidth}px</span>
               </div>
-              <input type="range" min="150" max="400" value={layoutOffsets.leftWidth} 
+              <input type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200} 
                 onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })} 
                 style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
             </div>
@@ -2250,7 +2456,7 @@ return (
                 <label>RIGHT WIDTH</label>
                 <span>{layoutOffsets.rightWidth}px</span>
               </div>
-              <input type="range" min="150" max="400" value={layoutOffsets.rightWidth} 
+              <input type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200} 
                 onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })} 
                 style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
             </div>
@@ -2259,7 +2465,7 @@ return (
                 <label>CMD HEIGHT</label>
                 <span>{layoutOffsets.bottomHeight}px</span>
               </div>
-              <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight} 
+              <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150} 
                 onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })} 
                 style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
             </div>
@@ -2447,7 +2653,7 @@ return (
                   type="text"
                   className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
                   placeholder={isMicrophoneActive ? 'M.M.S. LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
-                  value={isMicrophoneActive ? (recognizedText || '') : inputValue}
+                  value={isMicrophoneActive ? (recognizedText || '') : (inputValue || '')}
                   onChange={(e) => {
                     if (!isMicrophoneActive) {
                       setInputValue(e.target.value);
@@ -2483,11 +2689,24 @@ return (
               <div className="scanline-overlay"></div>
               <div className="hud-video-container">
                 {cameraStatus === 'authorized' ? (
-                  <img 
-                    src="http://127.0.0.1:3001/security/video_feed" 
-                    alt="Camera Feed"
-                    className="hud-video-feed"
-                  />
+                  <div className="hud-video-wrapper">
+                    <img 
+                      src="http://127.0.0.1:3001/security/video_feed" 
+                      alt="Camera Feed"
+                      className="hud-video-feed"
+                    />
+                    <canvas className="face-mesh-canvas" ref={faceMeshCanvasRef}></canvas>
+                    <div className="biometric-tactical-overlay">
+                      <div className="targeting-bracket tl"></div>
+                      <div className="targeting-bracket tr"></div>
+                      <div className="targeting-bracket bl"></div>
+                      <div className="targeting-bracket br"></div>
+                      <div className="bio-readout-hud">
+                        <div className="bio-stat">ID: {biometricData.name || 'SCANNING'}</div>
+                        <div className="bio-stat">CONF: {biometricData.confidence || 0}%</div>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="camera-auth-overlay">
                     <div className="auth-glitch-text">
@@ -2632,6 +2851,30 @@ return (
         }}
       />
     ))}
+
+    {/* ── OMNI-BOX SEARCH ── */}
+    {isOmniBoxOpen && (
+      <div className="omni-box-overlay" onClick={() => setIsOmniBoxOpen(false)}>
+        <div className="omni-box-container" onClick={e => e.stopPropagation()}>
+          <div className="omni-header">OMNI_SEARCH_V2 // SYSTEM_QUERY</div>
+          <input 
+            autoFocus
+            className="omni-input" 
+            placeholder="ASK JARVIS... (Prefix 'Deep think' for 70B cores)" 
+            value={omniInput || ''}
+            onChange={e => setOmniInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && omniInput.trim()) {
+                if (socketRef.current) socketRef.current.emit('user_message', omniInput);
+                setOmniInput('');
+                setIsOmniBoxOpen(false);
+              }
+            }}
+          />
+          <div className="omni-footer">PRESS ESC TO DISMISS</div>
+        </div>
+      </div>
+    )}
 
     {!isSystemEngaged && (
       <div className="engagement-overlay" onClick={() => setIsSystemEngaged(true)}>
