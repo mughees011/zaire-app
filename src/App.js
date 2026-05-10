@@ -61,6 +61,7 @@ function App() {
   const uniformsRef = useRef(null);
   const voiceWaveformRef = useRef(null);
   const neuralGaugeRef = useRef(null);
+  const traderChartRef = useRef(null);
   const faceMeshCanvasRef = useRef(null);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
@@ -1928,7 +1929,15 @@ return (
     <div className="scanline"></div>
     <div className="hex-overlay"></div>
 
-    <div className="main-grid" data-mode={activeMode}>
+    <div 
+      className="main-grid" 
+      data-mode={activeMode}
+      style={{
+        '--left-width': `${layoutOffsets.leftWidth}px`,
+        '--right-width': `${layoutOffsets.rightWidth}px`,
+        '--bottom-height': `${layoutOffsets.bottomHeight}px`
+      }}
+    >
       {/* ROW 1: NAVBAR */}
       <div className="grid-navbar">
         <div className="nav-logo">
@@ -2011,18 +2020,66 @@ return (
                 </div>
               </div>
             </div>
+
+            <div className="panel-section" style={getComponentStyle('MODULE_STATUS')}>
+              <div className="section-label">MODULE STATUS</div>
+              <div className="module-list">
+                {[
+                  { name: 'VISION', status: 'READY' },
+                  { name: 'VOICE', status: 'ACTIVE' },
+                  { name: 'WEB', status: 'LIVE' },
+                  { name: 'FILES', status: 'MOUNTED' },
+                ].map(mod => (
+                  <div key={mod.name} className="module-row">
+                    <span className="module-name">{mod.name}</span>
+                    <span className={`module-status ${mod.status === 'OFFLINE' ? 'offline' : 'online'}`}>{mod.status}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="panel-section" style={getComponentStyle('VOICE_MONITOR')}>
+              <div className="section-label">VOICE MONITOR</div>
+              <canvas ref={voiceWaveformRef} className="voice-waveform"></canvas>
+            </div>
+
+            {/* ── MEMORY CORE ── */}
+            <div className={`panel-section memory-panel ${memoryFlash ? 'memory-flash' : ''}`} style={getComponentStyle('MEMORY_CORE')}>
+              <div className="section-label memory-label">
+                <span>MEMORY CORE</span>
+                <span className="memory-count">{storedMemories.length} STORED</span>
+              </div>
+              <div className="memory-list">
+                {storedMemories.length === 0 && (
+                  <div className="memory-empty">— NO MEMORIES YET —</div>
+                )}
+                {storedMemories.map((m, i) => (
+                  <div key={m.id || i} className="memory-item">
+                    <span className="memory-dot">◆</span>
+                    <span className="memory-text">{m.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="panel-section">
+              <div className="section-label">LAST COMMAND</div>
+              <div className="last-command" style={{ minHeight: '60px' }}>
+                <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
+              </div>
+            </div>
           </>
         )}
 
         {/* ── TRADER MODE PANEL ── */}
         {activeMode === 'TRADER' && (
           <>
-            <div className="panel-section" style={getComponentStyle('PORTFOLIO')}>
-              <div className="section-label" style={{ color: '#00ff88' }}>PORTFOLIO</div>
+            <div className="panel-section">
+              <div className="section-label" >PORTFOLIO</div>
               <div className="metrics-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                 <div className="metric-card" style={{ padding: '8px' }}>
                   <span className="metric-value" style={{ color: '#00ff88', fontSize: '14px' }}>
-                    ${specialistData?.portfolio?.reduce((acc, curr) => acc + (parseFloat(curr.free) * (curr.asset === 'BTC' ? 67000 : 3200)), 0).toLocaleString() || '2,847'}
+                    ${specialistData?.portfolio_value || '2,847'}
                   </span>
                   <span className="metric-label">TOTAL VALUE</span>
                 </div>
@@ -2033,31 +2090,42 @@ return (
               </div>
             </div>
             
-            <div className="panel-section" style={getComponentStyle('WATCHLIST')}>
-              <div className="section-label" style={{ color: '#00ff88' }}>HOLDINGS</div>
+            <div className="panel-section">
+              <div className="section-label" >HOLDINGS</div>
               <div className="holding-list" style={{ maxHeight: '120px', overflowY: 'auto' }}>
-                {specialistData?.portfolio?.map(h => (
-                  <div key={h.asset} className="module-row" style={{ borderBottom: '1px solid rgba(0,255,136,0.05)' }}>
-                    <span className="module-name">{h.asset}</span>
-                    <span className="module-status online" style={{ color: '#00ff88' }}>{parseFloat(h.free).toFixed(4)}</span>
+                {['BTC', 'ETH', 'SOL', 'LINK'].map(asset => (
+                  <div key={asset} className="mini-bar-row">
+                    <span className="mbl">{asset}</span>
+                    <div className="mbt"><div className="mbf" style={{ width: '70%', background: '#00ff88' }}></div></div>
+                    <span className="mbv">82%</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="panel-section" style={getComponentStyle('HALAL_FILTER')}>
-              <div className="section-label" style={{ color: '#00ff88' }}>HALAL FILTER</div>
+            <div className="panel-section">
+              <div className="section-label" >HALAL FILTER</div>
               <div style={{ padding: '8px', background: 'rgba(0,255,136,0.04)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '2px' }}>
-                <div style={{ fontSize: '8px', color: '#00ff88', letterSpacing: '1px' }}>✓ {specialistData?.halal_filter || 'ACTIVE'} — {specialistData?.whitelisted_count || 14} APPROVED</div>
-                <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>LEVERAGE / MARGIN: BLOCKED</div>
-                <button 
-                  className="cmd-btn" 
-                  style={{ width: '100%', marginTop: '10px', borderColor: '#00ff88', color: '#00ff88', fontSize: '9px' }}
-                  onClick={() => socketRef.current.emit('SPECIALIST_ACTION', { mode: 'TRADER', action: 'EXECUTE_TRADE', payload: { symbol: 'BTCUSDT', side: 'BUY' } })}
-                >
-                  EXECUTE TEST TRADE
-                </button>
+                <div style={{ fontSize: '8px', color: '#00ff88', letterSpacing: '1px' }}>✓ {specialistData?.halal_filter || 'ACTIVE'}</div>
+                <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>LEVERAGE: BLOCKED</div>
+                <div style={{ fontSize: '7px', opacity: 0.4 }}>MEME COINS: BLOCKED</div>
               </div>
+            </div>
+
+            <div className="panel-section">
+              <div className="section-label" >MACRO SIGNALS</div>
+              <div className="macro-row"><span className="macro-key">DXY INDEX</span><span className="macro-val">104.2 (↓)</span></div>
+              <div className="macro-row"><span className="macro-key">S&P 500</span><span className="macro-val">5,124 (↑)</span></div>
+              <div className="macro-row"><span className="macro-key">GOLD</span><span className="macro-val">$2,145 (↑)</span></div>
+              <div className="macro-row"><span className="macro-key">BTC DOM</span><span className="macro-val">52.4%</span></div>
+            </div>
+
+            <div className="panel-section">
+                <div className="section-label" >STARK PULSE</div>
+                <div className="ticker-row">
+                    <span className="t-sym" >BINANCE WS</span>
+                    <span className="t-price pulse" >LIVE</span>
+                </div>
             </div>
           </>
         )}
@@ -2065,25 +2133,40 @@ return (
         {/* ── PROFESSOR MODE PANEL ── */}
         {activeMode === 'PROFESSOR' && (
           <>
-            <div className="panel-section" style={getComponentStyle('CURRICULUM')}>
-              <div className="section-label" style={{ color: '#a78bfa' }}>CURRICULUM</div>
+            <div className="panel-section">
+              <div className="section-label" >CURRICULUM</div>
               <div className="curriculum-list">
-                {specialistData?.curriculum?.map(c => (
-                  <div key={c.name} className="curriculum-item">
-                    <div className={`cur-dot ${c.status}`} style={{ background: c.status === 'DONE' ? '#00ff88' : (c.status === 'ACTIVE' ? '#a78bfa' : 'rgba(255,255,255,0.1)') }}></div>
-                    <span className="cur-name" style={{ color: c.status === 'ACTIVE' ? '#a78bfa' : 'inherit' }}>{c.name}</span>
-                    <span className="cur-status" style={{ color: c.status === 'DONE' ? '#00ff88' : (c.status === 'ACTIVE' ? '#a78bfa' : 'inherit') }}>{c.status}</span>
+                {['Quantum Physics', 'Neural Networks', 'Linear Algebra'].map(c => (
+                  <div key={c} className="curriculum-item">
+                    <div className="cur-dot" ></div>
+                    <span className="cur-name">{c.toUpperCase()}</span>
+                    <span className="cur-status">ACTIVE</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="panel-section" style={getComponentStyle('STUDY_METRICS')}>
-              <div className="section-label" style={{ color: '#a78bfa' }}>STUDY METRICS</div>
-              <div className="module-list">
-                <div className="module-row"><span className="module-name">MOOD</span><span className="module-status online" style={{ color: '#a78bfa' }}>{specialistData?.mood || 'ACADEMIC'}</span></div>
-                <div className="module-row"><span className="module-name">STREAK</span><span className="module-status online" style={{ color: '#a78bfa' }}>{specialistData?.streak || 0} SESSIONS</span></div>
-                <div className="module-row"><span className="module-name">LEVEL</span><span className="module-status online" style={{ color: '#00ff88' }}>{specialistData?.mastery_level || 'NOVICE'}</span></div>
+            <div className="panel-section">
+              <div className="section-label" >STUDY METRICS</div>
+              <div className="mini-bar-row">
+                <span className="mbl">FOCUS</span>
+                <div className="mbt"><div className="mbf" style={{ width: '92%', background: '#a78bfa' }}></div></div>
+                <span className="mbv">92%</span>
+              </div>
+              <div className="mini-bar-row">
+                <span className="mbl">SYNC</span>
+                <div className="mbt"><div className="mbf" style={{ width: '84%', background: '#a78bfa' }}></div></div>
+                <span className="mbv">84%</span>
+              </div>
+            </div>
+
+            <div className="panel-section">
+              <div className="section-label" >ARXIV WATCH</div>
+              <div style={{ padding: '8px', fontSize: '7px', color: 'rgba(255,255,255,0.4)', borderLeft: '1px solid #a78bfa' }}>
+                "Attention Is All You Need" — Vaswani et al.
+              </div>
+              <div style={{ padding: '8px', fontSize: '7px', color: 'rgba(255,255,255,0.4)', borderLeft: '1px solid #a78bfa', marginTop: '4px' }}>
+                "Deep Residual Learning..." — He et al.
               </div>
             </div>
           </>
@@ -2092,159 +2175,113 @@ return (
         {/* ── ENGINEER MODE PANEL ── */}
         {activeMode === 'ENGINEER' && (
           <>
-            <div className="panel-section" style={getComponentStyle('ACTIVE_PROJECT')}>
-              <div className="section-label" style={{ color: '#f97316' }}>ACTIVE PROJECTS</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {(specialistData?.active_projects || ['M.M.S. CORE']).map(proj => (
-                  <div key={proj} style={{ padding: '8px', background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: '2px' }}>
-                    <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '10px', color: '#f97316', letterSpacing: '1.5px' }}>{proj}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.5, marginTop: '4px' }}>
-                      <span>TYPE: NEXT.JS 15</span>
-                      <span>STATUS: {specialistData?.manifestation_sync?.status || 'STABLE'}</span>
+            <div className="panel-section">
+              <div className="section-label" >ACTIVE PROJECT</div>
+              <div style={{ padding: '8px', background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: '2px' }}>
+                <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '10px', color: '#f97316', letterSpacing: '1.5px' }}>M.M.S. CORE</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.5, marginTop: '4px' }}>
+                  <span>TYPE: NEXT.JS 15</span>
+                  <span>BUILD: STABLE</span>
+                </div>
+                <div className="mbt" style={{ marginTop: '6px' }}><div className="mbf" style={{ width: '65%', background: '#f97316' }}></div></div>
+              </div>
+            </div>
+
+            <div className="panel-section">
+              <div className="section-label" >FILE TREE</div>
+              <div className="file-tree" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                {['src/App.js', 'src/App.css', 'src/index.js', 'api/core.py'].map(f => (
+                    <div key={f} className="file-tree-item">
+                        <span className="file-icon">📄</span>
+                        <span>{f}</span>
                     </div>
-                  </div>
                 ))}
               </div>
             </div>
 
-            <div className="panel-section" style={getComponentStyle('FILE_TREE')}>
-              <div className="section-label" style={{ color: '#f97316' }}>LIVE FILE TREE</div>
-              <div className="file-tree" style={{ maxHeight: '250px', overflowY: 'auto' }}>
-                {specialistData?.live_file_tree ? (
-                  <FileTreeNode node={specialistData.live_file_tree} />
-                ) : (
-                  <div style={{ fontSize: '9px', opacity: 0.3, textAlign: 'center', padding: '20px' }}>AWAITING MANIFESTATION...</div>
-                )}
-              </div>
+            <div className="panel-section">
+              <div className="section-label" >GIT STATUS</div>
+              <div className="macro-row"><span className="macro-key">BRANCH</span><span className="macro-val">main</span></div>
+              <div className="macro-row"><span className="macro-key">COMMITS</span><span className="macro-val">124 (↑)</span></div>
             </div>
           </>
         )}
-
-        <div className="panel-section" style={getComponentStyle('MODULE_STATUS')}>
-          <div className="section-label">MODULE STATUS</div>
-          <div className="module-list">
-            {[
-              { name: 'VISION', status: 'READY' },
-              { name: 'VOICE', status: 'ACTIVE' },
-              { name: 'WEB', status: 'LIVE' },
-              { name: 'FILES', status: 'MOUNTED' },
-            ].map(mod => (
-              <div key={mod.name} className="module-row">
-                <span className="module-name">{mod.name}</span>
-                <span className={`module-status ${mod.status === 'OFFLINE' ? 'offline' : 'online'}`}>{mod.status}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="panel-section" style={getComponentStyle('VOICE_MONITOR')}>
-          <div className="section-label">VOICE MONITOR</div>
-          <canvas ref={voiceWaveformRef} className="voice-waveform"></canvas>
-        </div>
-
-        {/* ── MEMORY CORE ── */}
-        <div className={`panel-section memory-panel ${memoryFlash ? 'memory-flash' : ''}`} style={getComponentStyle('MEMORY_CORE')}>
-          <div className="section-label memory-label">
-            <span>MEMORY CORE</span>
-            <span className="memory-count">{storedMemories.length} STORED</span>
-          </div>
-          <div className="memory-list">
-            {storedMemories.length === 0 && (
-              <div className="memory-empty">— NO MEMORIES YET —</div>
-            )}
-            {storedMemories.map((m, i) => (
-              <div key={m.id || i} className="memory-item">
-                <span className="memory-dot">◆</span>
-                <span className="memory-text">{m.text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="panel-section">
-          <div className="section-label">LAST COMMAND</div>
-          <div className="last-command" style={{ minHeight: '60px' }}>
-            <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
-          </div>
-        </div>
-
-        {/* Removed static transcript to use floating subtitles */}
       </div>
 
       {/* ROW 2: CENTER (ORB / TACTICAL CONTENT) */}
       <div className={`grid-center ${activeMode !== 'M.M.S.' ? 'has-content' : ''}`}>
         
-        {/* ── TRADER CENTER: Market Signal ── */}
+        {/* ── TRADER CENTER: Live Chart ── */}
         {activeMode === 'TRADER' && (
-          <div className="center-panel trader-center">
-            <div className="market-pairs">
-              <div className="pair-row">
-                <span className="pair-name">BTC/USDT</span>
-                <span className="pair-price">$67,432.12</span>
-                <span className="pair-change positive">+2.42%</span>
-              </div>
-              <div className="pair-row">
-                <span className="pair-name">ETH/USDT</span>
-                <span className="pair-price">$3,241.53</span>
-                <span className="pair-change negative">-0.85%</span>
-              </div>
+          <div className="trader-center-container">
+            <div className="chart-header">
+                <div className="chart-title"><span className="live-dot pulse"></span>BTC / USDT — 15MIN</div>
+                <div style={{ fontSize: '10px', color: '#00ff88', fontFamily: 'var(--font-orbitron)' }}>$67,432.12 <span style={{ fontSize: '8px', opacity: 0.6 }}>▲ +2.42%</span></div>
             </div>
-            <div className="neural-verdict-box">
-              <div className="verdict-label">NEURAL MARKET VERDICT</div>
-              <div className="verdict-value">STRONG ACCUMULATE</div>
-              <div className="verdict-confidence">SIGNAL CONFIDENCE: 94%</div>
+            <div className="chart-area">
+                <canvas ref={traderChartRef} style={{ width: '100%', height: '100%' }}></canvas>
+                <div style={{ position: 'absolute', top: 20, left: 20, pointerEvents: 'none' }}>
+                    <div style={{ fontSize: '7px', color: 'rgba(0,255,136,0.2)', letterSpacing: '2px' }}>NEURAL OVERLAY ACTIVE</div>
+                </div>
+            </div>
+            <div style={{ padding: '4px 0', borderTop: '1px solid rgba(0,255,136,0.1)', background: 'rgba(0,0,0,0.2)' }}>
+                <div style={{ display: 'flex', overflowX: 'auto', gap: '20px', padding: '0 15px' }}>
+                    {['BTC $67K', 'ETH $3.2K', 'SOL $145', 'BNB $590'].map(t => (
+                        <span key={t} style={{ fontSize: '7px', letterSpacing: '1px', whiteSpace: 'nowrap', color: 'rgba(0,255,136,0.5)' }}>{t}</span>
+                    ))}
+                </div>
             </div>
           </div>
         )}
 
         {/* ── PROFESSOR CENTER: Slide Viewer ── */}
         {activeMode === 'PROFESSOR' && (
-          <div className="center-panel professor-center">
-            <div className="slide-box">
-              <div className="slide-box-header">
-                <span className="slide-title">QUANTUM COMPUTING 101</span>
-                <div className="slide-bullets-list">
-                  <div>• Superposition &amp; Entanglement</div>
-                  <div>• Qubit State Manifestation</div>
-                  <div>• Neural Link Optimization</div>
+          <div className="slide-viewer-new">
+            <div className="slide-header-new">
+                <div className="slide-title-txt">QUANTUM SUPREMACY</div>
+                <div className="slide-nav">
+                    <button className="slide-nav-btn">PREV</button>
+                    <span className="slide-progress-txt">04 / 12</span>
+                    <button className="slide-nav-btn">NEXT</button>
                 </div>
-                <div className="slide-counter">SLIDE 4 / 32</div>
-              </div>
-              <div className="slide-quiz-block">
-                <div className="quiz-question">What is the primary benefit of quantum parallelism in Shor's algorithm?</div>
-                <div className="quiz-answer-list">
-                  <div className="quiz-answer">A) Linear data processing</div>
-                  <div className="quiz-answer selected">B) Exponential factorization speedup</div>
-                  <div className="quiz-answer">C) Increased storage capacity</div>
-                </div>
-              </div>
+            </div>
+            <div className="slide-content-new">
+                <div style={{ fontSize: '14px', color: '#a78bfa', marginBottom: '15px', fontFamily: 'var(--font-orbitron)' }}>Core Principles</div>
+                <div className="slide-point-new">Superposition allows qubits to exist in multiple states.</div>
+                <div className="slide-point-new">Entanglement links qubit states across distances.</div>
+                <div className="slide-point-new">Quantum gates manipulate probability amplitudes.</div>
+            </div>
+            <div className="speaker-note">
+                <div className="speaker-note-label">SPEAKER NOTES</div>
+                Emphasize that superposition is not just "both states at once" but a complex linear combination.
             </div>
           </div>
         )}
 
         {/* ── ENGINEER CENTER: Forge Build Log ── */}
         {activeMode === 'ENGINEER' && (
-          <div className="center-panel engineer-center">
-            <div className="forge-build-panel">
-              <div className="forge-build-header">FORGE_BUILD_LOG</div>
-              <div className="forge-build-body">
-                {(specialistData?.forge_build_log || [
-                  { timestamp: '00:48:23', activity: 'Initiating architectural-sequencing core', status: 'OK' },
-                  { timestamp: '00:48:22', activity: 'Executing Scaffold: npx --yes create-next-app@lts...', status: 'OK' },
-                  { timestamp: '00:47:07', activity: 'Executing Scaffold: npm install frame-motion [ucf...', status: 'OK' },
-                  { timestamp: '00:38:52', activity: 'Engaging parallel manifestation threadpool', status: 'OK' },
-                ]).map((log, i) => (
-                  <div key={i} className="build-entry">
-                    <span className="build-ts">[{log.timestamp}]</span>
-                    <span className={`build-status ${log.status === 'OK' ? 'ok' : 'err'}`}>[{log.status}]</span>
-                    <span className="build-msg">{log.activity}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="forge-build-footer">
-                <span>THREADPOOL: ACTIVE [5 WORKERS]</span>
-                <span>NEURAL_LINK: STABLE</span>
-              </div>
+          <div className="terminal-new">
+            <div className="term-header-new">
+                <div className="term-title-new">FORGE BUILD TERMINAL</div>
+                <div className="term-status-new" >● STABLE</div>
+            </div>
+            <div className="terminal-new" style={{ overflowY: 'auto' }}>
+                <div className="log-line-new"><span className="log-ts-new">[14:22:01]</span> <span >INIT</span> <span style={{ opacity: 0.6 }}>Manifesting React 19 structure...</span></div>
+                <div className="log-line-new"><span className="log-ts-new">[14:22:05]</span> <span >DONE</span> <span style={{ opacity: 0.6 }}>Core architecture synchronized.</span></div>
+                <div className="log-line-new"><span className="log-ts-new">[14:22:08]</span> <span >RUN</span> <span style={{ opacity: 0.6 }}>npm install framer-motion lucide-react</span></div>
+                <div className="log-line-new"><span className="log-ts-new">[14:22:12]</span> <span >OK</span> <span style={{ opacity: 0.6 }}>Dependencies resolved (423 packages).</span></div>
+            </div>
+            <div className="build-progress-new">
+                <div className="bp-row-new">
+                    <span className="bp-label-new">BUILD PROGRESS</span>
+                    <span className="bp-pct-new">84%</span>
+                </div>
+                <div className="mbt"><div className="mbf" style={{ width: '84%', background: '#f97316' }}></div></div>
+            </div>
+            <div className="term-actions-new">
+                <button className="ta-btn-new active-btn">REBUILD</button>
+                <button className="ta-btn-new">DEPLOY</button>
+                <button className="ta-btn-new">LOGS</button>
             </div>
           </div>
         )}
@@ -2347,24 +2384,34 @@ return (
         {/* ── TRADER MODE RIGHT PANEL ── */}
         {activeMode === 'TRADER' && (
           <>
-            <div className="panel-section" style={getComponentStyle('TOP_OPPORTUNITY')}>
-              <div className="section-label" style={{ color: '#00ff88' }}>TOP OPPORTUNITY</div>
-              <div style={{ padding: '12px', background: 'rgba(0,255,136,0.06)', border: '1px solid rgba(0,255,136,0.2)', borderRadius: '2px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontFamily: 'var(--font-orbitron)', fontSize: '12px', color: '#00ff88' }}>SOL/USDT</span>
-                  <span style={{ fontSize: '10px', color: '#00ff88' }}>LONG</span>
+            <div className="panel-section">
+                <div className="section-label" >NEURAL VERDICT</div>
+                <div className="verdict-box" style={{ margin: 0 }}>
+                    <div className="v-label">MARKET SIGNAL</div>
+                    <div className="v-val" >STRONG BUY</div>
+                    <div className="v-conf">CONFIDENCE: 94%</div>
                 </div>
-                <div style={{ fontSize: '8px', opacity: 0.6, lineHeight: '1.4' }}>Breakout detected at $142.50. Target: $158.00. Neural confidence high.</div>
-                <button className="cmd-btn" style={{ width: '100%', marginTop: '10px', borderColor: '#00ff88', color: '#00ff88' }}>EXECUTE TRADE</button>
+            </div>
+
+            <div className="panel-section">
+              <div className="section-label" >TOP OPPORTUNITY</div>
+              <div className="trade-card">
+                <div className="tc-head">
+                  <span className="tc-asset" >SOL/USDT</span>
+                  <span className="tc-badge">HALAL</span>
+                </div>
+                <div style={{ fontSize: '8px', opacity: 0.6, lineHeight: '1.4' }}>Breakout detected at $142.50. Target: $158.00.</div>
+                <div className="tc-btns">
+                    <div className="tc-btn" style={{ borderColor: '#00ff88', color: '#00ff88' }}>CONFIRM</div>
+                    <div className="tc-btn" style={{ borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)' }}>CANCEL</div>
+                </div>
               </div>
             </div>
 
-            <div className="panel-section" style={getComponentStyle('MACRO_SIGNALS')}>
-              <div className="section-label" style={{ color: '#00ff88' }}>MACRO SIGNALS</div>
-              <div className="stat-row"><span className="sk">DXY INDEX</span><span className="sv">104.2 (↓)</span></div>
-              <div className="stat-row"><span className="sk">SPX 500</span><span className="sv">5,124 (↑)</span></div>
-              <div className="stat-row"><span className="sk">VOLATILITY</span><span className="sv">LOW</span></div>
-              <div className="stat-row"><span className="sk">FUNDING</span><span className="sv">NEUTRAL</span></div>
+            <div className="panel-section">
+              <div className="section-label" >RECENT TRADES</div>
+              <div className="macro-row"><span className="macro-key">BTC/USDT</span><span className="macro-val" >+$142.50</span></div>
+              <div className="macro-row"><span className="macro-key">ETH/USDT</span><span className="macro-val" style={{ color: '#ff3366' }}>-$24.12</span></div>
             </div>
           </>
         )}
@@ -2372,23 +2419,34 @@ return (
         {/* ── PROFESSOR MODE RIGHT PANEL ── */}
         {activeMode === 'PROFESSOR' && (
           <>
-            <div className="panel-section" style={getComponentStyle('LEARNING_PROGRESS')}>
-              <div className="section-label" style={{ color: '#a78bfa' }}>LEARNING PROGRESS</div>
-              <div className="neural-gauge" style={{ margin: '10px auto' }}>
-                <canvas ref={neuralGaugeRef} width="100" height="100"></canvas>
-                <div className="neural-text">
-                  <span className="neural-percent" style={{ color: '#a78bfa' }}>84%</span>
-                  <span className="neural-label">SYNC</span>
+            <div className="panel-section">
+              <div className="section-label" >NEURAL LOAD</div>
+              <div className="neural-gauge" style={{ margin: '10px auto', position: 'relative', width: '80px', height: '80px' }}>
+                <canvas ref={neuralGaugeRef} width="80" height="80"></canvas>
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '14px', color: '#a78bfa', fontWeight: 'bold' }}>84%</div>
+                    <div style={{ fontSize: '6px', opacity: 0.4 }}>SYNC</div>
                 </div>
               </div>
-              <div style={{ textAlign: 'center', fontSize: '8px', opacity: 0.4 }}>MASTERY: LEVEL 4 (ADVANCED)</div>
             </div>
 
-            <div className="panel-section" style={getComponentStyle('STUDY_GOALS')}>
-              <div className="section-label" style={{ color: '#a78bfa' }}>STUDY GOALS</div>
-              <div className="stat-row"><span className="sk">DAILY TARGET</span><span className="sv">2h 30m</span></div>
-              <div className="stat-row"><span className="sk">REMAINING</span><span className="sv" style={{ color: '#a78bfa' }}>45m</span></div>
-              <div className="stat-row"><span className="sk">NEXT EXAM</span><span className="sv">IN 2 DAYS</span></div>
+            <div className="panel-section">
+              <div className="section-label" >QUICK ACTIONS</div>
+              <div className="macro-row"><span className="macro-key">SUMMARIZE</span><span className="macro-val">READY</span></div>
+              <div className="macro-row"><span className="macro-key">EXPLAIN</span><span className="macro-val">READY</span></div>
+            </div>
+
+            <div className="panel-section">
+                <div className="section-label" >SESSION UPTIME</div>
+                <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '18px', color: '#a78bfa', textAlign: 'center' }}>02:45:12</div>
+            </div>
+
+            <div className="panel-section">
+                <div className="section-label" >SPACED REVIEW</div>
+                <div style={{ padding: '10px', background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.2)' }}>
+                    <div style={{ fontSize: '8px', color: '#a78bfa' }}>Next Review in 4h</div>
+                    <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>Topic: Backpropagation</div>
+                </div>
             </div>
           </>
         )}
@@ -2396,43 +2454,157 @@ return (
         {/* ── ENGINEER MODE RIGHT PANEL ── */}
         {activeMode === 'ENGINEER' && (
           <>
-            <div className="panel-section" style={getComponentStyle('FORGE_TELEMETRY')}>
-              <div className="section-label" style={{ color: '#f97316' }}>FORGE TELEMETRY</div>
-              <div className="metrics-grid">
-                <div className="metric-card">
-                  <span className="metric-value" style={{ color: '#f97316' }}>{specialistData?.forge_telemetry?.hmr_latency || '0.4s'}</span>
-                  <span className="metric-label">HMR LATENCY</span>
+            <div className="panel-section">
+              <div className="section-label" >BLUEPRINT</div>
+              <div className="macro-row"><span className="macro-key">NODES</span><span className="macro-val">24</span></div>
+              <div className="macro-row"><span className="macro-key">EDGES</span><span className="macro-val">56</span></div>
+              <div className="macro-row"><span className="macro-key">DEPTH</span><span className="macro-val">4</span></div>
+            </div>
+
+            <div className="panel-section">
+              <div className="section-label" >VANGUARD AUDIT</div>
+              <div className="macro-row"><span className="macro-key">SECURITY</span><span className="macro-val" >PASS</span></div>
+              <div className="macro-row"><span className="macro-key">PERF</span><span className="macro-val" >OPTIMAL</span></div>
+              <div className="macro-row"><span className="macro-key">LINT</span><span className="macro-val" style={{ color: '#ff3366' }}>2 ERR</span></div>
+            </div>
+
+            <div className="panel-section">
+                <div className="section-label" >DNA PROFILE</div>
+                <div style={{ height: '40px', background: 'repeating-linear-gradient(90deg, transparent, rgba(249,115,22,0.1) 2px, transparent 4px)', opacity: 0.4 }}></div>
+            </div>
+
+            <div className="panel-section">
+                <div className="section-label" >DESIGN BRIEF</div>
+                <div style={{ fontSize: '7px', opacity: 0.5, lineHeight: '1.4' }}>
+                    "Ensure high-fidelity glassmorphism across all modules."
                 </div>
-                <div className="metric-card">
-                  <span className="metric-value" style={{ color: specialistData?.forge_telemetry?.errors > 0 ? '#ff3366' : '#00ff88' }}>
-                    {specialistData?.forge_telemetry?.errors || 0} ERR
-                  </span>
-                  <span className="metric-label">LINT STATUS</span>
+            </div>
+          </>
+        )}
+
+        {activeMode === 'M.M.S.' && (
+          <>
+            {/* ── PERSISTENT LAYOUT CALIBRATION ── */}
+            <div className="panel-section" style={{ marginTop: 'auto', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="section-label">{activeMode} LAYOUT CALIBRATION</div>
+              <div className="calibration-controls" style={{ padding: '4px' }}>
+                <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                    <label>LEFT WIDTH</label>
+                    <span>{layoutOffsets.leftWidth}px</span>
+                  </div>
+                  <input type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200} 
+                    onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })} 
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
                 </div>
+                <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                    <label>RIGHT WIDTH</label>
+                    <span>{layoutOffsets.rightWidth}px</span>
+                  </div>
+                  <input type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200} 
+                    onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })} 
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
+                </div>
+                <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                    <label>CMD HEIGHT</label>
+                    <span>{layoutOffsets.bottomHeight}px</span>
+                  </div>
+                  <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150} 
+                    onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })} 
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
+                </div>
+                
+                <div style={{ margin: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  <div className="cal-col">
+                    <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
+                    <div style={{ marginBottom: '6px' }}>
+                      <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
+                      <input type="range" min="-100" max="100" value={layoutOffsets.leftX} 
+                        onChange={(e) => updateCurrentLayout({ leftX: parseInt(e.target.value) })} 
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
+                      <input type="range" min="-100" max="100" value={layoutOffsets.leftY} 
+                        onChange={(e) => updateCurrentLayout({ leftY: parseInt(e.target.value) })} 
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                    </div>
+                  </div>
+                  
+                  <div className="cal-col">
+                    <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
+                    <div style={{ marginBottom: '6px' }}>
+                      <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
+                      <input type="range" min="-100" max="100" value={layoutOffsets.rightX} 
+                        onChange={(e) => updateCurrentLayout({ rightX: parseInt(e.target.value) })} 
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
+                      <input type="range" min="-100" max="100" value={layoutOffsets.rightY} 
+                        onChange={(e) => updateCurrentLayout({ rightY: parseInt(e.target.value) })} 
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                    </div>
+                  </div>
+
+                  <div className="cal-col">
+                    <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
+                    <div style={{ marginBottom: '6px' }}>
+                      <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
+                      <input type="range" min="-100" max="100" value={layoutOffsets.bottomX} 
+                        onChange={(e) => updateCurrentLayout({ bottomX: parseInt(e.target.value) })} 
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
+                      <input type="range" min="-100" max="100" value={layoutOffsets.bottomY} 
+                        onChange={(e) => updateCurrentLayout({ bottomY: parseInt(e.target.value) })} 
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  className="cmd-btn" 
+                  style={{ width: '100%', marginTop: '12px', fontSize: '7px', padding: '4px', opacity: 0.6 }}
+                  onClick={() => {
+                    const defaults = {
+                      'M.M.S.': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                      'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                      'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                      'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
+                    };
+                    updateCurrentLayout(defaults[activeMode]);
+                  }}
+                >
+                  RESET {activeMode} LAYOUT
+                </button>
               </div>
             </div>
 
-            <div className="panel-section" style={getComponentStyle('MANIFESTATION_SYNC')}>
-              <div className="section-label" style={{ color: '#f97316' }}>MANIFESTATION SYNC</div>
-              <div style={{ padding: '10px', background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.1)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '5px' }}>
-                  <span>NEURAL ALIGNMENT</span>
-                  <span style={{ color: '#f97316' }}>{specialistData?.manifestation_sync?.alignment || '98%'}</span>
-                </div>
-                <div className="progress-bar" style={{ margin: 0 }}>
-                  <div className="progress-fill" style={{ width: specialistData?.manifestation_sync?.alignment || '98%' }}></div>
-                </div>
-                <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '5px', textAlign: 'right' }}>
-                  CORE: {specialistData?.manifestation_sync?.status || 'SYNCHRONIZED'}
-                </div>
-              </div>
-            </div>
-
-            <div className="panel-section" style={getComponentStyle('SYSTEM_ACTIONS')}>
-              <div className="section-label" style={{ color: '#f97316' }}>SYSTEM ACTIONS</div>
-              <div className="action-log" style={{ maxHeight: '100px' }}>
-                <div className="action-log-item"><span className="action-time">12:44</span> <span className="action-label">Pushed to main</span></div>
-                <div className="action-log-item"><span className="action-time">12:42</span> <span className="action-label">Asset optimized</span></div>
+            {/* ── COMPONENT CALIBRATION ── */}
+            <div className="panel-section" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+              <div className="section-label">COMPONENT CALIBRATION</div>
+              <div className="calibration-controls" style={{ padding: '4px' }}>
+                <select 
+                  value={selectedComponent} 
+                  onChange={(e) => setSelectedComponent(e.target.value)}
+                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '8px', padding: '4px', marginBottom: '8px' }}
+                >
+                  <option value="">SELECT COMPONENT...</option>
+                  {(({
+                    'M.M.S.': ['ACTIVE_MODE', 'SYSTEM_VITALS', 'BIOMETRIC_SCAN', 'SCREEN_VISION', 'SYSTEM_METRICS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
+                    'TRADER': ['PORTFOLIO', 'WATCHLIST', 'HALAL_FILTER', 'TOP_OPPORTUNITY', 'MACRO_SIGNALS'],
+                    'PROFESSOR': ['CURRICULUM', 'STUDY_METRICS', 'LEARNING_PROGRESS', 'STUDY_GOALS'],
+                    'ENGINEER': ['ACTIVE_PROJECT', 'FILE_TREE', 'FORGE_TELEMETRY', 'MANIFESTATION_SYNC', 'SYSTEM_ACTIONS']
+                  })[activeMode] || []).map(id => (
+                    <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </>
