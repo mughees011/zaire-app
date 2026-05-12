@@ -8,6 +8,7 @@ import './App.css';
 import ShadowAssistant from './components/ShadowAssistant';
 
 const DEFAULT_BLOB_COLOR = '#00b4ff';
+const API_BASE_URL = 'http://localhost:3001';
 
 function normalizeHexColor(value) {
   if (!value || typeof value !== 'string') return DEFAULT_BLOB_COLOR;
@@ -21,8 +22,8 @@ function App() {
   const cameraRef = useRef(null);
   const dragStateRef = useRef({ isPointerDown: false, tempPosition: { x: 0, y: 0 } });
 
-  const [activeMode, setActiveMode] = useState('M.M.S.');
-  const [mmsStatus, setMmsStatus] = useState('online'); 
+  const [activeMode, setActiveMode] = useState('ZAIRE');
+  const [zaireStatus, setZaireStatus] = useState('online');
   const [isDeepThinking, setIsDeepThinking] = useState(false);
   const [timeStr, setTimeStr] = useState('00:00:00');
   const [navItem, setNavItem] = useState('HOME');
@@ -52,7 +53,7 @@ function App() {
     { time: '15:47', message: 'System boot complete' },
     { time: '15:46', message: 'Neural core initialized' },
     { time: '15:45', message: 'Voice synthesis online' },
-    { time: '15:44', message: 'Loading M.M.S. protocol' },
+    { time: '15:44', message: 'Loading ZAIRE protocol' },
     { time: '15:43', message: 'Mounting file system' },
   ]);
 
@@ -89,7 +90,7 @@ function App() {
   const [lastSystemAction, setLastSystemAction] = useState(null);
   const [systemActionLog, setSystemActionLog] = useState([]);
   const [isDiagnosticActive, setIsDiagnosticActive] = useState(false);
-  
+
   // ── System State Engine ──
   const [systemState, setSystemState] = useState('IDLE'); // IDLE, LISTENING, THINKING, ALERT, SUCCESS
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -98,13 +99,38 @@ function App() {
   const [forgeProgress, setForgeProgress] = useState(0);
 
   const [professorPhase, setProfessorPhase] = useState('IDLE'); // IDLE, ARCHITECTING, SYNCING, LECTURE, QUIZ, GRADUATION
-  const [professorTopic, setProfessorTopic] = useState('QUANTUM PHYSICS');
-  const [quizActive, setQuizActive] = useState(false);
+  const [professorSubMode, setProfessorSubMode] = useState('LECTURE'); // LECTURE, ROADMAP, LAB
+  const [professorTopic, setProfessorTopic] = useState('Neural Networks');
+  const [professorNoteInput, setProfessorNoteInput] = useState('');
   const [learningProgress, setLearningProgress] = useState(0);
 
   const [traderPhase, setTraderPhase] = useState('IDLE'); // IDLE, ANALYSIS, SIGNAL, EXECUTION, AUDIT, HARVEST
+  const [traderSubMode, setTraderSubMode] = useState('CHART'); // CHART, STRATEGY, ALPHA
   const [traderProgress, setTraderProgress] = useState(0);
   const [liveTrades, setLiveTrades] = useState([]);
+
+  const [swarmPhase, setSwarmPhase] = useState('IDLE'); // IDLE, RECRUITING, ANALYZING, SYNTHESIZING
+  const [swarmMessages, setSwarmMessages] = useState([]);
+
+  const modes = ['ZAIRE', 'TRADER', 'PROFESSOR', 'ENGINEER', 'SWARM'];
+
+  const [lastUserPrompt, setLastUserPrompt] = useState('');
+
+  const handleSpecialistAction = async (mode, action, payload = {}) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/agent/specialist_action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, action, payload })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setSystemActionLog(prev => [{ time: new Date().toLocaleTimeString(), message: data.result.message }, ...prev]);
+      }
+    } catch (err) {
+      console.error("Specialist action failed:", err);
+    }
+  };
 
   // ── Engineer Mode Showcase Simulator ──
   useEffect(() => {
@@ -117,14 +143,14 @@ function App() {
 
     const phases = ['BLUEPRINT', 'RESEARCH', 'FORGE', 'AUDIT', 'DEPLOY'];
     let currentIdx = 0;
-    
+
     const interval = setInterval(() => {
       if (currentIdx < phases.length) {
         setEngineerPhase(phases[currentIdx]);
-        
+
         if (phases[currentIdx] === 'FORGE') {
           // Simulate code streaming
-          const sampleCode = `import React from 'react';\nimport './App.css';\n\nconst AutonomousSite = () => {\n  return (\n    <div className="manifest-container">\n      <h1>M.M.S. ENGINEERED STUDIO</h1>\n      <p>Neural Link Sync: Active</p>\n    </div>\n  );\n};`;
+          const sampleCode = `import React from 'react';\nimport './App.css';\n\nconst AutonomousSite = () => {\n  return (\n    <div className="manifest-container">\n      <h1>ZAIRE ENGINEERED STUDIO</h1>\n      <p>Neural Link Sync: Active</p>\n    </div>\n  );\n};`;
           let charIdx = 0;
           const codeInterval = setInterval(() => {
             if (charIdx < sampleCode.length) {
@@ -138,7 +164,7 @@ function App() {
         } else {
           setForgeProgress((currentIdx + 1) * 20);
         }
-        
+
         currentIdx++;
       } else {
         clearInterval(interval);
@@ -152,30 +178,61 @@ function App() {
   useEffect(() => {
     if (activeMode !== 'PROFESSOR') {
       setProfessorPhase('IDLE');
-      setQuizActive(false);
-      setLearningProgress(0);
       return;
     }
 
     const phases = ['ARCHITECTING', 'SYNCING', 'LECTURE', 'QUIZ', 'GRADUATION'];
     let currentIdx = 0;
-    
+
     const interval = setInterval(() => {
       if (currentIdx < phases.length) {
         setProfessorPhase(phases[currentIdx]);
         setLearningProgress((currentIdx + 1) * 20);
-        
+
         if (phases[currentIdx] === 'QUIZ') {
-          setQuizActive(true);
-        } else if (phases[currentIdx] === 'LECTURE') {
-          setQuizActive(false);
+          setProfessorSubMode('LECTURE'); // Quiz is now a sub-state of Lecture via specialistData
         }
-        
+
         currentIdx++;
       } else {
         clearInterval(interval);
       }
     }, 5000);
+
+    return () => clearInterval(interval);
+  }, [activeMode]);
+
+  // ── Swarm Mode Master Protocol Simulator ──
+  useEffect(() => {
+    if (activeMode !== 'SWARM') {
+      setSwarmPhase('IDLE');
+      return;
+    }
+
+    const phases = ['RECRUITING', 'ANALYZING', 'SYNTHESIZING'];
+    let currentIdx = 0;
+
+    const messages = [
+      { from: 'TRADER', text: 'Market liquidity confirmed. Alpha detected in SOL/USDT.' },
+      { from: 'PROFESSOR', text: 'Architecting educational module for the detected signal.' },
+      { from: 'ENGINEER', text: 'Neural Forge ready. Manifesting automation script...' },
+      { from: 'MASTER', text: 'Global sync established. Commencing neural fusion.' }
+    ];
+
+    const interval = setInterval(() => {
+      if (currentIdx < phases.length) {
+        setSwarmPhase(phases[currentIdx]);
+        if (messages[currentIdx]) {
+          setSwarmMessages(prev => [...prev, messages[currentIdx]]);
+        }
+        currentIdx++;
+      } else {
+        if (currentIdx === phases.length && messages[3]) {
+          setSwarmMessages(prev => [...prev, messages[3]]);
+          currentIdx++;
+        }
+      }
+    }, 4000);
 
     return () => clearInterval(interval);
   }, [activeMode]);
@@ -191,19 +248,19 @@ function App() {
 
     const phases = ['ANALYSIS', 'SIGNAL', 'EXECUTION', 'AUDIT', 'HARVEST'];
     let currentIdx = 0;
-    
+
     const interval = setInterval(() => {
       if (currentIdx < phases.length) {
         setTraderPhase(phases[currentIdx]);
         setTraderProgress((currentIdx + 1) * 20);
-        
+
         if (phases[currentIdx] === 'EXECUTION') {
           setLiveTrades(prev => [
             { id: Date.now(), pair: 'BTC/USDT', type: 'BUY', price: '67,432.12', amount: '0.42 BTC', status: 'FILLED' },
             ...prev
           ]);
         }
-        
+
         currentIdx++;
       } else {
         clearInterval(interval);
@@ -212,24 +269,32 @@ function App() {
 
     return () => clearInterval(interval);
   }, [activeMode]);
-  
+
 
 
   // ── HUD Customization States ──
-  const [hudOpacity, setHudOpacity] = useState(() => parseFloat(localStorage.getItem('mms_hud_opacity')) || 0.85);
-  const [neuralGlowEnabled, setNeuralGlowEnabled] = useState(() => localStorage.getItem('mms_neural_glow') !== 'false');
-  const [holographicTiltEnabled, setHolographicTiltEnabled] = useState(() => localStorage.getItem('mms_holographic_tilt') !== 'false');
-  
+  const [hudOpacity, setHudOpacity] = useState(() => parseFloat(localStorage.getItem('zaire_hud_opacity')) || 0.85);
+  const [neuralGlowEnabled, setNeuralGlowEnabled] = useState(() => localStorage.getItem('zaire_neural_glow') !== 'false');
+  const [holographicTiltEnabled, setHolographicTiltEnabled] = useState(() => localStorage.getItem('zaire_holographic_tilt') !== 'false');
+
   // ── Mode-Specific Advanced Toggles ──
   const [halalFilterEnabled, setHalalFilterEnabled] = useState(true);
   const [autoLintEnabled, setAutoLintEnabled] = useState(true);
 
   // Real-time Socket states
   const socketRef = useRef(null);
-  const [mmsResponseStream, setMmsResponseStream] = useState('');
+  const [zaireResponseStream, setZaireResponseStream] = useState('');
   const [showResponsePanel, setShowResponsePanel] = useState(false);
   const [isNeuralInterruptActive, setIsNeuralInterruptActive] = useState(false);
   const responseTimeoutRef = useRef(null);
+
+  const [zaireActionFeed, setZaireActionFeed] = useState([
+    { time: '15:47', message: 'System boot complete' },
+    { time: '15:46', message: 'Neural core initialized' },
+    { time: '15:45', message: 'Voice synthesis online' },
+    { time: '15:44', message: 'Loading ZAIRE protocol' },
+    { time: '15:43', message: 'Mounting file system' },
+  ]);
 
   // Biometric State
   const [biometricData, setBiometricData] = useState({ detected: false, name: 'ABSENT', confidence: 0 });
@@ -237,9 +302,60 @@ function App() {
   const [intruderSnapshots, setIntruderSnapshots] = useState([]);
   const [showSecurityOverlay, setShowSecurityOverlay] = useState(false);
   const [activeIntruder, setActiveIntruder] = useState(null);
-  const [specialistData, setSpecialistData] = useState(null);
+  const [specialistData, setSpecialistData] = useState({
+    active_persona: 'STARK_GRADE',
+    forge_telemetry: { neural_alignment: 0, thermal_hud: false },
+    active_projects: [],
+    forge_build_log: [],
+    portfolio_value: '0.00',
+    risk_level: 'LOW',
+    alpha_feed: []
+  });
+
+  const [previewUrl, setPreviewUrl] = useState('http://localhost:3005');
+  const [showDiff, setShowDiff] = useState(false);
+  const [diffData, setDiffData] = useState(null);
+  const [showMatrix, setShowMatrix] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
+  const [manifestedFiles, setManifestedFiles] = useState([]); // [{name, code}]
+  const [darwinResults, setDarwinResults] = useState(null); // {v1: score, v2: score, v3: score}
+  const [thermalActive, setThermalActive] = useState(false);
+  const [showHallOfFame, setShowHallOfFame] = useState(false);
+
+  const fetchDiff = async (filename) => {
+    try {
+      const res = await fetch(`http://localhost:3002/agent/specialist_action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'ENGINEER', action: 'GIT_DIFF', payload: { filename } })
+      });
+      const data = await res.json();
+      if (data.success) setDiffData(data.result.diff);
+    } catch (e) {
+      console.error("Diff fetch failed:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (specialistData?.forge_telemetry?.darwin_results) {
+      setDarwinResults(specialistData.forge_telemetry.darwin_results);
+      // Automatically hide after 5 seconds of 'OK' status
+      if (specialistData.status === 'OK') {
+        setTimeout(() => setDarwinResults(null), 5000);
+      }
+    }
+
+    if (specialistData?.recent_files && activeMode === 'ENGINEER') {
+      const newFiles = specialistData.recent_files.map(f => ({
+        name: f.split(/[\\/]/).pop(),
+        code: forgeCode
+      }));
+      if (newFiles.length > 0 && manifestedFiles.length === 0) {
+        setManifestedFiles(newFiles);
+      }
+    }
+  }, [specialistData, activeMode, forgeCode]);
   const [liveMetrics, setLiveMetrics] = useState({ cpu: 0, ram: 0, gpu: 0, latency: 4 });
-  const [mmsActionFeed, setMmsActionFeed] = useState([]);
   const [liveCodeStream, setLiveCodeStream] = useState('');
   const [professorSlides] = useState([
     { title: 'Neural Architectures', content: 'Understanding multi-head attention mechanisms in Transformers.', image: null },
@@ -248,10 +364,10 @@ function App() {
   ]);
   const [currentSlideIndex] = useState(0);
   const [modeLayouts, setModeLayouts] = useState(() => {
-    const saved = localStorage.getItem('mms_mode_layouts_v1');
+    const saved = localStorage.getItem('zaire_mode_layouts_v1');
     if (saved) return JSON.parse(saved);
     return {
-      'M.M.S.': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+      'ZAIRE': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
       'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
       'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
       'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
@@ -259,10 +375,10 @@ function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('mms_mode_layouts_v1', JSON.stringify(modeLayouts));
+    localStorage.setItem('zaire_mode_layouts_v1', JSON.stringify(modeLayouts));
   }, [modeLayouts]);
 
-  const layoutOffsets = modeLayouts[activeMode] || modeLayouts['M.M.S.'];
+  const layoutOffsets = modeLayouts[activeMode] || modeLayouts['ZAIRE'];
 
   const updateCurrentLayout = (updates) => {
     setModeLayouts(prev => ({
@@ -272,22 +388,22 @@ function App() {
   };
 
   const [componentNudges, setComponentNudges] = useState(() => {
-    const saved = localStorage.getItem('mms_component_nudges_v1');
+    const saved = localStorage.getItem('zaire_component_nudges_v1');
     return saved ? JSON.parse(saved) : {};
   });
 
   useEffect(() => {
-    localStorage.setItem('mms_component_nudges_v1', JSON.stringify(componentNudges));
+    localStorage.setItem('zaire_component_nudges_v1', JSON.stringify(componentNudges));
   }, [componentNudges]);
 
   useEffect(() => {
-    localStorage.setItem('mms_hud_opacity', hudOpacity);
-    localStorage.setItem('mms_neural_glow', neuralGlowEnabled);
-    localStorage.setItem('mms_holographic_tilt', holographicTiltEnabled);
+    localStorage.setItem('zaire_hud_opacity', hudOpacity);
+    localStorage.setItem('zaire_neural_glow', neuralGlowEnabled);
+    localStorage.setItem('zaire_holographic_tilt', holographicTiltEnabled);
     // Dynamic Color Mapping based on System State
     let stateColor = '#00d4ff'; // Default IDLE (Cyan)
     let stateGlow = 'rgba(0, 212, 255, 0.03)';
-    
+
     if (systemState === 'LISTENING') {
       stateColor = '#ffffff'; // LISTENING (White)
       stateGlow = 'rgba(255, 255, 255, 0.08)';
@@ -327,12 +443,12 @@ function App() {
       setSystemState('LISTENING');
     } else if (isTyping || isOmniBoxOpen) {
       setSystemState('THINKING');
-    } else if (mmsStatus === 'processing' || mmsResponseStream) {
+    } else if (zaireStatus === 'processing' || zaireResponseStream) {
       setSystemState('THINKING');
     } else {
       setSystemState('IDLE');
     }
-  }, [isSecurityAlert, biometricData, isMicrophoneActive, isTyping, isOmniBoxOpen, mmsStatus, mmsResponseStream]);
+  }, [isSecurityAlert, biometricData, isMicrophoneActive, isTyping, isOmniBoxOpen, zaireStatus, zaireResponseStream]);
 
   const updateComponentNudge = (id, updates) => {
     setComponentNudges(prev => ({
@@ -353,10 +469,10 @@ function App() {
   const FileTreeNode = ({ node, depth = 0 }) => {
     const [isOpen, setIsOpen] = useState(depth === 0); // Open root by default
     const isDir = node.type === 'directory';
-    
+
     return (
       <div className="file-tree-node" style={{ marginLeft: `${depth * 10}px` }}>
-        <div 
+        <div
           className={`node-label ${isDir ? 'directory' : 'file'} clickable`}
           onClick={() => isDir ? setIsOpen(!isOpen) : socketRef.current.emit('SPECIALIST_ACTION', { mode: 'ENGINEER', action: 'OPEN_FILE', payload: { filename: node.name } })}
         >
@@ -382,12 +498,11 @@ function App() {
   const [minigameScore, setMinigameScore] = useState(0);
   const [gameNodes, setGameNodes] = useState([]);
   const [isSystemEngaged, setIsSystemEngaged] = useState(false);
-  
+
   // Neural Video State
   const [neuralVideoData, setNeuralVideoData] = useState(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [currentVideoScene, setCurrentVideoScene] = useState(null);
-  const [attentionTimer, setAttentionTimer] = useState(0);
   const [isNeuralPulseActive, setIsNeuralPulseActive] = useState(false);
   const [particles, setParticles] = useState([]);
   const fileInputRef = useRef(null);
@@ -395,79 +510,78 @@ function App() {
 
   const audioQueueRef = useRef({}); // Using object keyed by index for O(1) lookups
   const isPlayingAudioRef = useRef(false);
-  const hudVideoRef = useRef(null);
   const [cameraStatus, setCameraStatus] = useState('pending'); // 'pending', 'authorized', 'denied'
   const nextExpectedIndexRef = useRef(0);
 
-  const playSpatialSound = (type, side = 'center') => {
+  const playSpatialSound = React.useCallback((type, side = 'center') => {
     // Spatial mapping: -1.0 (left), 0.0 (center), 1.0 (right)
     const panMap = { 'left': -0.8, 'center': 0.0, 'right': 0.8 };
     const pan = panMap[side] || 0.0;
-    
+
     if (audioContextRef.current && audioContextRef.current.state === 'running') {
       const osc = audioContextRef.current.createOscillator();
       const gain = audioContextRef.current.createGain();
       const panner = audioContextRef.current.createStereoPanner();
-      
+
       osc.type = 'sine';
       osc.frequency.setValueAtTime(type === 'alert' ? 880 : 440, audioContextRef.current.currentTime);
       gain.gain.setValueAtTime(0.05, audioContextRef.current.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, audioContextRef.current.currentTime + 0.15);
       panner.pan.setValueAtTime(pan, audioContextRef.current.currentTime);
-      
+
       osc.connect(gain);
       gain.connect(panner);
       panner.connect(audioContextRef.current.destination);
-      
+
       osc.start();
       osc.stop(audioContextRef.current.currentTime + 0.15);
     }
-  };
+  }, []);
 
   const handleModeChange = React.useCallback((newMode) => {
     if (newMode === activeMode) return;
-    
+
     // Digital Dissolve Trigger
     setIsTransitioning(true);
     setTimeout(() => setIsTransitioning(false), 800);
-    
+
     setActiveMode(newMode);
     if (socketRef.current) {
       socketRef.current.emit('MODE_CHANGE', { mode: newMode });
     }
 
     const modeThemes = {
-      'M.M.S.': { primary: '#00d4ff', accent: '#00d4ff', bg: 'rgba(0, 212, 255, 0.03)' },
+      'ZAIRE': { primary: '#00d4ff', accent: '#00d4ff', bg: 'rgba(0, 212, 255, 0.03)' },
       'TRADER': { primary: '#00ff88', accent: '#ffaa00', bg: 'rgba(0, 255, 136, 0.03)' },
       'PROFESSOR': { primary: '#a78bfa', accent: '#60a5fa', bg: 'rgba(167, 139, 250, 0.03)' },
       'ENGINEER': { primary: '#f97316', accent: '#facc15', bg: 'rgba(249, 115, 22, 0.03)' }
     };
 
-    const theme = modeThemes[newMode] || modeThemes['M.M.S.'];
+    const theme = modeThemes[newMode] || modeThemes['ZAIRE'];
     setBlobColor(theme.primary);
 
     document.documentElement.style.setProperty('--bg-glow', theme.bg);
-    
+
     // Trigger Neural Transition
     if (uniformsRef.current) {
       uniformsRef.current.uTransition.value = 0.0;
     }
-    
+
     // Spatial Audio Feedback
-    playSpatialSound('switch', newMode === 'M.M.S.' ? 'center' : (newMode === 'TRADER' ? 'left' : 'right'));
+    playSpatialSound('switch', newMode === 'ZAIRE' ? 'center' : (newMode === 'TRADER' ? 'left' : 'right'));
   }, [activeMode, playSpatialSound]);
 
   const handleModeSync = React.useCallback((newMode) => {
     setActiveMode(newMode);
 
     const modeColors = {
-      'M.M.S.': { primary: '#00d4ff', accent: '#00d4ff' },
+      'ZAIRE': { primary: '#00d4ff', accent: '#00d4ff' },
       'TRADER': { primary: '#00ff88', accent: '#ffaa00' },
       'PROFESSOR': { primary: '#a78bfa', accent: '#60a5fa' },
       'ENGINEER': { primary: '#f97316', accent: '#facc15' }
     };
 
-    const colors = modeColors[newMode] || modeColors['M.M.S.'];
+    const colors = modeColors[newMode] || modeColors['ZAIRE'];
     document.documentElement.style.setProperty('--accent', colors.accent);
 
     // Trigger Neural Transition
@@ -494,7 +608,7 @@ function App() {
       const startY = Math.random() * window.innerHeight;
       const targetX = window.innerWidth / 2 - startX;
       const targetY = window.innerHeight / 2 - startY;
-      
+
       newParticles.push({
         id: Math.random(),
         x: startX,
@@ -526,7 +640,7 @@ function App() {
   const handleNodeClick = (id) => {
     setMinigameScore(prev => prev + 100);
     setGameNodes(prev => prev.filter(n => n.id !== id));
-    
+
     // Ripple effect
     setIsGlitchActive(true);
     setTimeout(() => setIsGlitchActive(false), 200);
@@ -555,7 +669,7 @@ function App() {
     const updateNeuralAesthetics = () => {
       const hour = new Date().getHours();
       const isNight = hour >= 19 || hour <= 6;
-      
+
       // 1. Temporal Shift: Deepen colors at night
       if (isNight) {
         document.documentElement.style.setProperty('--bg-gradient', 'radial-gradient(circle at 50% 50%, #050505 0%, #000000 100%)');
@@ -567,7 +681,7 @@ function App() {
       const cpuLoad = liveMetrics.cpu || 0;
       const glowIntensity = 0.3 + (cpuLoad / 100) * 0.7; // Scale 0.3 to 1.0
       document.documentElement.style.setProperty('--glow-opacity', glowIntensity.toFixed(2));
-      
+
       // 3. Critical Alert: Red shift if CPU > 90%
       if (cpuLoad > 90) {
         document.documentElement.style.setProperty('--primary-glow', 'rgba(255, 0, 51, 0.6)');
@@ -642,14 +756,14 @@ function App() {
       const audio = new Audio(url);
 
       if (!audioContextRef.current) {
-         audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
       }
       if (!outputAnalyserRef.current) {
-         outputAnalyserRef.current = audioContextRef.current.createAnalyser();
-         outputAnalyserRef.current.fftSize = 256;
-         outputDataArrayRef.current = new Uint8Array(outputAnalyserRef.current.frequencyBinCount);
+        outputAnalyserRef.current = audioContextRef.current.createAnalyser();
+        outputAnalyserRef.current.fftSize = 256;
+        outputDataArrayRef.current = new Uint8Array(outputAnalyserRef.current.frequencyBinCount);
       }
-      
+
       try {
         const source = audioContextRef.current.createMediaElementSource(audio);
         source.connect(outputAnalyserRef.current);
@@ -695,15 +809,15 @@ function App() {
       })
       .catch(() => { });
 
-    fetch('http://127.0.0.1:3001/config') 
+    fetch('http://127.0.0.1:3001/config')
       .then(r => r.json())
       .then(res => {
-         if (res.success && res.data) {
-            console.log('[SYSTEM] Restored HUD config from core.');
-            if (res.data.blobColor) setBlobColor(res.data.blobColor);
-            if (res.data.blobSize) setBlobSize(res.data.blobSize);
-            if (res.data.blobPosition) setBlobPosition(res.data.blobPosition);
-         }
+        if (res.success && res.data) {
+          console.log('[SYSTEM] Restored HUD config from core.');
+          if (res.data.blobColor) setBlobColor(res.data.blobColor);
+          if (res.data.blobSize) setBlobSize(res.data.blobSize);
+          if (res.data.blobPosition) setBlobPosition(res.data.blobPosition);
+        }
       })
       .catch(() => { });
   }, []);
@@ -730,10 +844,12 @@ function App() {
       }
     });
 
-    socketRef.current.on('ai_error', (data) => {
-      console.error('[SOCKET] AI Error:', data.message);
+    socketRef.current.on('ai_error', (err) => {
+      const msg = typeof err === 'string' ? err : (err.message || "Unknown neural link error");
+      console.error('[SOCKET] AI Error:', msg);
       setIsGlitchActive(true);
       setTimeout(() => setIsGlitchActive(false), 3000);
+      setSystemActionLog(prev => [{ time: new Date().toLocaleTimeString(), message: `ERR: ${msg}` }, ...prev]);
     });
 
     socketRef.current.on('connect_error', (err) => {
@@ -741,7 +857,7 @@ function App() {
     });
 
     socketRef.current.on('ai_text_delta', (delta) => {
-      setMmsResponseStream(prev => {
+      setZaireResponseStream(prev => {
         const next = prev + delta;
         // Check for Neural Video Payload
         if (next.includes('[NEURAL_VIDEO_PAYLOAD]')) {
@@ -755,7 +871,7 @@ function App() {
           } catch (e) {
             console.error('Failed to parse video payload:', e);
           }
-          return parts[0]; 
+          return parts[0];
         }
 
         if (next.includes('[NEURAL_PULSE_TRIGGER]')) {
@@ -765,20 +881,20 @@ function App() {
         }
 
         if (next.includes('breakthrough') || next.includes('correct') || next.includes('excellent')) {
-           spawnKnowledgeParticles();
+          spawnKnowledgeParticles();
         }
 
         if (next.includes('```')) {
-           const codeBlocks = next.match(/```[\s\S]*?```/g);
-           if (codeBlocks && codeBlocks.length > 0) {
-              const lastBlock = codeBlocks[codeBlocks.length - 1];
-              const cleaned = lastBlock.replace(/```[a-zA-Z]*\n?/, '').replace(/```$/, '');
-              setLiveCodeStream(cleaned);
-           } else if (next.includes('```')) {
-              // Handle partial block (starting with ``` but not ending)
-              const partial = next.split('```').pop().replace(/^[a-zA-Z]*\n?/, '');
-              setLiveCodeStream(partial);
-           }
+          const codeBlocks = next.match(/```[\s\S]*?```/g);
+          if (codeBlocks && codeBlocks.length > 0) {
+            const lastBlock = codeBlocks[codeBlocks.length - 1];
+            const cleaned = lastBlock.replace(/```[a-zA-Z]*\n?/, '').replace(/```$/, '');
+            setLiveCodeStream(cleaned);
+          } else if (next.includes('```')) {
+            // Handle partial block (starting with ``` but not ending)
+            const partial = next.split('```').pop().replace(/^[a-zA-Z]*\n?/, '');
+            setLiveCodeStream(partial);
+          }
         }
 
         return next;
@@ -789,7 +905,7 @@ function App() {
       if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
       responseTimeoutRef.current = setTimeout(() => {
         setShowResponsePanel(false);
-        setMmsResponseStream('');
+        setZaireResponseStream('');
       }, 12000); // Fade after 12s of silence
     });
 
@@ -827,15 +943,15 @@ function App() {
     });
 
     // Vision status
-    socketRef.current.on('mms_status', (status) => setMmsStatus(status));
-    socketRef.current.on('mms_status', (status) => {
+    socketRef.current.on('zaire_status', (status) => setZaireStatus(status));
+    socketRef.current.on('zaire_status', (status) => {
       if (status === 'scanning') {
         setIsVisionScanning(true);
       } else {
         setIsVisionScanning(false);
       }
     });
-    
+
     // Deep thinking status
     socketRef.current.on('deep_thinking', (isThinking) => {
       setIsDeepThinking(isThinking);
@@ -855,7 +971,7 @@ function App() {
       if (data && data.content) {
         const now = new Date();
         const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
-        setMmsActionFeed(prev => [{ time, message: data.content }, ...prev].slice(0, 5));
+        setZaireActionFeed(prev => [{ time, message: data.content }, ...prev].slice(0, 5));
       }
     });
 
@@ -879,15 +995,15 @@ function App() {
     socketRef.current.on('neural_interrupt', (data) => {
       const { text, type } = data;
       console.log(`[PROACTIVE] ${type}: ${text}`);
-      setMmsResponseStream(text);
+      setZaireResponseStream(text);
       setShowResponsePanel(true);
       setIsNeuralInterruptActive(true);
-      
+
       // Auto-hide after 10s
       if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
       responseTimeoutRef.current = setTimeout(() => {
         setShowResponsePanel(false);
-        setMmsResponseStream('');
+        setZaireResponseStream('');
         setIsNeuralInterruptActive(false);
       }, 10000);
     });
@@ -898,7 +1014,7 @@ function App() {
       setIsSecurityAlert(true);
       setShowSecurityOverlay(true);
       setActiveIntruder(data);
-      setMmsResponseStream('🚨 SECURITY ALERT: UNKNOWN USER DETECTED AT YOUR SYSTEM! SNAPSHOT CAPTURED.');
+      setZaireResponseStream('🚨 SECURITY ALERT: UNKNOWN USER DETECTED AT YOUR SYSTEM! SNAPSHOT CAPTURED.');
       setShowResponsePanel(true);
 
       // Flash threat for 10 seconds
@@ -920,8 +1036,8 @@ function App() {
       setSpecialistData(data);
     });
 
-    socketRef.current.on('mms_action_feed', (actions) => {
-      setMmsActionFeed(actions);
+    socketRef.current.on('zaire_action_feed', (actions) => {
+      setZaireActionFeed(actions);
     });
 
     return () => {
@@ -936,7 +1052,7 @@ function App() {
   // with the Tier 5 Face Security Daemon (Python). Only one process can hold the camera lock.
   useEffect(() => {
     setCameraStatus('authorized'); // Assume authorized since backend daemon is handling it
-    return () => {};
+    return () => { };
   }, []);
 
   useEffect(() => {
@@ -946,19 +1062,19 @@ function App() {
         const res = await fetch('http://127.0.0.1:3001/security/status');
         const data = await res.json();
         if (data.success) {
-           setBiometricData({
-             detected:   data.master_present || data.running,
-             name:       data.master_present ? 'Master' : (data.running ? 'Scanning...' : 'Offline'),
-             locked:     data.pc_locked,
-             enabled:    data.face_lock_enabled,
-             intruders:  data.total_intruders
-           });
+          setBiometricData({
+            detected: data.master_present || data.running,
+            name: data.master_present ? 'Master' : (data.running ? 'Scanning...' : 'Offline'),
+            locked: data.pc_locked,
+            enabled: data.face_lock_enabled,
+            intruders: data.total_intruders
+          });
 
-           // If master present, clear alerts
-           if (data.master_present) {
-             setIsSecurityAlert(false);
-             setShowSecurityOverlay(false);
-           }
+          // If master present, clear alerts
+          if (data.master_present) {
+            setIsSecurityAlert(false);
+            setShowSecurityOverlay(false);
+          }
         }
       } catch (e) {
         // Security daemon offline?
@@ -967,20 +1083,6 @@ function App() {
 
     const biometricInterval = setInterval(pollBiometrics, 3000);
 
-    // ── ATTENTION MONITORING ──
-    const attentionInterval = setInterval(() => {
-      if (activeMode === 'PROFESSOR' && !biometricData.detected) {
-        setAttentionTimer(prev => {
-          if (prev >= 30) { // 30 seconds of absence
-            if (socketRef.current) socketRef.current.emit('user_message', 'ATTENTION_DRIFT');
-            return 0; 
-          }
-          return prev + 5;
-        });
-      } else {
-        setAttentionTimer(0);
-      }
-    }, 5000);
 
 
     const handlePersist = () => {
@@ -992,28 +1094,27 @@ function App() {
         });
       }
     };
-    window.addEventListener('MMS_PERSIST_CONFIG', handlePersist);
+    window.addEventListener('ZAIRE_PERSIST_CONFIG', handlePersist);
 
     return () => {
       clearInterval(biometricInterval);
-      clearInterval(attentionInterval);
-      window.removeEventListener('MMS_PERSIST_CONFIG', handlePersist);
+      window.removeEventListener('ZAIRE_PERSIST_CONFIG', handlePersist);
     };
   }, [activeMode, biometricData.detected]);
 
   // Poll for specialist data
   useEffect(() => {
-    if (activeMode === 'M.M.S.') {
-      setSpecialistData(null);
+    if (activeMode === 'ZAIRE') {
+      setSpecialistData({ active_persona: 'STARK_GRADE', forge_telemetry: {}, active_projects: [] });
       return;
     }
 
     const fetchSpecialistData = async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:3002/agent/mode_data?mode=${activeMode}`);
+        const res = await fetch(`${API_BASE_URL}/agent/specialist_data?mode=${activeMode}`);
         const data = await res.json();
         if (data.success) {
-          setSpecialistData(data.data);
+          setSpecialistData(data.data || { active_persona: 'STARK_GRADE', forge_telemetry: {}, active_projects: [] });
         }
       } catch (e) {
         console.error('Failed to fetch specialist data:', e);
@@ -1112,7 +1213,7 @@ function App() {
 
             // Send to Real-time Backend - include pending artifacts
             console.log('[DEBUG] Voice (Groq) sending with artifacts:', pendingArtifactTokens.length, pendingArtifactTokens);
-            setMmsResponseStream('');
+            setZaireResponseStream('');
             const allArtifacts = [...artifactTokens, ...pendingArtifactTokens];
             if (socketRef.current) {
               socketRef.current.emit('user_message', text, { artifactTokens: allArtifacts });
@@ -1125,6 +1226,7 @@ function App() {
             }
 
             setLastCommand(text);
+            setLastUserPrompt(text);
             setTimeout(() => setFinalRecognizedText(''), 2000);
           },
           (interim) => {
@@ -1254,7 +1356,7 @@ function App() {
 
         // Send to Real-time Backend - include pending artifacts
         console.log('[DEBUG] Voice (browser) sending with artifacts:', pendingArtifactTokens.length, pendingArtifactTokens);
-        setMmsResponseStream('');
+        setZaireResponseStream('');
         const allArtifacts = [...artifactTokens, ...pendingArtifactTokens];
         if (socketRef.current) {
           socketRef.current.emit('user_message', text, { artifactTokens: allArtifacts });
@@ -1267,6 +1369,7 @@ function App() {
         }
 
         setLastCommand(text);
+        setLastUserPrompt(text);
 
         setTimeout(() => {
           setFinalRecognizedText('');
@@ -1337,53 +1440,53 @@ function App() {
   };
 
 
-const stopMicrophone = () => {
-  setGroqStatus('');
-  if (groqSpeechRef.current) {
-    groqSpeechRef.current.stop();
-    groqSpeechRef.current = null;
-  }
-  if (audioStreamRef.current) {
-    audioStreamRef.current.getTracks().forEach(track => track.stop());
-    audioStreamRef.current = null;
-  }
-  if (recognitionRef.current) {
-    try {
-      recognitionRef.current.stop();
-    } catch (e) { }
-    recognitionRef.current = null;
-  }
-  setIsMicrophoneActive(false);
-  setRecognizedText('');
-};
-
-const toggleMicrophone = () => {
-  if (isMicrophoneActive) {
-    stopMicrophone();
-  } else {
-    initializeMicrophone();
-  }
-};
-
-useEffect(() => {
-  const params = {
-    timeScale: 0.78,
-    rotationSpeedX: 0.0012,
-    rotationSpeedY: 0.004,
-    plasmaScale: 0.1504,
-    plasmaBrightness: 1.5,
-    voidThreshold: 0.05,
-    colorDeep: 0x000833,
-    colorMid: 0x0044ff,
-    colorBright: 0x00ccff,
-    shellColor: 0x0088ff,
-    shellOpacity: 0.35
+  const stopMicrophone = () => {
+    setGroqStatus('');
+    if (groqSpeechRef.current) {
+      groqSpeechRef.current.stop();
+      groqSpeechRef.current = null;
+    }
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach(track => track.stop());
+      audioStreamRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) { }
+      recognitionRef.current = null;
+    }
+    setIsMicrophoneActive(false);
+    setRecognizedText('');
   };
 
-  // Use the state blobColor, not localStorage - this is reactively updated when color picker changes
-  const blobColorToUse = blobColor || DEFAULT_BLOB_COLOR;
+  const toggleMicrophone = () => {
+    if (isMicrophoneActive) {
+      stopMicrophone();
+    } else {
+      initializeMicrophone();
+    }
+  };
 
-const noiseFunctions = `
+  useEffect(() => {
+    const params = {
+      timeScale: 0.78,
+      rotationSpeedX: 0.0012,
+      rotationSpeedY: 0.004,
+      plasmaScale: 0.1504,
+      plasmaBrightness: 1.5,
+      voidThreshold: 0.05,
+      colorDeep: 0x000833,
+      colorMid: 0x0044ff,
+      colorBright: 0x00ccff,
+      shellColor: 0x0088ff,
+      shellOpacity: 0.35
+    };
+
+    // Use the state blobColor, not localStorage - this is reactively updated when color picker changes
+    const blobColorToUse = blobColor || DEFAULT_BLOB_COLOR;
+
+    const noiseFunctions = `
       vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
       vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
       vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}
@@ -1437,38 +1540,38 @@ const noiseFunctions = `
       }
     `;
 
-  const canvas = threeCanvasRef.current;
-  if (!canvas) return;
+    const canvas = threeCanvasRef.current;
+    if (!canvas) return;
 
-  const scene = new THREE.Scene();
-  scene.background = null;
+    const scene = new THREE.Scene();
+    scene.background = null;
 
-  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.z = 4.2;
-  cameraRef.current = camera;
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.z = 4.2;
+    cameraRef.current = camera;
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.9;
-  renderer.setClearColor(0x000000, 0);
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.9;
+    renderer.setClearColor(0x000000, 0);
 
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.enablePan = false;
-  controls.minDistance = 1.5;
-  controls.maxDistance = 6;
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.enablePan = false;
+    controls.minDistance = 1.5;
+    controls.maxDistance = 6;
 
-  const mainGroup = new THREE.Group();
-  scene.add(mainGroup);
-  mainGroupRef.current = mainGroup;
+    const mainGroup = new THREE.Group();
+    scene.add(mainGroup);
+    mainGroupRef.current = mainGroup;
 
-  const pointLight = new THREE.PointLight(0x0088ff, 2.0, 10);
-  mainGroup.add(pointLight);
+    const pointLight = new THREE.PointLight(0x0088ff, 2.0, 10);
+    mainGroup.add(pointLight);
 
-  const shellGeo = new THREE.SphereGeometry(1.0, 64, 64);
-  const shellVert = `
+    const shellGeo = new THREE.SphereGeometry(1.0, 64, 64);
+    const shellVert = `
       varying vec3 vNormal;
       varying vec3 vViewPosition;
       void main(){
@@ -1477,7 +1580,7 @@ const noiseFunctions = `
         vViewPosition=-mvPosition.xyz;
         gl_Position=projectionMatrix*mvPosition;
       }`;
-  const shellFrag = `
+    const shellFrag = `
       varying vec3 vNormal;
       varying vec3 vViewPosition;
       uniform vec3 uColor;
@@ -1487,36 +1590,36 @@ const noiseFunctions = `
         gl_FragColor=vec4(uColor,fresnel*uOpacity);
       }`;
 
-  const shellBackMat = new THREE.ShaderMaterial({
-    vertexShader: shellVert, fragmentShader: shellFrag,
-    uniforms: { uColor: { value: new THREE.Color(0x000055) }, uOpacity: { value: 0.3 } },
-    transparent: true, blending: THREE.AdditiveBlending, side: THREE.BackSide, depthWrite: false
-  });
-  const shellFrontMat = new THREE.ShaderMaterial({
-    vertexShader: shellVert, fragmentShader: shellFrag,
-    uniforms: { uColor: { value: new THREE.Color(params.shellColor) }, uOpacity: { value: params.shellOpacity } },
-    transparent: true, blending: THREE.AdditiveBlending, side: THREE.FrontSide, depthWrite: false
-  });
-  mainGroup.add(new THREE.Mesh(shellGeo, shellBackMat));
-  mainGroup.add(new THREE.Mesh(shellGeo, shellFrontMat));
+    const shellBackMat = new THREE.ShaderMaterial({
+      vertexShader: shellVert, fragmentShader: shellFrag,
+      uniforms: { uColor: { value: new THREE.Color(0x000055) }, uOpacity: { value: 0.3 } },
+      transparent: true, blending: THREE.AdditiveBlending, side: THREE.BackSide, depthWrite: false
+    });
+    const shellFrontMat = new THREE.ShaderMaterial({
+      vertexShader: shellVert, fragmentShader: shellFrag,
+      uniforms: { uColor: { value: new THREE.Color(params.shellColor) }, uOpacity: { value: params.shellOpacity } },
+      transparent: true, blending: THREE.AdditiveBlending, side: THREE.FrontSide, depthWrite: false
+    });
+    mainGroup.add(new THREE.Mesh(shellGeo, shellBackMat));
+    mainGroup.add(new THREE.Mesh(shellGeo, shellFrontMat));
 
-  const plasmaGeo = new THREE.SphereGeometry(0.998, 128, 128);
-  const plasmaMat = new THREE.ShaderMaterial({
-    uniforms: {
-      uTime: { value: 0 },
-      uTransition: { value: 1.0 },
-      uScale: { value: params.plasmaScale },
-      uBrightness: { value: params.plasmaBrightness },
-      uThreshold: { value: params.voidThreshold },
-      uColorDeep: { value: new THREE.Color(params.colorDeep) },
-      uColorMid: { value: new THREE.Color(params.colorMid) },
-      uColorBright: { value: new THREE.Color(params.colorBright) },
-      uAudioBass: { value: 0 },
-      uAudioMid: { value: 0 },
-      uAudioTreble: { value: 0 },
-      uAudioIntensity: { value: 0 }
-    },
-    vertexShader: `
+    const plasmaGeo = new THREE.SphereGeometry(0.998, 128, 128);
+    const plasmaMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uTransition: { value: 1.0 },
+        uScale: { value: params.plasmaScale },
+        uBrightness: { value: params.plasmaBrightness },
+        uThreshold: { value: params.voidThreshold },
+        uColorDeep: { value: new THREE.Color(params.colorDeep) },
+        uColorMid: { value: new THREE.Color(params.colorMid) },
+        uColorBright: { value: new THREE.Color(params.colorBright) },
+        uAudioBass: { value: 0 },
+        uAudioMid: { value: 0 },
+        uAudioTreble: { value: 0 },
+        uAudioIntensity: { value: 0 }
+      },
+      vertexShader: `
         uniform float uAudioBass;
         uniform float uAudioMid;
         uniform float uAudioTreble;
@@ -1536,7 +1639,7 @@ const noiseFunctions = `
           vViewPosition=-mvPosition.xyz;
           gl_Position=projectionMatrix*mvPosition;
         }`,
-    fragmentShader: `
+      fragmentShader: `
         uniform float uTime;
         uniform float uTransition;
         uniform float uScale;
@@ -1590,79 +1693,79 @@ const noiseFunctions = `
 
           gl_FragColor=vec4(color*uBrightness*(1.0+audioBoost*0.3),finalAlpha * uTransition);
         }`,
-    transparent: true, blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide, depthWrite: false
-  });
-  plasmaMatRef.current = plasmaMat;
-  const plasmaMesh = new THREE.Mesh(plasmaGeo, plasmaMat);
-  mainGroup.add(plasmaMesh);
+      transparent: true, blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide, depthWrite: false
+    });
+    plasmaMatRef.current = plasmaMat;
+    const plasmaMesh = new THREE.Mesh(plasmaGeo, plasmaMat);
+    mainGroup.add(plasmaMesh);
 
-  // --- MODE-SPECIFIC HOLOGRAMS ---
-  const hologramGroup = new THREE.Group();
-  mainGroup.add(hologramGroup);
+    // --- MODE-SPECIFIC HOLOGRAMS ---
+    const hologramGroup = new THREE.Group();
+    mainGroup.add(hologramGroup);
 
-  // 1. TRADER: 3D Wave Chart
-  const traderGroup = new THREE.Group();
-  const wavePoints = [];
-  for(let i=0; i<50; i++) wavePoints.push(new THREE.Vector3((i/25-1)*0.6, Math.sin(i*0.3)*0.1, Math.cos(i*0.2)*0.1));
-  const waveCurve = new THREE.CatmullRomCurve3(wavePoints);
-  const waveGeo = new THREE.TubeGeometry(waveCurve, 64, 0.005, 8, false);
-  const waveMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.8 });
-  traderGroup.add(new THREE.Mesh(waveGeo, waveMat));
-  hologramGroup.add(traderGroup);
+    // 1. TRADER: 3D Wave Chart
+    const traderGroup = new THREE.Group();
+    const wavePoints = [];
+    for (let i = 0; i < 50; i++) wavePoints.push(new THREE.Vector3((i / 25 - 1) * 0.6, Math.sin(i * 0.3) * 0.1, Math.cos(i * 0.2) * 0.1));
+    const waveCurve = new THREE.CatmullRomCurve3(wavePoints);
+    const waveGeo = new THREE.TubeGeometry(waveCurve, 64, 0.005, 8, false);
+    const waveMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.8 });
+    traderGroup.add(new THREE.Mesh(waveGeo, waveMat));
+    hologramGroup.add(traderGroup);
 
-  // 2. PROFESSOR: Neural Node Graph
-  const professorGroup = new THREE.Group();
-  const nodeGeo = new THREE.SphereGeometry(0.02, 8, 8);
-  const nodeMat = new THREE.MeshBasicMaterial({ color: 0xa78bfa });
-  for(let i=0; i<12; i++) {
-    const node = new THREE.Mesh(nodeGeo, nodeMat);
-    node.position.set((Math.random()-0.5)*0.8, (Math.random()-0.5)*0.8, (Math.random()-0.5)*0.8);
-    professorGroup.add(node);
-  }
-  hologramGroup.add(professorGroup);
+    // 2. PROFESSOR: Neural Node Graph
+    const professorGroup = new THREE.Group();
+    const nodeGeo = new THREE.SphereGeometry(0.02, 8, 8);
+    const nodeMat = new THREE.MeshBasicMaterial({ color: 0xa78bfa });
+    for (let i = 0; i < 12; i++) {
+      const node = new THREE.Mesh(nodeGeo, nodeMat);
+      node.position.set((Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8);
+      professorGroup.add(node);
+    }
+    hologramGroup.add(professorGroup);
 
-  // 3. ENGINEER: Manifestation Tree
-  const engineerGroup = new THREE.Group();
-  const branchMat = new THREE.LineBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.4 });
-  for(let i=0; i<8; i++) {
-    const pts = [new THREE.Vector3(0,0,0), new THREE.Vector3((Math.random()-0.5)*0.6, (Math.random()-0.5)*0.6, (Math.random()-0.5)*0.6)];
-    const bGeo = new THREE.BufferGeometry().setFromPoints(pts);
-    engineerGroup.add(new THREE.Line(bGeo, branchMat));
-  }
-  hologramGroup.add(engineerGroup);
+    // 3. ENGINEER: Manifestation Tree
+    const engineerGroup = new THREE.Group();
+    const branchMat = new THREE.LineBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.4 });
+    for (let i = 0; i < 8; i++) {
+      const pts = [new THREE.Vector3(0, 0, 0), new THREE.Vector3((Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6)];
+      const bGeo = new THREE.BufferGeometry().setFromPoints(pts);
+      engineerGroup.add(new THREE.Line(bGeo, branchMat));
+    }
+    hologramGroup.add(engineerGroup);
 
-  mainGroupRef.current = mainGroup;
-  uniformsRef.current = plasmaMat.uniforms;
+    mainGroupRef.current = mainGroup;
+    uniformsRef.current = plasmaMat.uniforms;
 
-  mainGroup.scale.set(blobSize, blobSize, blobSize);
-  mainGroup.position.set(blobPosition.x, blobPosition.y, 0);
-  const initialBase = new THREE.Color(blobColorToUse);
-  const idxHsl = {};
-  initialBase.getHSL(idxHsl);
-  plasmaMat.uniforms.uColorBright.value = initialBase.clone();
-  plasmaMat.uniforms.uColorMid.value = new THREE.Color(0x0044ff);
-  plasmaMat.uniforms.uColorDeep.value = new THREE.Color(0x000833);
+    mainGroup.scale.set(blobSize, blobSize, blobSize);
+    mainGroup.position.set(blobPosition.x, blobPosition.y, 0);
+    const initialBase = new THREE.Color(blobColorToUse);
+    const idxHsl = {};
+    initialBase.getHSL(idxHsl);
+    plasmaMat.uniforms.uColorBright.value = initialBase.clone();
+    plasmaMat.uniforms.uColorMid.value = new THREE.Color(0x0044ff);
+    plasmaMat.uniforms.uColorDeep.value = new THREE.Color(0x000833);
 
-  const pCount = 600;
-  const pPos = new Float32Array(pCount * 3);
-  const pSizes = new Float32Array(pCount);
-  const sR = 0.95;
-  for (let i = 0; i < pCount; i++) {
-    const r = sR * Math.cbrt(Math.random());
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(2 * Math.random() - 1);
-    pPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-    pPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-    pPos[i * 3 + 2] = r * Math.cos(phi);
-    pSizes[i] = Math.random();
-  }
-  const pGeo = new THREE.BufferGeometry();
-  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-  pGeo.setAttribute('aSize', new THREE.BufferAttribute(pSizes, 1));
-  const pMat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0xffffff) } },
-    vertexShader: `
+    const pCount = 600;
+    const pPos = new Float32Array(pCount * 3);
+    const pSizes = new Float32Array(pCount);
+    const sR = 0.95;
+    for (let i = 0; i < pCount; i++) {
+      const r = sR * Math.cbrt(Math.random());
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      pPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      pPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      pPos[i * 3 + 2] = r * Math.cos(phi);
+      pSizes[i] = Math.random();
+    }
+    const pGeo = new THREE.BufferGeometry();
+    pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+    pGeo.setAttribute('aSize', new THREE.BufferAttribute(pSizes, 1));
+    const pMat = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0xffffff) } },
+      vertexShader: `
         uniform float uTime;
         attribute float aSize;
         varying float vAlpha;
@@ -1676,7 +1779,7 @@ const noiseFunctions = `
           gl_PointSize=baseSize*(1.0/-mvPosition.z);
           vAlpha=0.8+0.2*sin(uTime+aSize*10.0);
         }`,
-    fragmentShader: `
+      fragmentShader: `
         uniform vec3 uColor;
         varying float vAlpha;
         void main(){
@@ -1685,1520 +1788,1861 @@ const noiseFunctions = `
           float glow=pow(1.0-length(uv)*2.0,1.8);
           gl_FragColor=vec4(uColor,glow*vAlpha);
         }`,
-    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
-  });
-  pMatRef.current = pMat;
-  mainGroup.add(new THREE.Points(pGeo, pMat));
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    pMatRef.current = pMat;
+    mainGroup.add(new THREE.Points(pGeo, pMat));
 
-  const gridCanvas = gridCanvasRef.current;
-  if (!gridCanvas) return;
-  const gCtx = gridCanvas.getContext('2d');
+    const gridCanvas = gridCanvasRef.current;
+    if (!gridCanvas) return;
+    const gCtx = gridCanvas.getContext('2d');
 
-  const initGrid = () => {
-    gridCanvas.width = window.innerWidth;
-    gridCanvas.height = window.innerHeight;
-  };
+    const initGrid = () => {
+      gridCanvas.width = window.innerWidth;
+      gridCanvas.height = window.innerHeight;
+    };
 
-  const drawGrid = (t) => {
-    const W = gridCanvas.width, H = gridCanvas.height;
-    gCtx.clearRect(0, 0, W, H);
-    const vx = W / 2, horizonY = H * 0.42;
+    const drawGrid = (t) => {
+      const W = gridCanvas.width, H = gridCanvas.height;
+      gCtx.clearRect(0, 0, W, H);
+      const vx = W / 2, horizonY = H * 0.42;
 
-    const lCount = 24;
-    for (let i = 0; i <= lCount; i++) {
-      const frac = i / lCount;
-      const x = -W * 0.35 + frac * W * 1.7;
-      const op = 0.025 + Math.pow(frac > 0.5 ? 1 - frac : frac, 1.5) * 0.055;
-      gCtx.strokeStyle = `rgba(0,180,255,${op})`;
-      gCtx.lineWidth = 0.5;
-      gCtx.beginPath();
-      gCtx.moveTo(x, H);
-      gCtx.lineTo(vx + (x - vx) * 0.015, horizonY);
-      gCtx.stroke();
-    }
+      const lCount = 24;
+      for (let i = 0; i <= lCount; i++) {
+        const frac = i / lCount;
+        const x = -W * 0.35 + frac * W * 1.7;
+        const op = 0.025 + Math.pow(frac > 0.5 ? 1 - frac : frac, 1.5) * 0.055;
+        gCtx.strokeStyle = `rgba(0,180,255,${op})`;
+        gCtx.lineWidth = 0.5;
+        gCtx.beginPath();
+        gCtx.moveTo(x, H);
+        gCtx.lineTo(vx + (x - vx) * 0.015, horizonY);
+        gCtx.stroke();
+      }
 
-    const hCount = 16;
-    for (let i = 0; i <= hCount; i++) {
-      const frac = i / hCount;
-      const scrollFrac = (frac + t * 0.04) % 1;
-      const y = horizonY + Math.pow(scrollFrac, 2.0) * (H - horizonY);
-      const xSpread = ((y - horizonY) / (H - horizonY)) * W * 0.68;
-      const op = Math.pow(scrollFrac, 0.9) * 0.07;
-      gCtx.strokeStyle = `rgba(0,180,255,${op})`;
-      gCtx.lineWidth = 0.5;
-      gCtx.beginPath();
-      gCtx.moveTo(vx - xSpread, y);
-      gCtx.lineTo(vx + xSpread, y);
-      gCtx.stroke();
-    }
-  };
+      const hCount = 16;
+      for (let i = 0; i <= hCount; i++) {
+        const frac = i / hCount;
+        const scrollFrac = (frac + t * 0.04) % 1;
+        const y = horizonY + Math.pow(scrollFrac, 2.0) * (H - horizonY);
+        const xSpread = ((y - horizonY) / (H - horizonY)) * W * 0.68;
+        const op = Math.pow(scrollFrac, 0.9) * 0.07;
+        gCtx.strokeStyle = `rgba(0,180,255,${op})`;
+        gCtx.lineWidth = 0.5;
+        gCtx.beginPath();
+        gCtx.moveTo(vx - xSpread, y);
+        gCtx.lineTo(vx + xSpread, y);
+        gCtx.stroke();
+      }
+    };
 
-  const handleResize = () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    const handleResize = () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      initGrid();
+    };
+
+
+    const handleMouseMove = (e) => {
+      const x = (e.clientX / window.innerWidth) - 0.5;
+      const y = (e.clientY / window.innerHeight) - 0.5;
+      document.documentElement.style.setProperty('--mouse-x', x.toFixed(3));
+      document.documentElement.style.setProperty('--mouse-y', y.toFixed(3));
+
+      // Gaze-aware simulation: dim side panels when mouse is in center zone
+      const centerStart = window.innerWidth * 0.25;
+      const centerEnd = window.innerWidth * 0.75;
+      const isInCenter = e.clientX > centerStart && e.clientX < centerEnd;
+      document.documentElement.style.setProperty('--hud-dim-opacity', isInCenter ? '0.35' : '1');
+    };
+
+    const handleGlobalClick = () => {
+      setIsGlitchActive(true);
+      setTimeout(() => setIsGlitchActive(false), 120);
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('click', handleGlobalClick);
+
     initGrid();
-  };
+    const startTime = performance.now();
+    let animationId;
 
+    const animate = () => {
+      animationId = requestAnimationFrame(animate);
+      const t = (performance.now() - startTime) * 0.001;
 
-  const handleMouseMove = (e) => {
-    const x = (e.clientX / window.innerWidth) - 0.5;
-    const y = (e.clientY / window.innerHeight) - 0.5;
-    document.documentElement.style.setProperty('--mouse-x', x.toFixed(3));
-    document.documentElement.style.setProperty('--mouse-y', y.toFixed(3));
-    
-    // Gaze-aware simulation: dim side panels when mouse is in center zone
-    const centerStart = window.innerWidth * 0.25;
-    const centerEnd = window.innerWidth * 0.75;
-    const isInCenter = e.clientX > centerStart && e.clientX < centerEnd;
-    document.documentElement.style.setProperty('--hud-dim-opacity', isInCenter ? '0.35' : '1');
-  };
+      // Get audio frequency data if microphone is active
+      let audioIntensity = 0;
+      let activeAnalyser = null;
+      let activeDataArray = null;
 
-  const handleGlobalClick = () => {
-    setIsGlitchActive(true);
-    setTimeout(() => setIsGlitchActive(false), 120);
-  };
-
-  window.addEventListener('resize', handleResize);
-  window.addEventListener('mousemove', handleMouseMove);
-  window.addEventListener('click', handleGlobalClick);
-
-  initGrid();
-  const startTime = performance.now();
-  let animationId;
-
-  const animate = () => {
-    animationId = requestAnimationFrame(animate);
-    const t = (performance.now() - startTime) * 0.001;
-
-    // Get audio frequency data if microphone is active
-    let audioIntensity = 0;
-    let activeAnalyser = null;
-    let activeDataArray = null;
-
-    if (isPlayingAudioRef.current && outputAnalyserRef.current && outputDataArrayRef.current) {
+      if (isPlayingAudioRef.current && outputAnalyserRef.current && outputDataArrayRef.current) {
         activeAnalyser = outputAnalyserRef.current;
         activeDataArray = outputDataArrayRef.current;
-    } else if (analyserRef.current && dataArrayRef.current) {
+      } else if (analyserRef.current && dataArrayRef.current) {
         activeAnalyser = analyserRef.current;
         activeDataArray = dataArrayRef.current;
-    }
-
-    if (activeAnalyser && activeDataArray) {
-      activeAnalyser.getByteFrequencyData(activeDataArray);
-      const total = activeDataArray.length;
-
-      // Split into frequency bands: bass, low-mid, mid, high-mid, treble
-      const bassBins = activeDataArray.slice(0, Math.floor(total * 0.2));
-      const lowMidBins = activeDataArray.slice(Math.floor(total * 0.2), Math.floor(total * 0.4));
-      const midBins = activeDataArray.slice(Math.floor(total * 0.4), Math.floor(total * 0.6));
-      const highMidBins = activeDataArray.slice(Math.floor(total * 0.6), Math.floor(total * 0.8));
-      const trebleBins = activeDataArray.slice(Math.floor(total * 0.8));
-
-      // Average each band
-      const bassAvg = (bassBins.reduce((a, b) => a + b, 0) / bassBins.length) / 255;
-      const lowMidAvg = (lowMidBins.reduce((a, b) => a + b, 0) / lowMidBins.length) / 255;
-      const midAvg = (midBins.reduce((a, b) => a + b, 0) / midBins.length) / 255;
-      const highMidAvg = (highMidBins.reduce((a, b) => a + b, 0) / highMidBins.length) / 255;
-      const trebleAvg = (trebleBins.reduce((a, b) => a + b, 0) / trebleBins.length) / 255;
-
-      // Store in ref for shader
-      frequencyBandsRef.current = [bassAvg, lowMidAvg, midAvg, highMidAvg, trebleAvg];
-      audioIntensity = (bassAvg + lowMidAvg + midAvg) / 3;
-      setAudioFrequency(audioIntensity);
-    }
-
-    plasmaMat.uniforms.uTime.value = t * params.timeScale;
-    plasmaMat.uniforms.uAudioBass.value = frequencyBandsRef.current[0];
-    plasmaMat.uniforms.uAudioMid.value = frequencyBandsRef.current[2];
-    plasmaMat.uniforms.uAudioTreble.value = frequencyBandsRef.current[4];
-    plasmaMat.uniforms.uAudioIntensity.value = audioIntensity;
-
-    pMat.uniforms.uTime.value = t;
-
-    plasmaMesh.rotation.y = t * 0.08;
-    mainGroup.rotation.x += params.rotationSpeedX;
-    mainGroup.rotation.y += params.rotationSpeedY;
-
-    // Apply audio-based scaling on top of user's chosen blob size
-    const userScale = blobSizeRef.current || 1.0;
-    const targetScale = userScale + audioIntensity * 0.08 * userScale;
-    mainGroup.scale.x += (targetScale - mainGroup.scale.x) * 0.1;
-    mainGroup.scale.y += (targetScale - mainGroup.scale.y) * 0.1;
-    mainGroup.scale.z += (targetScale - mainGroup.scale.z) * 0.1;
-
-    drawGrid(t);
-    
-    // Animate Mode Holograms
-    traderGroup.visible = activeMode === 'TRADER';
-    professorGroup.visible = activeMode === 'PROFESSOR';
-    engineerGroup.visible = activeMode === 'ENGINEER';
-    
-    if (activeMode === 'TRADER') traderGroup.rotation.y += 0.02;
-    if (activeMode === 'PROFESSOR') professorGroup.rotation.y -= 0.01;
-    if (activeMode === 'ENGINEER') engineerGroup.rotation.z += 0.015;
-
-    // Transition Logic
-    if (plasmaMat.uniforms.uTransition.value < 1.0) {
-      plasmaMat.uniforms.uTransition.value += 0.02;
-    }
-
-    // Deep Thinking Visuals
-    if (mmsStatus === 'deep_thinking') {
-      plasmaMat.uniforms.uAudioIntensity.value = 1.5;
-      plasmaMat.uniforms.uBrightness.value = 1.2 + Math.sin(t * 5.0) * 0.2;
-    }
-
-    controls.update();
-    renderer.render(scene, camera);
-  };
-  animate();
-
-  return () => {
-    window.removeEventListener('resize', handleResize);
-    window.removeEventListener('mousemove', handleMouseMove);
-    window.removeEventListener('click', handleGlobalClick);
-    cancelAnimationFrame(animationId);
-    renderer.dispose();
-    cameraRef.current = null;
-  };
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
-
-// Boot sequence handled elsewhere
-
-useEffect(() => {
-  const tick = () => {
-    const now = new Date();
-    const hms = [now.getHours(), now.getMinutes(), now.getSeconds()]
-      .map(n => String(n).padStart(2, '0'))
-      .join(':');
-    setTimeStr(hms);
-  };
-
-  const interval = setInterval(tick, 1000);
-  tick();
-
-  return () => clearInterval(interval);
-}, []);
-
-useEffect(() => {
-  const uptimeInterval = setInterval(() => {
-    setSessionUptime(prev => prev + 1);
-  }, 1000);
-  return () => clearInterval(uptimeInterval);
-}, []);
-
-const formatUptime = (seconds) => {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return [h, m, s].map(n => String(n).padStart(2, '0')).join(':');
-};
-
-useEffect(() => {
-  const canvas = voiceWaveformRef.current;
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  let animationId;
-  let phase = 0;
-
-  const drawWaveform = () => {
-    const width = canvas.width = canvas.offsetWidth;
-    const height = canvas.height = canvas.offsetHeight;
-
-    ctx.clearRect(0, 0, width, height);
-    ctx.strokeStyle = 'rgba(0,212,255,0.7)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-
-    const isVoiceActive = activeMode === 'VOICE';
-
-    for (let x = 0; x < width; x++) {
-      let y;
-      if (isVoiceActive) {
-        const amplitude = 15 + Math.random() * 10;
-        y = height / 2 + Math.sin(x * 0.05 + phase) * amplitude + Math.sin(x * 0.02 + phase * 1.5) * (amplitude * 0.5);
-      } else {
-        y = height / 2 + Math.sin(x * 0.02 + phase) * 2;
       }
 
-      if (x === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
+      if (activeAnalyser && activeDataArray) {
+        activeAnalyser.getByteFrequencyData(activeDataArray);
+        const total = activeDataArray.length;
+
+        // Split into frequency bands: bass, low-mid, mid, high-mid, treble
+        const bassBins = activeDataArray.slice(0, Math.floor(total * 0.2));
+        const lowMidBins = activeDataArray.slice(Math.floor(total * 0.2), Math.floor(total * 0.4));
+        const midBins = activeDataArray.slice(Math.floor(total * 0.4), Math.floor(total * 0.6));
+        const highMidBins = activeDataArray.slice(Math.floor(total * 0.6), Math.floor(total * 0.8));
+        const trebleBins = activeDataArray.slice(Math.floor(total * 0.8));
+
+        // Average each band
+        const bassAvg = (bassBins.reduce((a, b) => a + b, 0) / bassBins.length) / 255;
+        const lowMidAvg = (lowMidBins.reduce((a, b) => a + b, 0) / lowMidBins.length) / 255;
+        const midAvg = (midBins.reduce((a, b) => a + b, 0) / midBins.length) / 255;
+        const highMidAvg = (highMidBins.reduce((a, b) => a + b, 0) / highMidBins.length) / 255;
+        const trebleAvg = (trebleBins.reduce((a, b) => a + b, 0) / trebleBins.length) / 255;
+
+        // Store in ref for shader
+        frequencyBandsRef.current = [bassAvg, lowMidAvg, midAvg, highMidAvg, trebleAvg];
+        audioIntensity = (bassAvg + lowMidAvg + midAvg) / 3;
+        setAudioFrequency(audioIntensity);
       }
-    }
 
-    ctx.stroke();
-    phase += isVoiceActive ? 0.15 : 0.05;
-    animationId = requestAnimationFrame(drawWaveform);
-  };
+      plasmaMat.uniforms.uTime.value = t * params.timeScale;
+      plasmaMat.uniforms.uAudioBass.value = frequencyBandsRef.current[0];
+      plasmaMat.uniforms.uAudioMid.value = frequencyBandsRef.current[2];
+      plasmaMat.uniforms.uAudioTreble.value = frequencyBandsRef.current[4];
+      plasmaMat.uniforms.uAudioIntensity.value = audioIntensity;
 
-  drawWaveform();
-  return () => cancelAnimationFrame(animationId);
-}, [activeMode]);
+      pMat.uniforms.uTime.value = t;
 
-useEffect(() => {
-  const canvas = neuralGaugeRef.current;
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  let animationId;
-  let currentLoad = 0;
-  const targetLoad = 74;
+      plasmaMesh.rotation.y = t * 0.08;
+      mainGroup.rotation.x += params.rotationSpeedX;
+      mainGroup.rotation.y += params.rotationSpeedY;
 
-  const drawGauge = () => {
-    const width = canvas.width;
-    const height = canvas.height;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const radius = 30;
+      // Apply audio-based scaling on top of user's chosen blob size
+      const userScale = blobSizeRef.current || 1.0;
+      const targetScale = userScale + audioIntensity * 0.08 * userScale;
+      mainGroup.scale.x += (targetScale - mainGroup.scale.x) * 0.1;
+      mainGroup.scale.y += (targetScale - mainGroup.scale.y) * 0.1;
+      mainGroup.scale.z += (targetScale - mainGroup.scale.z) * 0.1;
 
-    ctx.clearRect(0, 0, width, height);
+      drawGrid(t);
 
-    // Animate to target, then fluctuate
-    if (currentLoad < targetLoad) {
-      currentLoad += 0.5;
-    } else {
-      // Subtle fluctuation: +/- 2%
-      const drift = (Math.random() - 0.5) * 0.4;
-      currentLoad = Math.max(targetLoad - 2, Math.min(targetLoad + 2, currentLoad + drift));
-    }
+      // Animate Mode Holograms
+      traderGroup.visible = activeMode === 'TRADER';
+      professorGroup.visible = activeMode === 'PROFESSOR';
+      engineerGroup.visible = activeMode === 'ENGINEER';
 
-    const startAngle = -Math.PI / 2;
-    const endAngle = startAngle + (currentLoad / 100) * Math.PI * 2;
+      if (activeMode === 'TRADER') traderGroup.rotation.y += 0.02;
+      if (activeMode === 'PROFESSOR') professorGroup.rotation.y -= 0.01;
+      if (activeMode === 'ENGINEER') engineerGroup.rotation.z += 0.015;
 
-    // Update text if possible (optional, but currentLoad is internal)
-    // Since the text is in JSX, we'll just keep it 74% fixed there or assume it's just visual for now.
+      // Transition Logic
+      if (plasmaMat.uniforms.uTransition.value < 1.0) {
+        plasmaMat.uniforms.uTransition.value += 0.02;
+      }
 
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = activeMode === 'PROFESSOR' ? 'rgba(167, 139, 250, 0.08)' : 'rgba(0,212,255,0.08)';
-    ctx.lineWidth = 6;
-    ctx.stroke();
+      // Deep Thinking Visuals
+      if (zaireStatus === 'deep_thinking') {
+        plasmaMat.uniforms.uAudioIntensity.value = 1.5;
+        plasmaMat.uniforms.uBrightness.value = 1.2 + Math.sin(t * 5.0) * 0.2;
+      }
 
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-    ctx.strokeStyle = activeMode === 'PROFESSOR' ? 'rgba(167, 139, 250, 0.8)' : 'rgba(0,212,255,0.8)';
-    ctx.lineWidth = 6;
-    ctx.lineCap = 'round';
-    ctx.stroke();
+      controls.update();
+      renderer.render(scene, camera);
+    };
+    animate();
 
-    animationId = requestAnimationFrame(drawGauge);
-  };
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('click', handleGlobalClick);
+      cancelAnimationFrame(animationId);
+      renderer.dispose();
+      cameraRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  drawGauge();
-  return () => cancelAnimationFrame(animationId);
-}, [activeMode]);
+  // Boot sequence handled elsewhere
 
-useEffect(() => {
-  const canvas = faceMeshCanvasRef.current;
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  let animationId;
-  let t = 0;
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const hms = [now.getHours(), now.getMinutes(), now.getSeconds()]
+        .map(n => String(n).padStart(2, '0'))
+        .join(':');
+      setTimeStr(hms);
+    };
 
-  const drawMesh = () => {
-    const w = canvas.width = canvas.offsetWidth;
-    const h = canvas.height = canvas.offsetHeight;
-    ctx.clearRect(0, 0, w, h);
-    
-    if (biometricData?.detected) {
-      ctx.strokeStyle = 'rgba(0, 212, 255, 0.4)';
-      ctx.lineWidth = 0.5;
-      
-      const centerX = w / 2;
-      const centerY = h / 2;
-      const rows = 12, cols = 12;
-      const size = 50;
-      
-      t += 0.04;
-      
-      for(let i=0; i<rows; i++) {
-        ctx.beginPath();
-        for(let j=0; j<cols; j++) {
-          const x = centerX - size + (j / (cols-1)) * size * 2;
-          const y = centerY - size + (i / (rows-1)) * size * 2;
-          const dist = Math.sqrt(Math.pow(j - (cols-1)/2, 2) + Math.pow(i - (rows-1)/2, 2));
-          const z = Math.sin(dist * 0.8 - t) * 8;
-          if (j === 0) ctx.moveTo(x, y + z);
-          else ctx.lineTo(x, y + z);
+    const interval = setInterval(tick, 1000);
+    tick();
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const uptimeInterval = setInterval(() => {
+      setSessionUptime(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(uptimeInterval);
+  }, []);
+
+
+  useEffect(() => {
+    const canvas = voiceWaveformRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animationId;
+    let phase = 0;
+
+    const drawWaveform = () => {
+      const width = canvas.width = canvas.offsetWidth;
+      const height = canvas.height = canvas.offsetHeight;
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.strokeStyle = 'rgba(0,212,255,0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+
+      const isVoiceActive = activeMode === 'VOICE';
+
+      for (let x = 0; x < width; x++) {
+        let y;
+        if (isVoiceActive) {
+          const amplitude = 15 + Math.random() * 10;
+          y = height / 2 + Math.sin(x * 0.05 + phase) * amplitude + Math.sin(x * 0.02 + phase * 1.5) * (amplitude * 0.5);
+        } else {
+          y = height / 2 + Math.sin(x * 0.02 + phase) * 2;
         }
-        ctx.stroke();
-      }
-      for(let j=0; j<cols; j++) {
-        ctx.beginPath();
-        for(let i=0; i<rows; i++) {
-          const x = centerX - size + (j / (cols-1)) * size * 2;
-          const y = centerY - size + (i / (rows-1)) * size * 2;
-          const dist = Math.sqrt(Math.pow(j - (cols-1)/2, 2) + Math.pow(i - (rows-1)/2, 2));
-          const z = Math.sin(dist * 0.8 - t) * 8;
-          if (i === 0) ctx.moveTo(x, y + z);
-          else ctx.lineTo(x, y + z);
+
+        if (x === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
         }
-        ctx.stroke();
       }
-    }
-    
-    animationId = requestAnimationFrame(drawMesh);
-  };
-  drawMesh();
-  return () => cancelAnimationFrame(animationId);
-}, [biometricData?.detected]);
 
-const modes = ['M.M.S.', 'TRADER', 'PROFESSOR', 'ENGINEER'];
-const navItems = ['M.M.S.', 'TRADER', 'PROFESSOR', 'ENGINEER'];
-const quickAccess = [
-  { label: 'SCREEN CAPTURE', action: 'capture' },
-  { label: 'OPEN BROWSER', action: 'browser' },
-  { label: 'FILE MANAGER', action: 'files' }
-];
+      ctx.stroke();
+      phase += isVoiceActive ? 0.15 : 0.05;
+      animationId = requestAnimationFrame(drawWaveform);
+    };
 
-useEffect(() => {
-  const handleKeyDown = (e) => {
-    if (e.ctrlKey && e.key === 'k') {
-      e.preventDefault();
-      setIsOmniBoxOpen(prev => !prev);
-    }
-    if (e.key === 'Escape') {
-      setIsOmniBoxOpen(false);
-    }
-  };
-  window.addEventListener('keydown', handleKeyDown);
-  return () => window.removeEventListener('keydown', handleKeyDown);
-}, []);
+    drawWaveform();
+    return () => cancelAnimationFrame(animationId);
+  }, [activeMode]);
 
-return (
-  <div 
-    className={`
-      mms-container 
+  useEffect(() => {
+    const canvas = neuralGaugeRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animationId;
+    let currentLoad = 0;
+    const targetLoad = 74;
+
+    const drawGauge = () => {
+      const width = canvas.width;
+      const height = canvas.height;
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const radius = 30;
+
+      ctx.clearRect(0, 0, width, height);
+
+      // Animate to target, then fluctuate
+      if (currentLoad < targetLoad) {
+        currentLoad += 0.5;
+      } else {
+        // Subtle fluctuation: +/- 2%
+        const drift = (Math.random() - 0.5) * 0.4;
+        currentLoad = Math.max(targetLoad - 2, Math.min(targetLoad + 2, currentLoad + drift));
+      }
+
+      const startAngle = -Math.PI / 2;
+      const endAngle = startAngle + (currentLoad / 100) * Math.PI * 2;
+
+      // Update text if possible (optional, but currentLoad is internal)
+      // Since the text is in JSX, we'll just keep it 74% fixed there or assume it's just visual for now.
+
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = activeMode === 'PROFESSOR' ? 'rgba(167, 139, 250, 0.08)' : 'rgba(0,212,255,0.08)';
+      ctx.lineWidth = 6;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+      ctx.strokeStyle = activeMode === 'PROFESSOR' ? 'rgba(167, 139, 250, 0.8)' : 'rgba(0,212,255,0.8)';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      animationId = requestAnimationFrame(drawGauge);
+    };
+
+    drawGauge();
+    return () => cancelAnimationFrame(animationId);
+  }, [activeMode]);
+
+  useEffect(() => {
+    const canvas = faceMeshCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animationId;
+    let t = 0;
+
+    const drawMesh = () => {
+      const w = canvas.width = canvas.offsetWidth;
+      const h = canvas.height = canvas.offsetHeight;
+      ctx.clearRect(0, 0, w, h);
+
+      if (biometricData?.detected) {
+        ctx.strokeStyle = 'rgba(0, 212, 255, 0.4)';
+        ctx.lineWidth = 0.5;
+
+        const centerX = w / 2;
+        const centerY = h / 2;
+        const rows = 12, cols = 12;
+        const size = 50;
+
+        t += 0.04;
+
+        for (let i = 0; i < rows; i++) {
+          ctx.beginPath();
+          for (let j = 0; j < cols; j++) {
+            const x = centerX - size + (j / (cols - 1)) * size * 2;
+            const y = centerY - size + (i / (rows - 1)) * size * 2;
+            const dist = Math.sqrt(Math.pow(j - (cols - 1) / 2, 2) + Math.pow(i - (rows - 1) / 2, 2));
+            const z = Math.sin(dist * 0.8 - t) * 8;
+            if (j === 0) ctx.moveTo(x, y + z);
+            else ctx.lineTo(x, y + z);
+          }
+          ctx.stroke();
+        }
+        for (let j = 0; j < cols; j++) {
+          ctx.beginPath();
+          for (let i = 0; i < rows; i++) {
+            const x = centerX - size + (j / (cols - 1)) * size * 2;
+            const y = centerY - size + (i / (rows - 1)) * size * 2;
+            const dist = Math.sqrt(Math.pow(j - (cols - 1) / 2, 2) + Math.pow(i - (rows - 1) / 2, 2));
+            const z = Math.sin(dist * 0.8 - t) * 8;
+            if (i === 0) ctx.moveTo(x, y + z);
+            else ctx.lineTo(x, y + z);
+          }
+          ctx.stroke();
+        }
+      }
+
+      animationId = requestAnimationFrame(drawMesh);
+    };
+    drawMesh();
+    return () => cancelAnimationFrame(animationId);
+  }, [biometricData?.detected]);
+
+  const navItems = ['ZAIRE', 'TRADER', 'PROFESSOR', 'ENGINEER', 'SWARM'];
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.key === 'k') {
+        e.preventDefault();
+        setIsOmniBoxOpen(prev => !prev);
+      }
+      if (e.key === 'Escape') {
+        setIsOmniBoxOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  return (
+    <div
+      className={`
+      zaire-container 
       ${isDiagnosticActive ? 'diagnostic-active' : ''} 
       ${isSecurityAlert ? 'security-alert' : ''} 
       ${isGlitchActive ? 'glitch-active' : ''} 
       ${isNeuralPulseActive ? 'neural-pulse-active' : ''} 
       ${isNeuralInterruptActive ? 'neural-interrupt-flash' : ''}
     `.trim()}
-    data-mode={activeMode}
-    style={{
-      '--left-width': `${layoutOffsets.leftWidth}px`,
-      '--right-width': `${layoutOffsets.rightWidth}px`,
-      '--bottom-height': `${layoutOffsets.bottomHeight}px`,
-      '--left-x': `${layoutOffsets.leftX}px`,
-      '--left-y': `${layoutOffsets.leftY}px`,
-      '--right-x': `${layoutOffsets.rightX}px`,
-      '--right-y': `${layoutOffsets.rightY}px`,
-      '--bottom-x': `${layoutOffsets.bottomX}px`,
-      '--bottom-y': `${layoutOffsets.bottomY}px`
-    }}
-  >
-    <canvas id="three-canvas" ref={threeCanvasRef}></canvas>
-    <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
-
-    {/* Neural Pulse Arena Overlay */}
-    {isMinigameActive && (
-      <div className="neural-pulse-arena">
-        <div className="arena-score">SYNC: {minigameScore}</div>
-        {gameNodes.map(node => (
-          <div 
-            key={node.id} 
-            className="neural-node"
-            style={{ 
-              top: node.top, 
-              left: node.left, 
-              width: node.size, 
-              height: node.size,
-              animationDelay: node.delay
-            }}
-            onClick={() => handleNodeClick(node.id)}
-          >
-            <div className="node-core"></div>
-            <div className="node-ring"></div>
-          </div>
-        ))}
-      </div>
-    )}
-
-    <div className="grid-overlay"></div>
-    <div className="vignette"></div>
-    <div className="scanline"></div>
-    <div className="hex-overlay"></div>
-
-    <div 
-      className={`main-grid ${isTransitioning ? 'is-transitioning' : ''}`} 
       data-mode={activeMode}
-      data-state={systemState}
       style={{
         '--left-width': `${layoutOffsets.leftWidth}px`,
         '--right-width': `${layoutOffsets.rightWidth}px`,
-        '--bottom-height': `${layoutOffsets.bottomHeight}px`
+        '--bottom-height': `${layoutOffsets.bottomHeight}px`,
+        '--left-x': `${layoutOffsets.leftX}px`,
+        '--left-y': `${layoutOffsets.leftY}px`,
+        '--right-x': `${layoutOffsets.rightX}px`,
+        '--right-y': `${layoutOffsets.rightY}px`,
+        '--bottom-x': `${layoutOffsets.bottomX}px`,
+        '--bottom-y': `${layoutOffsets.bottomY}px`
       }}
     >
-      {/* ROW 1: NAVBAR */}
-      <div className="grid-navbar">
-        <div className="nav-logo">
-          <span className="logo-text">M·M·S</span>
-          <span className="logo-sub">MUGHEES MANAGEMENT SYSTEM · v2.0</span>
-        </div>
+      <canvas id="three-canvas" ref={threeCanvasRef}></canvas>
+      <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
 
-        <div className="nav-links">
-          {navItems.map(item => (
+      {/* Neural Pulse Arena Overlay */}
+      {isMinigameActive && (
+        <div className="neural-pulse-arena">
+          <div className="arena-score">SYNC: {minigameScore}</div>
+          {gameNodes.map(node => (
             <div
-              key={item}
-              className={`nav-item ${activeMode === item ? 'active' : ''}`}
-              onClick={() => handleModeChange(item)}
+              key={node.id}
+              className="neural-node"
+              style={{
+                top: node.top,
+                left: node.left,
+                width: node.size,
+                height: node.size,
+                animationDelay: node.delay
+              }}
+              onClick={() => handleNodeClick(node.id)}
             >
-              <span className="nav-arrow">›</span>
-              {item}
+              <div className="node-core"></div>
+              <div className="node-ring"></div>
             </div>
           ))}
         </div>
+      )}
 
-        <div className="nav-status">
-          <div className="settings-icon" onClick={() => setIsSettingsOpen(!isSettingsOpen)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 1.65 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-            </svg>
+      <div className="grid-overlay"></div>
+      <div className="vignette"></div>
+      <div className="scanline"></div>
+      <div className="hex-overlay"></div>
+
+      <div
+        className={`main-grid ${isTransitioning ? 'is-transitioning' : ''}`}
+        data-mode={activeMode}
+        data-state={systemState}
+        style={{
+          '--left-width': `${layoutOffsets.leftWidth}px`,
+          '--right-width': `${layoutOffsets.rightWidth}px`,
+          '--bottom-height': `${layoutOffsets.bottomHeight}px`
+        }}
+      >
+        {/* ROW 1: NAVBAR */}
+        <div className="grid-navbar">
+          <div className="nav-logo">
+            <span className="logo-text">ZAIRE</span>
+            <span className="logo-sub">ZAIRE ARTIFICIAL INTELLIGENCE · REVOLUTIONARY ENGINE · v2.0</span>
           </div>
-          <div className="mode-indicator">
-            <div className="mode-dot"></div>
-            <span className="mode-text">MODE: {activeMode}</span>
+
+          <div className="nav-links">
+            {navItems.map(item => (
+              <div
+                key={item}
+                className={`nav-item ${activeMode === item ? 'active' : ''}`}
+                onClick={() => handleModeChange(item)}
+              >
+                <span className="nav-arrow">›</span>
+                {item}
+              </div>
+            ))}
           </div>
-          <div className="status-indicator">
-            <div className={`status-dot ${mmsStatus}`}></div>
-            <span className="status-text">{mmsStatus.toUpperCase().replace('_', ' ')}</span>
+
+          <div className="nav-status">
+            <div className="settings-icon" onClick={() => setIsSettingsOpen(!isSettingsOpen)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 1.65 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+              </svg>
+            </div>
+            <div className="mode-indicator">
+              <div className="mode-dot"></div>
+              <span className="mode-text">MODE: {activeMode}</span>
+            </div>
+            <div className="status-indicator">
+              <div className={`status-dot ${zaireStatus}`}></div>
+              <span className="status-text">{zaireStatus.toUpperCase().replace('_', ' ')}</span>
+            </div>
+            <div className="clock-display">{timeStr}</div>
           </div>
-          <div className="clock-display">{timeStr}</div>
         </div>
-      </div>
 
-      {/* ROW 2: LEFT PANEL */}
-      <div className="grid-left">
-        {/* ── M.M.S. MODE PANEL ── */}
-        {activeMode === 'M.M.S.' && (
-          <>
-            <div className="panel-section" style={getComponentStyle('ACTIVE_MODE')}>
-              <div className="section-label">ACTIVE MODE</div>
-              <div className="mode-buttons">
-                {modes.map(mode => (
-                  <div
-                    key={mode}
-                    className={`mode-btn ${activeMode === mode ? 'active' : ''}`}
-                    onClick={() => handleModeChange(mode)}
-                    style={activeMode === mode ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : {}}
-                  >
-                    <span className="mode-text">{mode}</span>
-                    {activeMode === mode && <div className="mode-dot" style={{ background: 'var(--primary)' }}></div>}
+        {/* ROW 2: LEFT PANEL */}
+        <div className="grid-left">
+          {/* ── ZAIRE MODE PANEL ── */}
+          {activeMode === 'ZAIRE' && (
+            <>
+
+              <div className="panel-section" style={getComponentStyle('SYSTEM_VITALS')}>
+                <div className="section-label">SYSTEM VITALS</div>
+                <div className="vitals-bars">
+                  <div className="vital-row">
+                    <span className="vital-label">CPU</span>
+                    <div className="vital-bar"><div className="vital-fill" style={{ width: `${liveMetrics.cpu}%` }}></div></div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="panel-section" style={getComponentStyle('SYSTEM_VITALS')}>
-              <div className="section-label">SYSTEM VITALS</div>
-              <div className="vitals-bars">
-                <div className="vital-row">
-                  <span className="vital-label">CPU</span>
-                  <div className="vital-bar"><div className="vital-fill" style={{ width: `${liveMetrics.cpu}%` }}></div></div>
-                </div>
-                <div className="vital-row">
-                  <span className="vital-label">MEM</span>
-                  <div className="vital-bar"><div className="vital-fill" style={{ width: `${liveMetrics.ram}%` }}></div></div>
-                </div>
-                <div className="vital-row">
-                  <span className="vital-label gpu">GPU</span>
-                  <div className="vital-bar gpu"><div className="vital-fill" style={{ width: `${liveMetrics.gpu}%` }}></div></div>
-                </div>
-                <div className="vital-row">
-                  <span className="vital-label net">NET</span>
-                  <div className="vital-bar net"><div className="vital-fill" style={{ width: `${liveMetrics.net}%` }}></div></div>
-                </div>
-              </div>
-            </div>
-
-            <div className="panel-section" style={getComponentStyle('MODULE_STATUS')}>
-              <div className="section-label">MODULE STATUS</div>
-              <div className="module-list">
-                {[
-                  { name: 'VISION', status: 'READY' },
-                  { name: 'VOICE', status: 'ACTIVE' },
-                  { name: 'WEB', status: 'LIVE' },
-                  { name: 'FILES', status: 'MOUNTED' },
-                ].map(mod => (
-                  <div key={mod.name} className="module-row">
-                    <span className="module-name">{mod.name}</span>
-                    <span className={`module-status ${mod.status === 'OFFLINE' ? 'offline' : 'online'}`}>{mod.status}</span>
+                  <div className="vital-row">
+                    <span className="vital-label">MEM</span>
+                    <div className="vital-bar"><div className="vital-fill" style={{ width: `${liveMetrics.ram}%` }}></div></div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="panel-section" style={getComponentStyle('VOICE_MONITOR')}>
-              <div className="section-label">VOICE MONITOR</div>
-              <canvas ref={voiceWaveformRef} className="voice-waveform"></canvas>
-            </div>
-
-            {/* ── MEMORY CORE ── */}
-            <div className={`panel-section memory-panel ${memoryFlash ? 'memory-flash' : ''}`} style={getComponentStyle('MEMORY_CORE')}>
-              <div className="section-label memory-label">
-                <span>MEMORY CORE</span>
-                <span className="memory-count">{storedMemories.length} STORED</span>
-              </div>
-              <div className="memory-list">
-                {storedMemories.length === 0 && (
-                  <div className="memory-empty">— NO MEMORIES YET —</div>
-                )}
-                {storedMemories.map((m, i) => (
-                  <div key={m.id || i} className="memory-item">
-                    <span className="memory-dot">◆</span>
-                    <span className="memory-text">{m.text}</span>
+                  <div className="vital-row">
+                    <span className="vital-label gpu">GPU</span>
+                    <div className="vital-bar gpu"><div className="vital-fill" style={{ width: `${liveMetrics.gpu}%` }}></div></div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="panel-section">
-              <div className="section-label">LAST COMMAND</div>
-              <div className="last-command" style={{ minHeight: '60px' }}>
-                <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ── TRADER MODE PANEL ── */}
-        {activeMode === 'TRADER' && (
-          <>
-            <div className="panel-section">
-              <div className="section-label" >PORTFOLIO</div>
-              <div className="metrics-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                <div className="metric-card" style={{ padding: '8px' }}>
-                  <span className="metric-value" style={{ color: '#00ff88', fontSize: '14px' }}>
-                    ${specialistData?.portfolio_value || '2,847'}
-                  </span>
-                  <span className="metric-label">TOTAL VALUE</span>
-                </div>
-                <div className="metric-card" style={{ padding: '8px' }}>
-                  <span className="metric-value" style={{ color: '#00ff88', fontSize: '14px' }}>+4.2%</span>
-                  <span className="metric-label">24H CHANGE</span>
+                  <div className="vital-row">
+                    <span className="vital-label net">NET</span>
+                    <div className="vital-bar net"><div className="vital-fill" style={{ width: `${liveMetrics.net}%` }}></div></div>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <div className="panel-section">
-              <div className="section-label" >HOLDINGS</div>
-              <div className="holding-list" style={{ maxHeight: '120px', overflowY: 'auto' }}>
-                {['BTC', 'ETH', 'SOL', 'LINK'].map(asset => (
-                  <div key={asset} className="mini-bar-row">
-                    <span className="mbl">{asset}</span>
-                    <div className="mbt"><div className="mbf" style={{ width: '70%', background: '#00ff88' }}></div></div>
-                    <span className="mbv">82%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            <div className="panel-section">
-              <div className="section-label" >HALAL FILTER</div>
-              <div style={{ padding: '8px', background: 'rgba(0,255,136,0.04)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '2px' }}>
-                <div style={{ fontSize: '8px', color: '#00ff88', letterSpacing: '1px' }}>✓ {specialistData?.halal_filter || 'ACTIVE'}</div>
-                <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>LEVERAGE: BLOCKED</div>
-                <div style={{ fontSize: '7px', opacity: 0.4 }}>MEME COINS: BLOCKED</div>
-              </div>
-            </div>
-
-            <div className="panel-section">
-              <div className="section-label">TRADING TIMELINE</div>
-              <div className="manifestation-timeline">
-                {[
-                  { phase: 'ANALYSIS', label: 'MARKET ANALYSIS', icon: '🔍' },
-                  { phase: 'SIGNAL', label: 'SIGNAL DETECTION', icon: '⚡' },
-                  { phase: 'EXECUTION', label: 'EXECUTION FORGE', icon: '⚔' },
-                  { phase: 'AUDIT', label: 'RISK AUDIT', icon: '🛡' },
-                  { phase: 'HARVEST', label: 'PROFIT HARVEST', icon: '💰' },
-                ].map((p, i) => (
-                  <div 
-                    key={p.phase} 
-                    className={`timeline-step ${traderPhase === p.phase ? 'active' : ''} ${i < ['ANALYSIS', 'SIGNAL', 'EXECUTION', 'AUDIT', 'HARVEST'].indexOf(traderPhase) ? 'completed' : ''}`}
-                  >
-                    <div className="step-icon" style={{ borderColor: traderPhase === p.phase ? '#00ff88' : '', color: traderPhase === p.phase ? '#00ff88' : '' }}>{p.icon}</div>
-                    <div className="step-info">
-                      <span className="step-name">{p.label}</span>
-                      <span className="step-status">{traderPhase === p.phase ? 'SCANNING' : (i < ['ANALYSIS', 'SIGNAL', 'EXECUTION', 'AUDIT', 'HARVEST'].indexOf(traderPhase) ? 'SUCCESS' : 'AWAITING')}</span>
+              <div className="panel-section" style={getComponentStyle('MODULE_STATUS')}>
+                <div className="section-label">MODULE STATUS</div>
+                <div className="module-list">
+                  {[
+                    { name: 'VISION', status: 'READY' },
+                    { name: 'VOICE', status: 'ACTIVE' },
+                    { name: 'WEB', status: 'LIVE' },
+                    { name: 'FILES', status: 'MOUNTED' },
+                  ].map(mod => (
+                    <div key={mod.name} className="module-row">
+                      <span className="module-name">{mod.name}</span>
+                      <span className={`module-status ${mod.status === 'OFFLINE' ? 'offline' : 'online'}`}>{mod.status}</span>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="panel-section">
-              <div className="section-label" >ALGO SYNC</div>
-              <div className="mini-bar-row">
-                <span className="mbl" style={{ width: '40px' }}>PRECISION</span>
-                <div className="mbt"><div className="mbf" style={{ width: `${traderProgress}%`, background: '#00ff88' }}></div></div>
-                <span className="mbv">{Math.round(traderProgress)}%</span>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ── PROFESSOR MODE PANEL ── */}
-        {activeMode === 'PROFESSOR' && (
-          <>
-            <div className="panel-section">
-              <div className="section-label" >CURRICULUM</div>
-              <div className="curriculum-list">
-                {['Quantum Physics', 'Neural Networks', 'Linear Algebra'].map(c => (
-                  <div key={c} className="curriculum-item">
-                    <div className="cur-dot" ></div>
-                    <span className="cur-name">{c.toUpperCase()}</span>
-                    <span className="cur-status">ACTIVE</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="panel-section">
-              <div className="section-label">LEARNING TIMELINE</div>
-              <div className="manifestation-timeline">
-                {[
-                  { phase: 'ARCHITECTING', label: 'CURRICULUM DESIGN', icon: '✎' },
-                  { phase: 'SYNCING', label: 'KNOWLEDGE SYNC', icon: '❈' },
-                  { phase: 'LECTURE', label: 'LECTURE MANIFEST', icon: '🕮' },
-                  { phase: 'QUIZ', label: 'EVALUATION (QUIZ)', icon: '❓' },
-                  { phase: 'GRADUATION', label: 'CERTIFICATION', icon: '🎓' },
-                ].map((p, i) => (
-                  <div 
-                    key={p.phase} 
-                    className={`timeline-step ${professorPhase === p.phase ? 'active' : ''} ${i < ['ARCHITECTING', 'SYNCING', 'LECTURE', 'QUIZ', 'GRADUATION'].indexOf(professorPhase) ? 'completed' : ''}`}
-                  >
-                    <div className="step-icon" style={{ borderColor: professorPhase === p.phase ? '#a78bfa' : '', color: professorPhase === p.phase ? '#a78bfa' : '' }}>{p.icon}</div>
-                    <div className="step-info">
-                      <span className="step-name">{p.label}</span>
-                      <span className="step-status">{professorPhase === p.phase ? 'IN PROGRESS' : (i < ['ARCHITECTING', 'SYNCING', 'LECTURE', 'QUIZ', 'GRADUATION'].indexOf(professorPhase) ? 'COMPLETE' : 'PENDING')}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="panel-section">
-              <div className="section-label" >CURRICULUM SYNC</div>
-              <div className="mini-bar-row">
-                <span className="mbl" style={{ width: '40px' }}>OVERALL</span>
-                <div className="mbt"><div className="mbf" style={{ width: `${learningProgress}%`, background: '#a78bfa' }}></div></div>
-                <span className="mbv">{Math.round(learningProgress)}%</span>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ── ENGINEER MODE PANEL ── */}
-        {activeMode === 'ENGINEER' && (
-          <>
-            <div className="panel-section">
-              <div className="section-label" >ACTIVE PROJECT</div>
-              <div style={{ padding: '8px', background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: '2px' }}>
-                <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '10px', color: '#f97316', letterSpacing: '1.5px' }}>M.M.S. CORE</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.5, marginTop: '4px' }}>
-                  <span>TYPE: NEXT.JS 15</span>
-                  <span>BUILD: STABLE</span>
+                  ))}
                 </div>
-                <div className="mbt" style={{ marginTop: '6px' }}><div className="mbf" style={{ width: '65%', background: '#f97316' }}></div></div>
               </div>
-            </div>
 
-            <div className="panel-section">
-              <div className="section-label">MANIFESTATION TIMELINE</div>
-              <div className="manifestation-timeline">
-                {[
-                  { phase: 'BLUEPRINT', label: 'NEURAL ARCHITECT', icon: '◈' },
-                  { phase: 'RESEARCH', label: 'INTELLIGENCE SYNC', icon: '❈' },
-                  { phase: 'FORGE', label: 'ACTIVE MANIFEST', icon: '⚔' },
-                  { phase: 'AUDIT', label: 'VANGUARD AUDIT', icon: '🛡' },
-                  { phase: 'DEPLOY', label: 'CORE DEPLOY', icon: '🚀' },
-                ].map((p, i) => (
-                  <div 
-                    key={p.phase} 
-                    className={`timeline-step ${engineerPhase === p.phase ? 'active' : ''} ${i < ['BLUEPRINT', 'RESEARCH', 'FORGE', 'AUDIT', 'DEPLOY'].indexOf(engineerPhase) ? 'completed' : ''}`}
-                  >
-                    <div className="step-icon">{p.icon}</div>
-                    <div className="step-info">
-                      <span className="step-name">{p.label}</span>
-                      <span className="step-status">{engineerPhase === p.phase ? 'PROCESSING' : (i < ['BLUEPRINT', 'RESEARCH', 'FORGE', 'AUDIT', 'DEPLOY'].indexOf(engineerPhase) ? 'COMPLETE' : 'AWAITING')}</span>
+              <div className="panel-section" style={getComponentStyle('VOICE_MONITOR')}>
+                <div className="section-label">VOICE MONITOR</div>
+                <canvas ref={voiceWaveformRef} className="voice-waveform"></canvas>
+              </div>
+
+              {/* ── MEMORY CORE ── */}
+              <div className={`panel-section memory-panel ${memoryFlash ? 'memory-flash' : ''}`} style={getComponentStyle('MEMORY_CORE')}>
+                <div className="section-label memory-label">
+                  <span>MEMORY CORE</span>
+                  <span className="memory-count">{storedMemories.length} STORED</span>
+                </div>
+                <div className="memory-list">
+                  {storedMemories.length === 0 && (
+                    <div className="memory-empty">— NO MEMORIES YET —</div>
+                  )}
+                  {storedMemories.map((m, i) => (
+                    <div key={m.id || i} className="memory-item">
+                      <span className="memory-dot">◆</span>
+                      <span className="memory-text">{m.text}</span>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div className="panel-section">
-              <div className="section-label" >FILE TREE</div>
-              <div className="file-tree" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                {['src/App.js', 'src/App.css', 'src/index.js', 'api/core.py'].map(f => (
+              <div className="panel-section">
+                <div className="section-label">LAST COMMAND</div>
+                <div className="last-command" style={{ minHeight: '60px' }}>
+                  <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── TRADER MODE PANEL ── */}
+          {activeMode === 'TRADER' && (
+            <>
+              <div className="panel-section">
+                <div className="section-label" >PORTFOLIO</div>
+                <div className="metrics-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                  <div className="metric-card" style={{ padding: '8px' }}>
+                    <span className="metric-value" style={{ color: '#00ff88', fontSize: '14px' }}>
+                      ${specialistData?.portfolio_value || '2,847'}
+                    </span>
+                    <span className="metric-label">TOTAL VALUE</span>
+                  </div>
+                  <div className="metric-card" style={{ padding: '8px' }}>
+                    <span className="metric-value" style={{ color: '#00ff88', fontSize: '14px' }}>+4.2%</span>
+                    <span className="metric-label">24H CHANGE</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >HOLDINGS</div>
+                <div className="holding-list" style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                  {['BTC', 'ETH', 'SOL', 'LINK'].map(asset => (
+                    <div key={asset} className="mini-bar-row">
+                      <span className="mbl">{asset}</span>
+                      <div className="mbt"><div className="mbf" style={{ width: '70%', background: '#00ff88' }}></div></div>
+                      <span className="mbv">82%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >HALAL FILTER</div>
+                <div style={{ padding: '8px', background: 'rgba(0,255,136,0.04)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '2px' }}>
+                  <div style={{ fontSize: '8px', color: '#00ff88', letterSpacing: '1px' }}>✓ {specialistData?.halal_filter || 'ACTIVE'}</div>
+                  <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>LEVERAGE: BLOCKED</div>
+                  <div style={{ fontSize: '7px', opacity: 0.4 }}>MEME COINS: BLOCKED</div>
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label">TRADING TIMELINE</div>
+                <div className="manifestation-timeline">
+                  {[
+                    { phase: 'ANALYSIS', label: 'MARKET ANALYSIS', icon: '🔍' },
+                    { phase: 'SIGNAL', label: 'SIGNAL DETECTION', icon: '⚡' },
+                    { phase: 'EXECUTION', label: 'EXECUTION FORGE', icon: '⚔' },
+                    { phase: 'AUDIT', label: 'RISK AUDIT', icon: '🛡' },
+                    { phase: 'HARVEST', label: 'PROFIT HARVEST', icon: '💰' },
+                  ].map((p, i) => (
+                    <div
+                      key={p.phase}
+                      className={`timeline-step ${traderPhase === p.phase ? 'active' : ''} ${i < ['ANALYSIS', 'SIGNAL', 'EXECUTION', 'AUDIT', 'HARVEST'].indexOf(traderPhase) ? 'completed' : ''}`}
+                    >
+                      <div className="step-icon" style={{ borderColor: traderPhase === p.phase ? '#00ff88' : '', color: traderPhase === p.phase ? '#00ff88' : '' }}>{p.icon}</div>
+                      <div className="step-info">
+                        <span className="step-name">{p.label}</span>
+                        <span className="step-status">{traderPhase === p.phase ? 'SCANNING' : (i < ['ANALYSIS', 'SIGNAL', 'EXECUTION', 'AUDIT', 'HARVEST'].indexOf(traderPhase) ? 'SUCCESS' : 'AWAITING')}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >ALGO SYNC</div>
+                <div className="mini-bar-row">
+                  <span className="mbl" style={{ width: '40px' }}>PRECISION</span>
+                  <div className="mbt"><div className="mbf" style={{ width: `${traderProgress}%`, background: '#00ff88' }}></div></div>
+                  <span className="mbv">{Math.round(traderProgress)}%</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── PROFESSOR MODE PANEL ── */}
+          {activeMode === 'PROFESSOR' && (
+            <>
+              <div className="panel-section">
+                <div className="section-label" >CURRICULUM</div>
+                <div className="curriculum-list">
+                  {['Quantum Physics', 'Neural Networks', 'Linear Algebra'].map(c => (
+                    <div key={c} className="curriculum-item">
+                      <div className="cur-dot" ></div>
+                      <span className="cur-name">{c.toUpperCase()}</span>
+                      <span className="cur-status">ACTIVE</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label">LEARNING TIMELINE</div>
+                <div className="manifestation-timeline">
+                  {[
+                    { phase: 'ARCHITECTING', label: 'CURRICULUM DESIGN', icon: '✎' },
+                    { phase: 'SYNCING', label: 'KNOWLEDGE SYNC', icon: '❈' },
+                    { phase: 'LECTURE', label: 'LECTURE MANIFEST', icon: '🕮' },
+                    { phase: 'QUIZ', label: 'EVALUATION (QUIZ)', icon: '❓' },
+                    { phase: 'GRADUATION', label: 'CERTIFICATION', icon: '🎓' },
+                  ].map((p, i) => (
+                    <div
+                      key={p.phase}
+                      className={`timeline-step ${professorPhase === p.phase ? 'active' : ''} ${i < ['ARCHITECTING', 'SYNCING', 'LECTURE', 'QUIZ', 'GRADUATION'].indexOf(professorPhase) ? 'completed' : ''}`}
+                    >
+                      <div className="step-icon" style={{ borderColor: professorPhase === p.phase ? '#a78bfa' : '', color: professorPhase === p.phase ? '#a78bfa' : '' }}>{p.icon}</div>
+                      <div className="step-info">
+                        <span className="step-name">{p.label}</span>
+                        <span className="step-status">{professorPhase === p.phase ? 'IN PROGRESS' : (i < ['ARCHITECTING', 'SYNCING', 'LECTURE', 'QUIZ', 'GRADUATION'].indexOf(professorPhase) ? 'COMPLETE' : 'PENDING')}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >CURRICULUM SYNC</div>
+                <div className="mini-bar-row">
+                  <span className="mbl" style={{ width: '40px' }}>OVERALL</span>
+                  <div className="mbt"><div className="mbf" style={{ width: `${learningProgress}%`, background: '#a78bfa' }}></div></div>
+                  <span className="mbv">{Math.round(learningProgress)}%</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── ENGINEER MODE PANEL ── */}
+          {activeMode === 'ENGINEER' && (
+            <>
+              <div className="panel-section">
+                <div className="section-label" >ACTIVE PROJECT</div>
+                <div style={{ padding: '8px', background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: '2px' }}>
+                  <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '10px', color: '#f97316', letterSpacing: '1.5px' }}>ZAIRE CORE</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.5, marginTop: '4px' }}>
+                    <span>TYPE: NEXT.JS 15</span>
+                    <span>BUILD: STABLE</span>
+                  </div>
+                  <div className="mbt" style={{ marginTop: '6px' }}><div className="mbf" style={{ width: '65%', background: '#f97316' }}></div></div>
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >MANIFESTATION PROGRESS</div>
+                <div className="build-stats-sidebar">
+                  <div className="stat-row">
+                    <span>SYSTEM_LOAD</span>
+                    <span>{Math.round(forgeProgress)}%</span>
+                  </div>
+                  <div className="mbt"><div className="mbf" style={{ width: `${forgeProgress}%`, background: '#f97316' }}></div></div>
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label">MANIFESTATION TIMELINE</div>
+                <div className="manifestation-timeline">
+                  {[
+                    { phase: 'BLUEPRINT', label: 'NEURAL ARCHITECT', icon: '◈' },
+                    { phase: 'RESEARCH', label: 'INTELLIGENCE SYNC', icon: '❈' },
+                    { phase: 'FORGE', label: 'ACTIVE MANIFEST', icon: '⚔' },
+                    { phase: 'AUDIT', label: 'VANGUARD AUDIT', icon: '🛡' },
+                    { phase: 'DEPLOY', label: 'CORE DEPLOY', icon: '🚀' },
+                  ].map((p, i) => (
+                    <div
+                      key={p.phase}
+                      className={`timeline-step ${engineerPhase === p.phase ? 'active' : ''} ${i < ['BLUEPRINT', 'RESEARCH', 'FORGE', 'AUDIT', 'DEPLOY'].indexOf(engineerPhase) ? 'completed' : ''}`}
+                    >
+                      <div className="step-icon">{p.icon}</div>
+                      <div className="step-info">
+                        <span className="step-name">{p.label}</span>
+                        <span className="step-status">{engineerPhase === p.phase ? 'PROCESSING' : (i < ['BLUEPRINT', 'RESEARCH', 'FORGE', 'AUDIT', 'DEPLOY'].indexOf(engineerPhase) ? 'COMPLETE' : 'AWAITING')}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >FILE TREE</div>
+                <div className="file-tree" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                  {['src/App.js', 'src/App.css', 'src/index.js', 'api/core.py'].map(f => (
                     <div key={f} className="file-tree-item">
-                        <span className="file-icon">📄</span>
-                        <span>{f}</span>
+                      <span className="file-icon">📄</span>
+                      <span>{f}</span>
                     </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ROW 2: CENTER (ORB / TACTICAL CONTENT) */}
+        <div className={`grid-center ${activeMode !== 'ZAIRE' ? 'has-content' : ''}`}>
+
+          {/* ── TRADER CENTER: Sovereign Trading Floor ── */}
+          {activeMode === 'TRADER' && (
+            <div className="trader-floor">
+              <div className="hall-nav">
+                {['CHART', 'STRATEGY', 'ALPHA'].map(m => (
+                  <button key={m} className={`h-nav-btn ${traderSubMode === m ? 'active' : ''}`} onClick={() => setTraderSubMode(m)}>{m}</button>
                 ))}
               </div>
-            </div>
-          </>
-        )}
-      </div>
 
-      {/* ROW 2: CENTER (ORB / TACTICAL CONTENT) */}
-      <div className={`grid-center ${activeMode !== 'M.M.S.' ? 'has-content' : ''}`}>
-        
-        {/* ── TRADER CENTER: Live Chart ── */}
-        {activeMode === 'TRADER' && (
-          <div className="trader-floor">
-            <div className="floor-top">
-              <div className="neural-chart-wrap">
-                <div className="chart-header">
-                  <div className="pair-info">BTC/USDT <span className="live-dot pulse"></span></div>
-                  <div className="chart-controls">
-                    <span>15M</span>
-                    <span>INDICATORS</span>
-                  </div>
-                </div>
-                <div className="chart-canvas-area">
-                  <canvas ref={traderChartRef} style={{ width: '100%', height: '100%' }}></canvas>
-                  <div className="neural-overlay-text">NEURAL_SENTIMENT: BULLISH (84%)</div>
-                </div>
-              </div>
-              
-              <div className="execution-side">
-                <div className="side-label">LIVE EXECUTION</div>
-                <div className="execution-log">
-                  {liveTrades.length === 0 && <div className="log-empty">SCANNING FOR SIGNALS...</div>}
-                  {liveTrades.map(trade => (
-                    <div key={trade.id} className="trade-entry">
-                      <div className="t-row">
-                        <span className={`t-type ${trade.type.toLowerCase()}`}>{trade.type}</span>
-                        <span className="t-pair">{trade.pair}</span>
-                      </div>
-                      <div className="t-row sub">
-                        <span>{trade.price}</span>
-                        <span className="t-status">{trade.status}</span>
+              {traderSubMode === 'CHART' && (
+                <div className="floor-top">
+                  <div className="neural-chart-wrap">
+                    <div className="chart-header">
+                      <div className="pair-info">BTC/USDT <span className="live-dot pulse"></span></div>
+                      <div className="chart-controls">
+                        <span>15M</span>
+                        <span onClick={() => handleSpecialistAction('TRADER', 'WHALE_FORENSICS', { asset: 'BTC' })}>WHALE_SCAN</span>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="floor-bottom">
-              <div className="floor-stats">
-                <div className="f-stat">
-                  <span className="fs-label">24H PROFIT</span>
-                  <span className="fs-val positive">+$1,242.84</span>
-                </div>
-                <div className="f-stat">
-                  <span className="fs-label">ACTIVE RISK</span>
-                  <span className="fs-val">LOW</span>
-                </div>
-                <div className="f-stat">
-                  <span className="fs-label">ALGO_MODE</span>
-                  <span className="fs-val" style={{ color: '#00ff88' }}>AGGRESSIVE</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── PROFESSOR CENTER: Slide Viewer ── */}
-        {activeMode === 'PROFESSOR' && (
-          <div className="professor-learning-hall">
-            {!quizActive ? (
-              <div className="lecture-manifest">
-                <div className="lecture-header">
-                  <div className="topic-badge">{professorTopic} // MODULE 04</div>
-                  <div className="slide-counter">04 / 12</div>
-                </div>
-                <div className="manifest-content">
-                  <div className="concept-title">Neural Entanglement & Superposition</div>
-                  <div className="concept-body">
-                    <p>In the quantum realm, information is not binary. It exists in a state of probability, defined by the wave function Ψ. M.M.S. is currently synchronizing this knowledge core with your neural baseline.</p>
-                    <ul className="learning-points">
-                      <li>✦ Superposition: N-dimensional state vectors.</li>
-                      <li>✦ Interference: Constructive reinforcement of data.</li>
-                      <li>✦ Decoherence: The primary bottleneck in neural sync.</li>
-                    </ul>
-                  </div>
-                </div>
-                <div className="lecture-footer">
-                  <div className="professor-note">
-                    <span className="note-label">PROFESSOR_INSIGHT:</span>
-                    Focus on the relationship between entropy and information density.
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="quiz-manifest">
-                <div className="quiz-header">
-                  <div className="quiz-title">NEURAL EVALUATION // STAGE 01</div>
-                  <div className="timer">04:52 REMAINING</div>
-                </div>
-                <div className="quiz-question">
-                  <div className="q-label">QUESTION 01</div>
-                  <div className="q-text">What is the primary cause of decoherence in a neural-sync environment?</div>
-                  <div className="q-options">
-                    <button className="q-opt">A) Atmospheric Pressure</button>
-                    <button className="q-opt correct">B) Quantum Interference</button>
-                    <button className="q-opt">C) Clock Speed Mismatch</button>
-                    <button className="q-opt">D) Thermal Exhaustion</button>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <div className="research-summary">
-              <div className="summary-label">NEURAL SUMMARY FEED</div>
-              <div className="summary-items">
-                <div className="s-item">✦ Source: Nature Physics // Entanglement detected.</div>
-                <div className="s-item">✦ Source: Arxiv // New transformer architecture found.</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── ENGINEER CENTER: Forge Build Log ── */}
-        {activeMode === 'ENGINEER' && (
-          <div className="engineer-studio">
-            <div className="studio-top">
-              <div className="forge-editor">
-                <div className="editor-header">
-                  <div className="file-tab active">App.js <span className="tab-status-dot pulse"></span></div>
-                  <div className="editor-metrics">
-                    <span>CHARS: {forgeCode.length}</span>
-                    <span>LINT: <span style={{ color: '#00ff88' }}>PASS</span></span>
-                  </div>
-                </div>
-                <div className="editor-content">
-                  <pre className="code-block">
-                    <code>{forgeCode || '// AWAITING NEURAL FORGE MANIFESTATION...'}</code>
-                  </pre>
-                  <div className="editor-cursor pulse"></div>
-                </div>
-              </div>
-              
-              <div className="research-panel">
-                <div className="panel-label">RESEARCH INTELLIGENCE</div>
-                <div className="research-log">
-                  <div className="log-item">✦ Analyzing Tailwind configuration...</div>
-                  <div className="log-item">✦ Syncing with Framer Motion documentation...</div>
-                  <div className="log-item">✦ Optimization: Tree-shaking enabled.</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="studio-bottom">
-              <div className="studio-console">
-                <div className="console-header">
-                  <span>SYSTEM_CONSOLE // STABLE</span>
-                  <div className="console-actions">
-                    <button className="c-btn">REBUILD</button>
-                    <button className="c-btn">LOGS</button>
-                  </div>
-                </div>
-                <div className="console-output">
-                  <div className="log-line"><span className="log-ts">[17:28:01]</span> <span className="log-tag init">INIT</span> <span className="log-msg">Autonomous Web Studio Manifested.</span></div>
-                  <div className="log-line"><span className="log-ts">[17:28:05]</span> <span className="log-tag ok">OK</span> <span className="log-msg">Neural Link Synchronized.</span></div>
-                  {mmsActionFeed.slice(0, 3).map((f, i) => (
-                    <div key={i} className="log-line"><span className="log-ts">[{f.time}]</span> <span className="log-tag">FEED</span> <span className="log-msg">{f.message}</span></div>
-                  ))}
-                </div>
-              </div>
-              <div className="build-stats">
-                <div className="stat-row">
-                  <span>PROGRESS</span>
-                  <span>{Math.round(forgeProgress)}%</span>
-                </div>
-                <div className="mbt"><div className="mbf" style={{ width: `${forgeProgress}%`, background: '#f97316' }}></div></div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* M.M.S. CENTER: Orb fills via fixed canvas */}
-      </div>
-
-      {/* ROW 2: RIGHT PANEL */}
-      <div className="grid-right">
-        {/* ── M.M.S. MODE RIGHT PANEL ── */}
-        {activeMode === 'M.M.S.' && (
-          <>
-            <div className={`panel-section biometric-panel ${biometricData.detected ? 'detected' : ''} ${isSecurityAlert ? 'threat' : ''}`} style={getComponentStyle('BIOMETRIC_SCAN')}>
-              <div className="section-label">BIOMETRIC SCAN</div>
-              <div className="biometric-hud">
-                <div className="bio-status-row">
-                  <span className="bio-label">IDENTITY:</span>
-                  <span className={`bio-value ${biometricData.name === 'Master' ? 'master' : (isSecurityAlert ? 'alert' : '')}`}>
-                    {isSecurityAlert ? 'UNKNOWN_THREAT' : (biometricData.detected ? biometricData.name.toUpperCase() : 'ABSENT')}
-                  </span>
-                </div>
-                <div className="bio-status-row">
-                  <span className="bio-label">SCAN LOCK:</span>
-                  <div className="bio-lock-bar">
-                    <div className={`bio-lock-fill ${biometricData.detected ? 'active' : ''} ${isSecurityAlert ? 'threat' : ''}`} style={{ width: biometricData.detected || isSecurityAlert ? '100%' : '0%' }}></div>
-                  </div>
-                </div>
-                <div className="bio-status-row">
-                  <span className="bio-label">FACE-LOCK:</span>
-                  <span className={`bio-value ${biometricData.enabled ? 'online' : 'offline'}`}>{biometricData.enabled ? 'ACTIVE' : 'DISABLED'}</span>
-                </div>
-                <div className="bio-meta">
-                  <div className="bio-btn-group">
-                    <span className="bio-tag-btn active">SYSTEM READY</span>
-                    <span className="bio-tag-btn">LOCKED</span>
-                    <span className="bio-tag-btn">UNLOCKED</span>
-                  </div>
-                  <div className="bio-timer">30.01</div>
-                </div>
-              </div>
-            </div>
-
-            <div className={`panel-section vision-panel ${isVisionScanning ? 'vision-active' : ''}`} style={getComponentStyle('SCREEN_VISION')}>
-              <div className="section-label vision-label">
-                <span>SCREEN VISION</span>
-              </div>
-              <div className="vision-feed">
-                {isVisionScanning ? (
-                  <div className="vision-scan-box">
-                    <div className="scan-line-vision"></div>
-                    <div className="vision-meta">OCR: ENABLED | NEURAL: SYNCING</div>
-                  </div>
-                ) : (
-                  <div className="vision-placeholder">
-                    <div className="vision-off-text">VISION CORE OFFLINE</div>
-                    <div className="vision-hint-text">Say: "What's on my screen?"</div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="panel-section" style={getComponentStyle('SLEEP_AWAKE')}>
-              <div className="section-label">SLEEP / AWAKE</div>
-              <div className="sleep-hud">
-                <div className="sleep-main">
-                  <span className="sleep-val">8</span>
-                  <span className="sleep-unit">H</span>
-                  <span className="sleep-state">STANDBY</span>
-                </div>
-                <div className="sleep-progress">
-                  <div className="sleep-fill" style={{ width: '85%' }}></div>
-                </div>
-              </div>
-            </div>
-
-            <div className="panel-section" style={getComponentStyle('SYSTEM_METRICS')}>
-              <div className="section-label">SYSTEM METRICS</div>
-              <div className="metrics-grid">
-                <div className="metric-card">
-                  <span className="metric-value">{liveMetrics.latency}ms</span>
-                  <span className="metric-label">LATENCY</span>
-                </div>
-                <div className="metric-card">
-                  <span className="metric-value good">{liveMetrics.cpu}%</span>
-                  <span className="metric-label">CPU LOAD</span>
-                </div>
-                <div className="metric-card">
-                  <span className="metric-value">{liveMetrics.ram}%</span>
-                  <span className="metric-label">RAM USAGE</span>
-                </div>
-                <div className="metric-card">
-                  <span className="metric-value">{(audioFrequency * 100).toFixed(0)}%</span>
-                  <span className="metric-label">VOICE PULSE</span>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ── TRADER MODE RIGHT PANEL ── */}
-        {activeMode === 'TRADER' && (
-          <>
-            <div className="panel-section">
-                <div className="section-label" >NEURAL VERDICT</div>
-                <div className="verdict-box" style={{ margin: 0 }}>
-                    <div className="v-label">MARKET SIGNAL</div>
-                    <div className="v-val" >STRONG BUY</div>
-                    <div className="v-conf">CONFIDENCE: 94%</div>
-                </div>
-            </div>
-
-            <div className="panel-section">
-              <div className="section-label" >TOP OPPORTUNITY</div>
-              <div className="trade-card">
-                <div className="tc-head">
-                  <span className="tc-asset" >SOL/USDT</span>
-                  <span className="tc-badge">HALAL</span>
-                </div>
-                <div style={{ fontSize: '8px', opacity: 0.6, lineHeight: '1.4' }}>Breakout detected at $142.50. Target: $158.00.</div>
-                <div className="tc-btns">
-                    <div className="tc-btn" style={{ borderColor: '#00ff88', color: '#00ff88' }}>CONFIRM</div>
-                    <div className="tc-btn" style={{ borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)' }}>CANCEL</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="panel-section">
-              <div className="section-label" >RECENT TRADES</div>
-              <div className="macro-row"><span className="macro-key">BTC/USDT</span><span className="macro-val" >+$142.50</span></div>
-              <div className="macro-row"><span className="macro-key">ETH/USDT</span><span className="macro-val" style={{ color: '#ff3366' }}>-$24.12</span></div>
-            </div>
-          </>
-        )}
-
-        {/* ── PROFESSOR MODE RIGHT PANEL ── */}
-        {activeMode === 'PROFESSOR' && (
-          <>
-            <div className="panel-section">
-              <div className="section-label" >NEURAL LOAD</div>
-              <div className="neural-gauge" style={{ margin: '10px auto', position: 'relative', width: '80px', height: '80px' }}>
-                <canvas ref={neuralGaugeRef} width="80" height="80"></canvas>
-                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '14px', color: '#a78bfa', fontWeight: 'bold' }}>84%</div>
-                    <div style={{ fontSize: '6px', opacity: 0.4 }}>SYNC</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="panel-section">
-              <div className="section-label" >QUICK ACTIONS</div>
-              <div className="macro-row"><span className="macro-key">SUMMARIZE</span><span className="macro-val">READY</span></div>
-              <div className="macro-row"><span className="macro-key">EXPLAIN</span><span className="macro-val">READY</span></div>
-            </div>
-
-            <div className="panel-section">
-                <div className="section-label" >SESSION UPTIME</div>
-                <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '18px', color: '#a78bfa', textAlign: 'center' }}>02:45:12</div>
-            </div>
-
-            <div className="panel-section">
-                <div className="section-label" >SPACED REVIEW</div>
-                <div style={{ padding: '10px', background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.2)' }}>
-                    <div style={{ fontSize: '8px', color: '#a78bfa' }}>Next Review in 4h</div>
-                    <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>Topic: Backpropagation</div>
-                </div>
-            </div>
-          </>
-        )}
-
-        {/* ── ENGINEER MODE RIGHT PANEL ── */}
-        {activeMode === 'ENGINEER' && (
-          <>
-            <div className="panel-section">
-              <div className="section-label" >BLUEPRINT</div>
-              <div className="macro-row"><span className="macro-key">NODES</span><span className="macro-val">24</span></div>
-              <div className="macro-row"><span className="macro-key">EDGES</span><span className="macro-val">56</span></div>
-              <div className="macro-row"><span className="macro-key">DEPTH</span><span className="macro-val">4</span></div>
-            </div>
-
-            <div className="panel-section">
-              <div className="section-label" >VANGUARD AUDIT</div>
-              <div className="macro-row"><span className="macro-key">SECURITY</span><span className="macro-val" >PASS</span></div>
-              <div className="macro-row"><span className="macro-key">PERF</span><span className="macro-val" >OPTIMAL</span></div>
-              <div className="macro-row"><span className="macro-key">LINT</span><span className="macro-val" style={{ color: '#ff3366' }}>2 ERR</span></div>
-            </div>
-
-            <div className="panel-section">
-                <div className="section-label" >DNA PROFILE</div>
-                <div style={{ height: '40px', background: 'repeating-linear-gradient(90deg, transparent, rgba(249,115,22,0.1) 2px, transparent 4px)', opacity: 0.4 }}></div>
-            </div>
-
-            <div className="panel-section">
-                <div className="section-label" >DESIGN BRIEF</div>
-                <div style={{ fontSize: '7px', opacity: 0.5, lineHeight: '1.4' }}>
-                    "Ensure high-fidelity glassmorphism across all modules."
-                </div>
-            </div>
-          </>
-        )}
-
-        {activeMode === 'M.M.S.' && (
-          <>
-            {/* ── PERSISTENT LAYOUT CALIBRATION ── */}
-            <div className="panel-section" style={{ marginTop: 'auto', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <div className="section-label">{activeMode} LAYOUT CALIBRATION</div>
-              <div className="calibration-controls" style={{ padding: '4px' }}>
-                <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                    <label>LEFT WIDTH</label>
-                    <span>{layoutOffsets.leftWidth}px</span>
-                  </div>
-                  <input type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200} 
-                    onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })} 
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
-                </div>
-                <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                    <label>RIGHT WIDTH</label>
-                    <span>{layoutOffsets.rightWidth}px</span>
-                  </div>
-                  <input type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200} 
-                    onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })} 
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
-                </div>
-                <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                    <label>CMD HEIGHT</label>
-                    <span>{layoutOffsets.bottomHeight}px</span>
-                  </div>
-                  <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150} 
-                    onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })} 
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
-                </div>
-                
-                <div style={{ margin: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                  <div className="cal-col">
-                    <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
-                    <div style={{ marginBottom: '6px' }}>
-                      <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
-                      <input type="range" min="-100" max="100" value={layoutOffsets.leftX} 
-                        onChange={(e) => updateCurrentLayout({ leftX: parseInt(e.target.value) })} 
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
-                      <input type="range" min="-100" max="100" value={layoutOffsets.leftY} 
-                        onChange={(e) => updateCurrentLayout({ leftY: parseInt(e.target.value) })} 
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
-                    </div>
-                  </div>
-                  
-                  <div className="cal-col">
-                    <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
-                    <div style={{ marginBottom: '6px' }}>
-                      <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
-                      <input type="range" min="-100" max="100" value={layoutOffsets.rightX} 
-                        onChange={(e) => updateCurrentLayout({ rightX: parseInt(e.target.value) })} 
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
-                      <input type="range" min="-100" max="100" value={layoutOffsets.rightY} 
-                        onChange={(e) => updateCurrentLayout({ rightY: parseInt(e.target.value) })} 
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                    <div className="chart-canvas-area">
+                      <canvas ref={traderChartRef} style={{ width: '100%', height: '100%' }}></canvas>
+                      <div className="neural-overlay-text">NEURAL_SENTIMENT: {specialistData?.sentiment || 'BULLISH (84%)'}</div>
                     </div>
                   </div>
 
-                  <div className="cal-col">
-                    <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
-                    <div style={{ marginBottom: '6px' }}>
-                      <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
-                      <input type="range" min="-100" max="100" value={layoutOffsets.bottomX} 
-                        onChange={(e) => updateCurrentLayout({ bottomX: parseInt(e.target.value) })} 
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                  <div className="execution-side">
+                    <div className="side-label">LIVE EXECUTION</div>
+                    <div className="execution-log">
+                      {specialistData?.live_trades?.length === 0 && <div className="log-empty">SCANNING FOR SIGNALS...</div>}
+                      {(specialistData?.live_trades || liveTrades).map(trade => (
+                        <div key={trade.id} className="trade-entry">
+                          <div className="t-row">
+                            <span className={`t-type ${trade.type.toLowerCase()}`}>{trade.type}</span>
+                            <span className="t-pair">{trade.pair}</span>
+                          </div>
+                          <div className="t-row sub">
+                            <span>{trade.price}</span>
+                            <span className="t-status">{trade.status}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div>
-                      <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
-                      <input type="range" min="-100" max="100" value={layoutOffsets.bottomY} 
-                        onChange={(e) => updateCurrentLayout({ bottomY: parseInt(e.target.value) })} 
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
+                  </div>
+                </div>
+              )}
+
+              {traderSubMode === 'STRATEGY' && (
+                <div className="strategy-manifest">
+                  <div className="strategy-header">NEURAL STRATEGY FORGE // {specialistData?.active_strategy?.risk_score || '0'} RISK SCORE</div>
+                  <div className="strategy-grid">
+                    {specialistData?.active_strategy?.steps?.map((s, i) => (
+                      <div key={i} className="strategy-node">
+                        <div className="node-id">STEP 0{i + 1}</div>
+                        <div className="node-content">
+                          <div className="node-title">{s.name}</div>
+                          <div className="node-desc">{s.desc}</div>
+                        </div>
+                      </div>
+                    )) || <div className="strategy-empty">FORGE A STRATEGY TO MANIFEST TACTICAL BLUEPRINTS.</div>}
+                  </div>
+                </div>
+              )}
+
+              {traderSubMode === 'ALPHA' && (
+                <div className="alpha-manifest">
+                  <div className="alpha-header">WHALE FORENSICS // LIVE ALPHA FEED</div>
+                  <div className="alpha-list">
+                    {specialistData?.alpha_feed?.map((a, i) => (
+                      <div key={i} className={`alpha-item ${a.sentiment}`}>
+                        <span className="alpha-time">{new Date(a.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="alpha-event">{a.event}</span>
+                        <span className="alpha-sentiment-tag">{a.sentiment}</span>
+                      </div>
+                    )) || <div className="alpha-empty">SCANNING ON-CHAIN PROTOCOLS...</div>}
+                  </div>
+                </div>
+              )}
+
+              <div className="floor-bottom">
+                <div className="floor-stats">
+                  <div className="f-stat">
+                    <span className="fs-label">PORTFOLIO</span>
+                    <span className="fs-val positive">${specialistData?.portfolio_value || '2,847.00'}</span>
+                  </div>
+                  <div className="f-stat">
+                    <span className="fs-label">ACTIVE RISK</span>
+                    <span className="fs-val">{specialistData?.risk_level || 'LOW'}</span>
+                  </div>
+                  <div className="f-stat">
+                    <div className="trader-actions">
+                      <button className="t-btn buy" onClick={() => handleSpecialistAction('TRADER', 'EXECUTE_TRADE', { symbol: 'BTCUSDT', side: 'BUY', qty: 0.01 })}>BUY BTC</button>
+                      <button className="t-btn buy" onClick={() => handleSpecialistAction('TRADER', 'STRATEGY_FORGE', { asset: 'BTC' })}>FORGE STRATEGY</button>
+                      <button className="t-btn report" onClick={() => handleSpecialistAction('TRADER', 'WHALE_FORENSICS', { asset: 'BTC' })}>WHALE SCAN</button>
                     </div>
                   </div>
                 </div>
-
-                <button 
-                  className="cmd-btn" 
-                  style={{ width: '100%', marginTop: '12px', fontSize: '7px', padding: '4px', opacity: 0.6 }}
-                  onClick={() => {
-                    const defaults = {
-                      'M.M.S.': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                      'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                      'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                      'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
-                    };
-                    updateCurrentLayout(defaults[activeMode]);
-                  }}
-                >
-                  RESET {activeMode} LAYOUT
-                </button>
-              </div>
-            </div>
-
-            {/* ── COMPONENT CALIBRATION ── */}
-            <div className="panel-section" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-              <div className="section-label">COMPONENT CALIBRATION</div>
-              <div className="calibration-controls" style={{ padding: '4px' }}>
-                <select 
-                  value={selectedComponent} 
-                  onChange={(e) => setSelectedComponent(e.target.value)}
-                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '8px', padding: '4px', marginBottom: '8px' }}
-                >
-                  <option value="">SELECT COMPONENT...</option>
-                  {(({
-                    'M.M.S.': ['ACTIVE_MODE', 'SYSTEM_VITALS', 'BIOMETRIC_SCAN', 'SCREEN_VISION', 'SYSTEM_METRICS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
-                    'TRADER': ['PORTFOLIO', 'WATCHLIST', 'HALAL_FILTER', 'TOP_OPPORTUNITY', 'MACRO_SIGNALS'],
-                    'PROFESSOR': ['CURRICULUM', 'STUDY_METRICS', 'LEARNING_PROGRESS', 'STUDY_GOALS'],
-                    'ENGINEER': ['ACTIVE_PROJECT', 'FILE_TREE', 'FORGE_TELEMETRY', 'MANIFESTATION_SYNC', 'SYSTEM_ACTIONS']
-                  })[activeMode] || []).map(id => (
-                    <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ── PERSISTENT LAYOUT CALIBRATION ── */}
-        <div className="panel-section" style={{ marginTop: 'auto', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <div className="section-label">{activeMode} LAYOUT CALIBRATION</div>
-          <div className="calibration-controls" style={{ padding: '4px' }}>
-            <div className="calibration-item" style={{ marginBottom: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                <label>LEFT WIDTH</label>
-                <span>{layoutOffsets.leftWidth}px</span>
-              </div>
-              <input type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200} 
-                onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })} 
-                style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
-            </div>
-            <div className="calibration-item" style={{ marginBottom: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                <label>RIGHT WIDTH</label>
-                <span>{layoutOffsets.rightWidth}px</span>
-              </div>
-              <input type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200} 
-                onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })} 
-                style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
-            </div>
-            <div className="calibration-item" style={{ marginBottom: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                <label>CMD HEIGHT</label>
-                <span>{layoutOffsets.bottomHeight}px</span>
-              </div>
-              <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150} 
-                onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })} 
-                style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}/>
-            </div>
-            
-            <div style={{ margin: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-              <div className="cal-col">
-                <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
-                <div style={{ marginBottom: '6px' }}>
-                  <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
-                  <input type="range" min="-100" max="100" value={layoutOffsets.leftX} 
-                    onChange={(e) => updateCurrentLayout({ leftX: parseInt(e.target.value) })} 
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
-                </div>
-                <div>
-                  <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
-                  <input type="range" min="-100" max="100" value={layoutOffsets.leftY} 
-                    onChange={(e) => updateCurrentLayout({ leftY: parseInt(e.target.value) })} 
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
-                </div>
-              </div>
-              
-              <div className="cal-col">
-                <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
-                <div style={{ marginBottom: '6px' }}>
-                  <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
-                  <input type="range" min="-100" max="100" value={layoutOffsets.rightX} 
-                    onChange={(e) => updateCurrentLayout({ rightX: parseInt(e.target.value) })} 
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
-                </div>
-                <div>
-                  <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
-                  <input type="range" min="-100" max="100" value={layoutOffsets.rightY} 
-                    onChange={(e) => updateCurrentLayout({ rightY: parseInt(e.target.value) })} 
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
-                </div>
-              </div>
-
-              <div className="cal-col">
-                <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
-                <div style={{ marginBottom: '6px' }}>
-                  <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
-                  <input type="range" min="-100" max="100" value={layoutOffsets.bottomX} 
-                    onChange={(e) => updateCurrentLayout({ bottomX: parseInt(e.target.value) })} 
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
-                </div>
-                <div>
-                  <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
-                  <input type="range" min="-100" max="100" value={layoutOffsets.bottomY} 
-                    onChange={(e) => updateCurrentLayout({ bottomY: parseInt(e.target.value) })} 
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
-                </div>
-              </div>
-            </div>
-
-            <button 
-              className="cmd-btn" 
-              style={{ width: '100%', marginTop: '12px', fontSize: '7px', padding: '4px', opacity: 0.6 }}
-              onClick={() => {
-                const defaults = {
-                  'M.M.S.': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                  'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                  'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                  'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
-                };
-                updateCurrentLayout(defaults[activeMode]);
-              }}
-            >
-              RESET {activeMode} LAYOUT
-            </button>
-          </div>
-        </div>
-
-        {/* ── COMPONENT CALIBRATION ── */}
-        <div className="panel-section" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-          <div className="section-label">COMPONENT CALIBRATION</div>
-          <div className="calibration-controls" style={{ padding: '4px' }}>
-            <select 
-              value={selectedComponent} 
-              onChange={(e) => setSelectedComponent(e.target.value)}
-              style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '8px', padding: '4px', marginBottom: '8px' }}
-            >
-              <option value="">SELECT COMPONENT...</option>
-              {(({
-                'M.M.S.': ['ACTIVE_MODE', 'SYSTEM_VITALS', 'BIOMETRIC_SCAN', 'SCREEN_VISION', 'SYSTEM_METRICS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
-                'TRADER': ['PORTFOLIO', 'WATCHLIST', 'HALAL_FILTER', 'TOP_OPPORTUNITY', 'MACRO_SIGNALS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
-                'PROFESSOR': ['CURRICULUM', 'STUDY_METRICS', 'LEARNING_PROGRESS', 'STUDY_GOALS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
-                'ENGINEER': ['ACTIVE_PROJECT', 'FILE_TREE', 'FORGE_TELEMETRY', 'MANIFESTATION_SYNC', 'SYSTEM_ACTIONS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE']
-              })[activeMode] || []).map(id => (
-                <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
-              ))}
-            </select>
-
-            {selectedComponent && (
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.4 }}>
-                    <label>X NUDGE</label>
-                    <span>{(componentNudges[selectedComponent]?.x || 0)}px</span>
-                  </div>
-                  <input type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.x || 0} 
-                    onChange={(e) => updateComponentNudge(selectedComponent, { x: parseInt(e.target.value) })} 
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.4 }}>
-                    <label>Y NUDGE</label>
-                    <span>{(componentNudges[selectedComponent]?.y || 0)}px</span>
-                  </div>
-                  <input type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.y || 0} 
-                    onChange={(e) => updateComponentNudge(selectedComponent, { y: parseInt(e.target.value) })} 
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}/>
-                </div>
-              </div>
-            )}
-            
-            <button 
-              className="cmd-btn" 
-              style={{ width: '100%', marginTop: '10px', fontSize: '7px', padding: '4px', opacity: 0.4 }}
-              onClick={() => {
-                if (window.confirm('RESET ALL COMPONENT NUDGES?')) setComponentNudges({});
-              }}
-            >
-              RESET ALL COMPONENTS
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ROW 3: BOTTOM BAR */}
-      <div className="grid-bottom">
-        <div className="bottom-left">
-          {/* ── SECURITY ALERT HUD (IMAGE OVERLAY) ── */}
-          {(isSecurityAlert || biometricData.intruders > 0) && (
-            <div className="security-alert-hud-box">
-              <div className="alert-header">
-                <span className="alert-icon">⚠️</span>
-                <span className="alert-title">ALERT: UNKNOWN USER</span>
-              </div>
-              <div className="alert-content">
-                <div className="alert-msg">SCANNING YOUR SYSTEM! SNAPSHOT...</div>
-                <div className="alert-meta">THREAT_LEVEL: CRITICAL</div>
-              </div>
-              <div className="alert-footer">
-                <span className="blink">NEU-STREAM: ACTIVE</span>
               </div>
             </div>
           )}
 
-          <div className="version-info">
-            <span className="version-row">M.M.S. CORE: v2.0.0</span>
-            <span className="version-row verified">AUTH: MUGHEES [VERIFIED]</span>
-          </div>
-        </div>
+          {/* ── PROFESSOR CENTER: Sovereign Learning Hall ── */}
+          {activeMode === 'PROFESSOR' && (
+            <div className="professor-learning-hall">
+              <div className="hall-nav">
+                {['LECTURE', 'ROADMAP', 'LAB'].map(m => (
+                  <button key={m} className={`h-nav-btn ${professorSubMode === m ? 'active' : ''}`} onClick={() => setProfessorSubMode(m)}>{m}</button>
+                ))}
+              </div>
 
-        <div className="bottom-center">
-          <div className="single-command-box">
-            <div className="command-header">
-              <span>M.M.S. COMMAND INTERFACE</span>
-              <div className="header-controls">
-                <button
-                  className={`engine-toggle ${useGroqSpeech ? 'groq' : 'browser'}`}
-                  onClick={() => setUseGroqSpeech(!useGroqSpeech)}
-                  title={useGroqSpeech ? 'Using Groq AI (Whisper)' : 'Using Browser Speech'}
-                >
-                  {useGroqSpeech ? 'GROQ' : 'BROWSER'}
-                </button>
-                <span className="groq-status">{groqStatus}</span>
-                <div className={`mic-indicator ${isMicrophoneActive ? 'active' : ''}`}>
-                  <span className="mic-dot"></span>
-                  <span>{isMicrophoneActive ? 'LISTENING' : 'VOICE READY'}</span>
+              {professorSubMode === 'LECTURE' && (
+                <>
+                  {!specialistData?.active_quiz ? (
+                    <div className="lecture-manifest">
+                      <div className="lecture-header">
+                        <div className="topic-badge">{professorTopic} {'//'} MODULE {specialistData?.module || '04'}</div>
+                        <div className="persona-dna-tag" title="Adaptive Teaching Style">DNA: {specialistData?.persona?.replace('_', ' ') || 'SERIOUS ACADEMIC'}</div>
+                        <div className="slide-counter">{specialistData?.slide_index || '04'} / {specialistData?.total_slides || '12'}</div>
+                      </div>
+                      <div className="manifest-content">
+                        <div className="concept-title">{specialistData?.current_concept?.title || 'Neural Entanglement & Superposition'}</div>
+                        <div className="concept-body">
+                          <p>{specialistData?.current_concept?.body || 'In the quantum realm, information is not binary. It exists in a state of probability, defined by the wave function Ψ. ZAIRE is currently synchronizing this knowledge core with your neural baseline.'}</p>
+                          <ul className="learning-points">
+                            {specialistData?.current_concept?.points?.map((p, i) => (
+                              <li key={i}>✦ {p}</li>
+                            )) || (
+                                <>
+                                  <li>✦ Superposition: N-dimensional state vectors.</li>
+                                  <li>✦ Interference: Constructive reinforcement of data.</li>
+                                  <li>✦ Decoherence: The primary bottleneck in neural sync.</li>
+                                </>
+                              )}
+                          </ul>
+                        </div>
+                      </div>
+                      <div className="lecture-footer">
+                        <div className="professor-note">
+                          <span className="note-label">PROFESSOR_INSIGHT:</span>
+                          {specialistData?.current_concept?.insight || 'Focus on the relationship between entropy and information density.'}
+                        </div>
+                        <div className="professor-controls">
+                          <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'GENERATE_QUIZ', { topic: lastUserPrompt || professorTopic })}>GENERATE QUIZ</button>
+                          <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'ARCHITECT_ROADMAP', { topic: lastUserPrompt || professorTopic })}>ARCHITECT ROADMAP</button>
+                          <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'MANIFEST_VISUAL_LAB', { concept: lastUserPrompt || professorTopic })}>INITIALIZE LAB</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="quiz-manifest">
+                      <div className="quiz-header">
+                        <div className="quiz-title">NEURAL EVALUATION // STAGE 01</div>
+                        <div className="timer">04:52 REMAINING</div>
+                      </div>
+                      <div className="quiz-question">
+                        <div className="q-label">QUESTION 01</div>
+                        <div className="q-text">{specialistData?.active_quiz?.question || 'What is the primary cause of decoherence in a neural-sync environment?'}</div>
+                        <div className="q-options">
+                          {specialistData?.active_quiz?.options?.map((opt, i) => (
+                            <button key={i} className={`q-opt ${opt.correct ? 'correct' : ''}`} onClick={() => handleSpecialistAction('PROFESSOR', 'SUBMIT_QUIZ', { answer: opt.text, is_correct: opt.correct })}>
+                              {String.fromCharCode(65 + i)}) {opt.text}
+                            </button>
+                          )) || (
+                              <>
+                                <button className="q-opt">A) Atmospheric Pressure</button>
+                                <button className="q-opt correct">B) Quantum Interference</button>
+                                <button className="q-opt">C) Clock Speed Mismatch</button>
+                                <button className="q-opt">D) Thermal Exhaustion</button>
+                              </>
+                            )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {professorSubMode === 'ROADMAP' && (
+                <div className="roadmap-manifest">
+                  <div className="roadmap-header">SOVEREIGN STUDY ROADMAP // {professorTopic}</div>
+                  <div className="roadmap-grid">
+                    {specialistData?.roadmap?.modules?.map((m, i) => (
+                      <div key={i} className={`roadmap-node ${m.status}`}>
+                        <div className="node-id">0{i + 1}</div>
+                        <div className="node-content">
+                          <div className="node-title">{m.title}</div>
+                          <div className="node-desc">{m.desc}</div>
+                        </div>
+                        <div className="node-status-tag">{m.status || 'LOCKED'}</div>
+                      </div>
+                    )) || <div className="roadmap-empty">AWAITING ARCHITECTURAL COMMAND...</div>}
+                  </div>
+                </div>
+              )}
+
+              {professorSubMode === 'LAB' && (
+                <div className="lab-manifest">
+                  <div className="lab-header">VISUALIZATION LAB // {specialistData?.lab?.title || 'AWAITING NEURAL SYNC'}</div>
+                  <div className="lab-viewport">
+                    {specialistData?.lab ? (
+                      <div className="lab-sim-placeholder">
+                        <div className="sim-pulse"></div>
+                        <span>{specialistData.lab.status}...</span>
+                        <p>Synchronizing with Engineer Forge for {specialistData.lab.engine} manifestation.</p>
+                      </div>
+                    ) : (
+                      <div className="lab-empty">INITIALIZE THE LAB TO MANIFEST INTERACTIVE SIMULATIONS.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="research-summary">
+                <div className="summary-label">NEURAL SUMMARY FEED</div>
+                <div className="summary-items">
+                  {specialistData?.research_feed?.map((f, i) => (
+                    <div key={i} className="s-item">✦ Source: {f.source} {'//'} {f.title}</div>
+                  )) || <div className="s-item opacity-30">PARSING GLOBAL KNOWLEDGE CORES...</div>}
+                </div>
+              </div>
+
+              <div className="learning-hall-sidebar">
+                <div className="sidebar-section">
+                  <div className="sidebar-label">TEACHING PERSONA</div>
+                  <div className="persona-grid">
+                    {['SERIOUS_ACADEMIC', 'STARK_ENTHUSIAST', 'ZEN_SOCRATIC', 'NEURAL_COACH'].map(p => (
+                      <button
+                        key={p}
+                        className={`persona-btn ${specialistData?.persona === p ? 'active' : ''}`}
+                        onClick={() => handleSpecialistAction('PROFESSOR', 'SET_PERSONA', { persona: p })}
+                        title={p.replace('_', ' ')}
+                      >
+                        {p.split('_')[1][0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="sidebar-section">
+                  <div className="sidebar-label">NEURAL NOTEBOOK</div>
+                  <div className="notebook-entries">
+                    {specialistData?.notebook?.map((n, i) => (
+                      <div key={i} className="note-entry">
+                        <span className="note-time">{new Date(n.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="note-text">{n.note}</span>
+                      </div>
+                    )) || <div className="note-empty">NO ATOMIC NOTES ARCHIVED.</div>}
+                  </div>
+                  <div className="note-input-wrap">
+                    <input
+                      type="text"
+                      placeholder="Capture atomic note..."
+                      value={professorNoteInput}
+                      onChange={(e) => setProfessorNoteInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && professorNoteInput) {
+                          handleSpecialistAction('PROFESSOR', 'TAKE_NOTE', { note: professorNoteInput });
+                          setProfessorNoteInput('');
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-            
-            {/* ... (Existing Command Box Logic) ... */}
-            <div className="command-row">
-              <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={handleFileUpload} />
-              <button className="uplink-btn" onClick={() => fileInputRef.current.click()} title="Tactical Uplink">
-                 <svg className="uplink-icon" viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-2.48-2.02-4.5-4.5-4.5S7 2.52 7 5v12.5c0 3.59 2.91 6.5 6.5 6.5s6.5-2.91 6.5-6.5V6h-1.5z" /></svg>
-              </button>
-              <div className={`command-input-wrapper ${isMicrophoneActive ? 'voice-mode' : (isTyping ? 'typing-mode' : '')}`}>
-                <input
-                  type="text"
-                  className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
-                  placeholder={isMicrophoneActive ? 'M.M.S. LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
-                  value={isMicrophoneActive ? (recognizedText || '') : (inputValue || '')}
-                  onChange={(e) => {
-                    if (!isMicrophoneActive) {
-                      setInputValue(e.target.value);
-                      setIsTyping(e.target.value.length > 0);
-                    }
-                  }}
-                  onFocus={() => setIsTyping(true)}
-                  onBlur={() => setIsTyping(false)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.target.value.trim()) {
-                      const userText = e.target.value;
-                      setInputValue('');
-                      setIsTyping(false);
-                      setMmsResponseStream('');
-                      setLiveCodeStream('');
-                      if (socketRef.current) socketRef.current.emit('user_message', userText, { artifactTokens: [...artifactTokens, ...pendingArtifactTokens] });
-                      if (pendingArtifactTokens.length > 0) { setArtifactTokens(prev => [...prev, ...pendingArtifactTokens]); setPendingArtifactTokens([]); }
-                    }
-                  }}
-                  disabled={isMicrophoneActive}
-                />
+          )}
+
+          {/* ── ENGINEER CENTER: Forge Build Log ── */}
+          {activeMode === 'ENGINEER' && (
+            <div className="engineer-studio">
+              <div className="studio-top">
+                <div className="editor-panel">
+                  <div className="editor-header">
+                    <div className="tabs-container">
+                      {manifestedFiles.length > 0 ? manifestedFiles.map((file, i) => (
+                        <div
+                          key={i}
+                          className={`file-tab ${activeTab === i ? 'active' : ''}`}
+                          onClick={() => {
+                            setActiveTab(i);
+                          }}
+                        >
+                          {file.name} <span className="tab-status-dot pulse"></span>
+                        </div>
+                      )) : (
+                        <div className="file-tab active">MANIFEST.js <span className="tab-status-dot pulse"></span></div>
+                      )}
+                    </div>
+                    <div className="editor-metrics">
+                      <span>LINES: {forgeCode.split('\n').length}</span>
+                      <span className="diff-toggle" onClick={() => setShowDiff(!showDiff)}>
+                        DIFF: <span style={{ color: showDiff ? '#f97316' : '#446677' }}>{showDiff ? 'ON' : 'OFF'}</span>
+                      </span>
+                      <span>ALIGN: <span style={{ color: '#00ff88' }}>{specialistData?.manifestation_sync?.alignment || '99%'}</span></span>
+                    </div>
+                  </div>
+                  <div className="editor-content-wrapper">
+                    <div className="line-numbers">
+                      {forgeCode.split('\n').map((_, i) => <div key={i}>{i + 1}</div>)}
+                    </div>
+                    <div className="editor-main">
+                      <pre className="code-block">
+                        <code>
+                          {showDiff && diffData ? (
+                            <div className="diff-viewer">
+                              {diffData.map((line, i) => (
+                                <div key={i} className={`diff-line ${line.type}`}>
+                                  <span className="line-marker">{line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' '}</span>
+                                  {line.content}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            (manifestedFiles[activeTab]?.code || forgeCode) || '// AWAITING NEURAL FORGE MANIFESTATION...'
+                          )}
+                        </code>
+                      </pre>
+                      <div className="editor-cursor pulse"></div>
+                    </div>
+                    <div className="code-minimap">
+                      <div className="minimap-content" style={{ transform: `scale(0.1)`, transformOrigin: 'top right' }}>
+                        <pre><code>{forgeCode}</code></pre>
+                      </div>
+                      <div className="minimap-viewport"></div>
+                    </div>
+                  </div>
+
+                  {darwinResults && (
+                    <div className="darwin-overlay">
+                      <div className="darwin-header">NEURAL DARWINISM: VARIANT COMPETITION</div>
+                      <div className="darwin-grid">
+                        {Object.entries(darwinResults).map(([variant, score], i) => (
+                          <div key={i} className="darwin-variant">
+                            <div className="variant-label">{variant}</div>
+                            <div className="variant-preview-small"></div>
+                            <div className="variant-score-bar">
+                              <div className="score-fill" style={{ width: `${score}%` }}></div>
+                            </div>
+                            <div className="variant-score-val">{score}%</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="research-panel">
+                  <div className="panel-label">
+                    LIVE PREVIEW
+                    <span className="preview-refresh" style={{ marginLeft: '10px' }} onClick={() => setShowMatrix(!showMatrix)}>
+                      {showMatrix ? 'HIDE MATRIX' : 'SHOW MATRIX'}
+                    </span>
+                    <span className="preview-refresh" onClick={() => {
+                      const current = previewUrl;
+                      setPreviewUrl('');
+                      setTimeout(() => setPreviewUrl(current), 10);
+                    }}>↻</span>
+                  </div>
+                  <div className="preview-container">
+                    {thermalActive && (
+                      <div className="thermal-overlay pulse">
+                        <div className="fracture-marker" style={{ top: '20%', left: '30%', width: '100px', height: '40px' }}>
+                          <span className="fracture-label">ALIGNMENT_FRACTURE: 4px</span>
+                        </div>
+                        <div className="fracture-marker danger" style={{ top: '60%', left: '50%', width: '150px', height: '60px' }}>
+                          <span className="fracture-label">LOW_CONTRAST_DETECTED</span>
+                        </div>
+                      </div>
+                    )}
+                    {showMatrix ? (
+                      <div className="responsive-matrix-grid">
+                        {['mobile', 'tablet', 'laptop', 'desktop'].map(v => (
+                          <div key={v} className="matrix-item">
+                            <span className="matrix-label">{v.toUpperCase()}</span>
+                            <div className="matrix-frame">
+                              {/* Since these are local files in backend/memory/components, we might need a proxy or serve them */}
+                              {/* For now, we simulate with the iframe at different widths */}
+                              <iframe src={previewUrl} style={{ width: v === 'mobile' ? '375px' : v === 'tablet' ? '768px' : '100%', height: '100%', border: 'none', transform: 'scale(0.5)', transformOrigin: 'top left' }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        <iframe
+                          src={previewUrl}
+                          className="live-preview-iframe"
+                          title="Engineer Live Preview"
+                          onError={() => console.log("Preview not available yet")}
+                        />
+                        {specialistData?.project_status?.server !== 'RUNNING' && (
+                          <div className="preview-placeholder">
+                            <div className="pulse-ring"></div>
+                            <span>AWAITING SERVER...</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {specialistData?.tech_stack_reasoning && (
+                    <div className="reasoning-box">
+                      <div className="panel-label" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>ARCHITECTURAL REASONING</div>
+                      <div className="reasoning-text">{specialistData.tech_stack_reasoning}</div>
+                    </div>
+                  )}
+
+                  <div className="surveillance-brief">
+                    <div className="panel-label">COMPETITOR SURVEILLANCE</div>
+                    <div className="brief-feed">
+                      <div className="brief-item">✦ ROLEX: NEW TYPOGRAPHY DETECTED (MUSEO → INTER)</div>
+                      <div className="brief-item">✦ AP: ADDED CINEMATIC HERO PARALLAX</div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <button className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`} onClick={toggleMicrophone} title="Toggle Mic">
-                <svg className="mic-icon" viewBox="0 0 24 24"><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" /></svg>
+
+              <div className="studio-bottom">
+                <div className="studio-console">
+                  <div className="console-header">
+                    <span>
+                      SYSTEM_CONSOLE {'//'} {specialistData?.forge_telemetry?.dna_locked ? `DNA_LOCKED: ${specialistData.forge_telemetry.dna_locked}` : (specialistData?.status || 'STABLE')}
+                      {specialistData?.forge_telemetry?.is_healing && <span className="healing-tag pulse">SELF-HEALING ACTIVE</span>}
+                      <span className="dna-indicator" title="User Design DNA Alignment">DNA: <span style={{ color: '#00ff88' }}>OPTIMIZED</span></span>
+                    </span>
+                    <div className="console-actions">
+                      <button className="c-btn" onClick={() => handleSpecialistAction('ENGINEER', 'MANIFEST_PROJECT', { prompt: lastUserPrompt, project_name: 'zaire-engineered-site' })}>MANIFEST</button>
+                      <button className={`c-btn ${specialistData?.forge_telemetry?.is_healing ? 'healing-active' : ''}`} onClick={() => handleSpecialistAction('ENGINEER', 'VISION_AUDIT')}>
+                        {specialistData?.forge_telemetry?.is_healing ? 'HEALING...' : 'AUDIT'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="console-output">
+                    {specialistData?.forge_build_log?.length > 0 ? (
+                      specialistData.forge_build_log.map((log, i) => (
+                        <div key={i} className="log-line">
+                          <span className="log-ts">[{log.timestamp}]</span>
+                          <span className={`log-tag ${log.status.toLowerCase()}`}>{log.status}</span>
+                          <span className="log-msg">{log.activity}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <>
+                        <div className="log-line"><span className="log-ts">[17:28:01]</span> <span className="log-tag init">INIT</span> <span className="log-msg">Autonomous Web Studio Manifested.</span></div>
+                        <div className="log-line"><span className="log-ts">[17:28:05]</span> <span className="log-tag ok">OK</span> <span className="log-msg">Neural Link Synchronized.</span></div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── SWARM CENTER: Master Protocol ── */}
+          {activeMode === 'SWARM' && (
+            <div className="swarm-chamber">
+              <div className="chamber-header">
+                <div className="chamber-title">NEURAL SWARM {'//'} MASTER PROTOCOL</div>
+                <div className={`swarm-status-badge ${swarmPhase.toLowerCase()}`}>{swarmPhase}</div>
+              </div>
+
+              <div className="swarm-visualizer">
+                <div className="central-node pulse">MASTER</div>
+                <div className={`agent-node trader ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>TRADER</div>
+                <div className={`agent-node professor ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>PROFESSOR</div>
+                <div className={`agent-node engineer ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>ENGINEER</div>
+                <div className="swarm-stream">
+                  {swarmMessages.map((m, i) => (
+                    <div key={i} className={`s-msg ${m.from.toLowerCase()}`}>
+                      <span className="s-from">[{m.from}]</span> {m.text}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="swarm-controls">
+                <button className="swarm-btn" onClick={() => handleSpecialistAction('SWARM', 'INITIATE_TASK', { task: lastUserPrompt })}>INITIATE GLOBAL SYNC</button>
+              </div>
+            </div>
+          )}
+
+          {/* ZAIRE CENTER: Orb fills via fixed canvas */}
+        </div>
+
+        {/* ROW 2: RIGHT PANEL */}
+        <div className="grid-right">
+          {/* ── ZAIRE MODE RIGHT PANEL ── */}
+          {activeMode === 'ZAIRE' && (
+            <>
+              <div className={`panel-section biometric-panel ${biometricData.detected ? 'detected' : ''} ${isSecurityAlert ? 'threat' : ''}`} style={getComponentStyle('BIOMETRIC_SCAN')}>
+                <div className="section-label">BIOMETRIC SCAN</div>
+                <div className="biometric-hud">
+                  <div className="bio-status-row">
+                    <span className="bio-label">IDENTITY:</span>
+                    <span className={`bio-value ${biometricData.name === 'Master' ? 'master' : (isSecurityAlert ? 'alert' : '')}`}>
+                      {isSecurityAlert ? 'UNKNOWN_THREAT' : (biometricData.detected ? biometricData.name.toUpperCase() : 'ABSENT')}
+                    </span>
+                  </div>
+                  <div className="bio-status-row">
+                    <span className="bio-label">SCAN LOCK:</span>
+                    <div className="bio-lock-bar">
+                      <div className={`bio-lock-fill ${biometricData.detected ? 'active' : ''} ${isSecurityAlert ? 'threat' : ''}`} style={{ width: biometricData.detected || isSecurityAlert ? '100%' : '0%' }}></div>
+                    </div>
+                  </div>
+                  <div className="bio-status-row">
+                    <span className="bio-label">FACE-LOCK:</span>
+                    <span className={`bio-value ${biometricData.enabled ? 'online' : 'offline'}`}>{biometricData.enabled ? 'ACTIVE' : 'DISABLED'}</span>
+                  </div>
+                  <div className="bio-meta">
+                    <div className="bio-btn-group">
+                      <span className="bio-tag-btn active">SYSTEM READY</span>
+                      <span className="bio-tag-btn">LOCKED</span>
+                      <span className="bio-tag-btn">UNLOCKED</span>
+                    </div>
+                    <div className="bio-timer">30.01</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`panel-section vision-panel ${isVisionScanning ? 'vision-active' : ''}`} style={getComponentStyle('SCREEN_VISION')}>
+                <div className="section-label vision-label">
+                  <span>SCREEN VISION</span>
+                </div>
+                <div className="vision-feed">
+                  {isVisionScanning ? (
+                    <div className="vision-scan-box">
+                      <div className="scan-line-vision"></div>
+                      <div className="vision-meta">OCR: ENABLED | NEURAL: SYNCING</div>
+                    </div>
+                  ) : (
+                    <div className="vision-placeholder">
+                      <div className="vision-off-text">VISION CORE OFFLINE</div>
+                      <div className="vision-hint-text">Say: "What's on my screen?"</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="panel-section" style={getComponentStyle('SLEEP_AWAKE')}>
+                <div className="section-label">SLEEP / AWAKE</div>
+                <div className="sleep-hud">
+                  <div className="sleep-main">
+                    <span className="sleep-val">8</span>
+                    <span className="sleep-unit">H</span>
+                    <span className="sleep-state">STANDBY</span>
+                  </div>
+                  <div className="panel-section" style={getComponentStyle('ZAIRE_FEED')}>
+                    <div className="section-label">SYSTEM_LOGS</div>
+                    <div className="log-feed">
+                      {zaireActionFeed.map((log, idx) => (
+                        <div key={idx} className="log-entry">
+                          <span className="log-time">[{log.time}]</span>
+                          <span className="log-msg">{log.message}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel-section" style={getComponentStyle('SYSTEM_METRICS')}>
+                <div className="section-label">SYSTEM METRICS</div>
+                <div className="metrics-grid">
+                  <div className="metric-card">
+                    <span className="metric-value">{liveMetrics.latency}ms</span>
+                    <span className="metric-label">LATENCY</span>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-value good">{liveMetrics.cpu}%</span>
+                    <span className="metric-label">CPU LOAD</span>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-value">{liveMetrics.ram}%</span>
+                    <span className="metric-label">RAM USAGE</span>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-value">{(audioFrequency * 100).toFixed(0)}%</span>
+                    <span className="metric-label">VOICE PULSE</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── TRADER MODE RIGHT PANEL ── */}
+          {activeMode === 'TRADER' && (
+            <>
+              <div className="panel-section">
+                <div className="section-label" >NEURAL VERDICT</div>
+                <div className="verdict-box" style={{ margin: 0 }}>
+                  <div className="v-label">MARKET SIGNAL</div>
+                  <div className="v-val" >STRONG BUY</div>
+                  <div className="v-conf">CONFIDENCE: 94%</div>
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >TOP OPPORTUNITY</div>
+                <div className="trade-card">
+                  <div className="tc-head">
+                    <span className="tc-asset" >SOL/USDT</span>
+                    <span className="tc-badge">HALAL</span>
+                  </div>
+                  <div style={{ fontSize: '8px', opacity: 0.6, lineHeight: '1.4' }}>Breakout detected at $142.50. Target: $158.00.</div>
+                  <div className="tc-btns">
+                    <div className="tc-btn" style={{ borderColor: '#00ff88', color: '#00ff88' }}>CONFIRM</div>
+                    <div className="tc-btn" style={{ borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)' }}>CANCEL</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >RECENT TRADES</div>
+                <div className="macro-row"><span className="macro-key">BTC/USDT</span><span className="macro-val" >+$142.50</span></div>
+                <div className="macro-row"><span className="macro-key">ETH/USDT</span><span className="macro-val" style={{ color: '#ff3366' }}>-$24.12</span></div>
+              </div>
+            </>
+          )}
+
+          {/* ── PROFESSOR MODE RIGHT PANEL ── */}
+          {activeMode === 'PROFESSOR' && (
+            <>
+              <div className="panel-section">
+                <div className="section-label" >NEURAL LOAD</div>
+                <div className="neural-gauge" style={{ margin: '10px auto', position: 'relative', width: '80px', height: '80px' }}>
+                  <canvas ref={neuralGaugeRef} width="80" height="80"></canvas>
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '14px', color: '#a78bfa', fontWeight: 'bold' }}>84%</div>
+                    <div style={{ fontSize: '6px', opacity: 0.4 }}>SYNC</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >QUICK ACTIONS</div>
+                <div className="macro-row"><span className="macro-key">SUMMARIZE</span><span className="macro-val">READY</span></div>
+                <div className="macro-row"><span className="macro-key">EXPLAIN</span><span className="macro-val">READY</span></div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >SESSION UPTIME</div>
+                <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '18px', color: '#a78bfa', textAlign: 'center' }}>02:45:12</div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >SPACED REVIEW</div>
+                <div style={{ padding: '10px', background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.2)' }}>
+                  <div style={{ fontSize: '8px', color: '#a78bfa' }}>Next Review in 4h</div>
+                  <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>Topic: Backpropagation</div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── ENGINEER MODE RIGHT PANEL ── */}
+          {activeMode === 'ENGINEER' && (
+            <>
+              <div className="panel-section">
+                <div className="section-label" >BLUEPRINT</div>
+                <div className="macro-row"><span className="macro-key">NODES</span><span className="macro-val">24</span></div>
+                <div className="macro-row"><span className="macro-key">EDGES</span><span className="macro-val">56</span></div>
+                <div className="macro-row"><span className="macro-key">DEPTH</span><span className="macro-val">4</span></div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >VANGUARD AUDIT</div>
+                <div className="macro-row"><span className="macro-key">SECURITY</span><span className="macro-val" >PASS</span></div>
+                <div className="macro-row"><span className="macro-key">PERF</span><span className="macro-val" >OPTIMAL</span></div>
+                <div className="macro-row"><span className="macro-key">LINT</span><span className="macro-val" style={{ color: '#ff3366' }}>2 ERR</span></div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label">DESIGNER PERSONALITY</div>
+                <div className="persona-grid-engineer">
+                  {[
+                    'STARK_GRADE', 'STEVE_JOBS', 'JONY_IVE', 'MASSIMO_VIGNELLI',
+                    'PAULA_SCHER', 'DAVID_CARSON', 'NERI_OXMAN', 'VIRGIL_ABLOH',
+                    'DIETER_RAMS', 'ZAHA_HADID'
+                  ].map(p => (
+                    <button
+                      key={p}
+                      className={`e-persona-btn ${specialistData?.active_persona === p ? 'active' : ''}`}
+                      onClick={() => handleSpecialistAction('ENGINEER', 'SET_DESIGNER_PERSONA', { persona: p })}
+                      title={p.replace('_', ' ')}
+                    >
+                      {p.split('_')[0][0]}{p.split('_')[1] ? p.split('_')[1][0] : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >DNA PROFILE</div>
+                <div className="dna-viz-container">
+                  <div className="dna-strand"></div>
+                  <div className="dna-stats">
+                    <span>TYPO: 98%</span>
+                    <span>COLOR: 94%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label">TACTICAL OPS</div>
+                <div className="ops-grid">
+                  <button className="ops-btn" onClick={() => setThermalActive(!thermalActive)}>
+                    {thermalActive ? 'THERMAL: ON' : 'THERMAL: OFF'}
+                  </button>
+                  <button className="ops-btn" onClick={() => handleSpecialistAction('ENGINEER', 'MIRROR_SANDBOX_SYNC')}>
+                    SYNC MIRROR
+                  </button>
+                  <button className="ops-btn" onClick={() => setShowHallOfFame(!showHallOfFame)}>
+                    HALL OF FAME
+                  </button>
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label" >DESIGN BRIEF</div>
+                <div style={{ fontSize: '7px', opacity: 0.5, lineHeight: '1.4' }}>
+                  "Ensure high-fidelity glassmorphism across all modules."
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeMode === 'ZAIRE' && (
+            <>
+              {/* ── PERSISTENT LAYOUT CALIBRATION ── */}
+              <div className="panel-section" style={{ marginTop: 'auto', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <div className="section-label">{activeMode} LAYOUT CALIBRATION</div>
+                <div className="calibration-controls" style={{ padding: '4px' }}>
+                  <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                      <label>LEFT WIDTH</label>
+                      <span>{layoutOffsets.leftWidth}px</span>
+                    </div>
+                    <input type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200}
+                      onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })}
+                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
+                  </div>
+                  <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                      <label>RIGHT WIDTH</label>
+                      <span>{layoutOffsets.rightWidth}px</span>
+                    </div>
+                    <input type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200}
+                      onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })}
+                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
+                  </div>
+                  <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                      <label>CMD HEIGHT</label>
+                      <span>{layoutOffsets.bottomHeight}px</span>
+                    </div>
+                    <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150}
+                      onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })}
+                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
+                  </div>
+
+                  <div style={{ margin: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                    <div className="cal-col">
+                      <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
+                      <div style={{ marginBottom: '6px' }}>
+                        <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
+                        <input type="range" min="-100" max="100" value={layoutOffsets.leftX}
+                          onChange={(e) => updateCurrentLayout({ leftX: parseInt(e.target.value) })}
+                          style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
+                        <input type="range" min="-100" max="100" value={layoutOffsets.leftY}
+                          onChange={(e) => updateCurrentLayout({ leftY: parseInt(e.target.value) })}
+                          style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                      </div>
+                    </div>
+
+                    <div className="cal-col">
+                      <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
+                      <div style={{ marginBottom: '6px' }}>
+                        <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
+                        <input type="range" min="-100" max="100" value={layoutOffsets.rightX}
+                          onChange={(e) => updateCurrentLayout({ rightX: parseInt(e.target.value) })}
+                          style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
+                        <input type="range" min="-100" max="100" value={layoutOffsets.rightY}
+                          onChange={(e) => updateCurrentLayout({ rightY: parseInt(e.target.value) })}
+                          style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                      </div>
+                    </div>
+
+                    <div className="cal-col">
+                      <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
+                      <div style={{ marginBottom: '6px' }}>
+                        <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
+                        <input type="range" min="-100" max="100" value={layoutOffsets.bottomX}
+                          onChange={(e) => updateCurrentLayout({ bottomX: parseInt(e.target.value) })}
+                          style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
+                        <input type="range" min="-100" max="100" value={layoutOffsets.bottomY}
+                          onChange={(e) => updateCurrentLayout({ bottomY: parseInt(e.target.value) })}
+                          style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    className="cmd-btn"
+                    style={{ width: '100%', marginTop: '12px', fontSize: '7px', padding: '4px', opacity: 0.6 }}
+                    onClick={() => {
+                      const defaults = {
+                        'ZAIRE': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                        'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                        'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                        'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
+                      };
+                      updateCurrentLayout(defaults[activeMode]);
+                    }}
+                  >
+                    RESET {activeMode} LAYOUT
+                  </button>
+                </div>
+              </div>
+
+              {/* ── COMPONENT CALIBRATION ── */}
+              <div className="panel-section" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+                <div className="section-label">COMPONENT CALIBRATION</div>
+                <div className="calibration-controls" style={{ padding: '4px' }}>
+                  <select
+                    value={selectedComponent}
+                    onChange={(e) => setSelectedComponent(e.target.value)}
+                    style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '8px', padding: '4px', marginBottom: '8px' }}
+                  >
+                    <option value="">SELECT COMPONENT...</option>
+                    {(({
+                      'ZAIRE': ['ACTIVE_MODE', 'SYSTEM_VITALS', 'BIOMETRIC_SCAN', 'SCREEN_VISION', 'SYSTEM_METRICS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
+                      'TRADER': ['PORTFOLIO', 'WATCHLIST', 'HALAL_FILTER', 'TOP_OPPORTUNITY', 'MACRO_SIGNALS'],
+                      'PROFESSOR': ['CURRICULUM', 'STUDY_METRICS', 'LEARNING_PROGRESS', 'STUDY_GOALS'],
+                      'ENGINEER': ['ACTIVE_PROJECT', 'FILE_TREE', 'FORGE_TELEMETRY', 'MANIFESTATION_SYNC', 'SYSTEM_ACTIONS']
+                    })[activeMode] || []).map(id => (
+                      <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── PERSISTENT LAYOUT CALIBRATION ── */}
+          <div className="panel-section" style={{ marginTop: 'auto', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="section-label">{activeMode} LAYOUT CALIBRATION</div>
+            <div className="calibration-controls" style={{ padding: '4px' }}>
+              <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                  <label>LEFT WIDTH</label>
+                  <span>{layoutOffsets.leftWidth}px</span>
+                </div>
+                <input type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200}
+                  onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })}
+                  style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
+              </div>
+              <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                  <label>RIGHT WIDTH</label>
+                  <span>{layoutOffsets.rightWidth}px</span>
+                </div>
+                <input type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200}
+                  onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })}
+                  style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
+              </div>
+              <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                  <label>CMD HEIGHT</label>
+                  <span>{layoutOffsets.bottomHeight}px</span>
+                </div>
+                <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150}
+                  onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })}
+                  style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
+              </div>
+
+              <div style={{ margin: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <div className="cal-col">
+                  <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
+                  <div style={{ marginBottom: '6px' }}>
+                    <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
+                    <input type="range" min="-100" max="100" value={layoutOffsets.leftX}
+                      onChange={(e) => updateCurrentLayout({ leftX: parseInt(e.target.value) })}
+                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
+                    <input type="range" min="-100" max="100" value={layoutOffsets.leftY}
+                      onChange={(e) => updateCurrentLayout({ leftY: parseInt(e.target.value) })}
+                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                  </div>
+                </div>
+
+                <div className="cal-col">
+                  <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
+                  <div style={{ marginBottom: '6px' }}>
+                    <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
+                    <input type="range" min="-100" max="100" value={layoutOffsets.rightX}
+                      onChange={(e) => updateCurrentLayout({ rightX: parseInt(e.target.value) })}
+                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
+                    <input type="range" min="-100" max="100" value={layoutOffsets.rightY}
+                      onChange={(e) => updateCurrentLayout({ rightY: parseInt(e.target.value) })}
+                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                  </div>
+                </div>
+
+                <div className="cal-col">
+                  <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
+                  <div style={{ marginBottom: '6px' }}>
+                    <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
+                    <input type="range" min="-100" max="100" value={layoutOffsets.bottomX}
+                      onChange={(e) => updateCurrentLayout({ bottomX: parseInt(e.target.value) })}
+                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
+                    <input type="range" min="-100" max="100" value={layoutOffsets.bottomY}
+                      onChange={(e) => updateCurrentLayout({ bottomY: parseInt(e.target.value) })}
+                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                className="cmd-btn"
+                style={{ width: '100%', marginTop: '12px', fontSize: '7px', padding: '4px', opacity: 0.6 }}
+                onClick={() => {
+                  const defaults = {
+                    'ZAIRE': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                    'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                    'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                    'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
+                  };
+                  updateCurrentLayout(defaults[activeMode]);
+                }}
+              >
+                RESET {activeMode} LAYOUT
+              </button>
+            </div>
+          </div>
+
+          {/* ── COMPONENT CALIBRATION ── */}
+          <div className="panel-section" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+            <div className="section-label">COMPONENT CALIBRATION</div>
+            <div className="calibration-controls" style={{ padding: '4px' }}>
+              <select
+                value={selectedComponent}
+                onChange={(e) => setSelectedComponent(e.target.value)}
+                style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '8px', padding: '4px', marginBottom: '8px' }}
+              >
+                <option value="">SELECT COMPONENT...</option>
+                {(({
+                  'ZAIRE': ['ACTIVE_MODE', 'SYSTEM_VITALS', 'BIOMETRIC_SCAN', 'SCREEN_VISION', 'SYSTEM_METRICS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
+                  'TRADER': ['PORTFOLIO', 'WATCHLIST', 'HALAL_FILTER', 'TOP_OPPORTUNITY', 'MACRO_SIGNALS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
+                  'PROFESSOR': ['CURRICULUM', 'STUDY_METRICS', 'LEARNING_PROGRESS', 'STUDY_GOALS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
+                  'ENGINEER': ['ACTIVE_PROJECT', 'FILE_TREE', 'FORGE_TELEMETRY', 'MANIFESTATION_SYNC', 'SYSTEM_ACTIONS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE']
+                })[activeMode] || []).map(id => (
+                  <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+
+              {selectedComponent && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.4 }}>
+                      <label>X NUDGE</label>
+                      <span>{(componentNudges[selectedComponent]?.x || 0)}px</span>
+                    </div>
+                    <input type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.x || 0}
+                      onChange={(e) => updateComponentNudge(selectedComponent, { x: parseInt(e.target.value) })}
+                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.4 }}>
+                      <label>Y NUDGE</label>
+                      <span>{(componentNudges[selectedComponent]?.y || 0)}px</span>
+                    </div>
+                    <input type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.y || 0}
+                      onChange={(e) => updateComponentNudge(selectedComponent, { y: parseInt(e.target.value) })}
+                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                  </div>
+                </div>
+              )}
+
+              <button
+                className="cmd-btn"
+                style={{ width: '100%', marginTop: '10px', fontSize: '7px', padding: '4px', opacity: 0.4 }}
+                onClick={() => {
+                  if (window.confirm('RESET ALL COMPONENT NUDGES?')) setComponentNudges({});
+                }}
+              >
+                RESET ALL COMPONENTS
               </button>
             </div>
           </div>
         </div>
 
-        <div className="bottom-right">
-           <div className="camera-scan-container">
+        {/* ROW 3: BOTTOM BAR */}
+        <div className="grid-bottom">
+          <div className="bottom-left">
+            {/* ── SECURITY ALERT HUD (IMAGE OVERLAY) ── */}
+            {(isSecurityAlert || biometricData.intruders > 0) && (
+              <div className="security-alert-hud-box">
+                <div className="alert-header">
+                  <span className="alert-icon">⚠️</span>
+                  <span className="alert-title">ALERT: UNKNOWN USER</span>
+                </div>
+                <div className="alert-content">
+                  <div className="alert-msg">SCANNING YOUR SYSTEM! SNAPSHOT...</div>
+                  <div className="alert-meta">THREAT_LEVEL: CRITICAL</div>
+                </div>
+                <div className="alert-footer">
+                  <span className="blink">NEU-STREAM: ACTIVE</span>
+                </div>
+              </div>
+            )}
+
+            <div className="version-info">
+              <span className="version-row">ZAIRE CORE: v2.0.0</span>
+              <span className="version-row verified">AUTH: MUGHEES [VERIFIED]</span>
+            </div>
+          </div>
+
+          <div className="bottom-center">
+            <div className="single-command-box">
+              <div className="command-header">
+                <span>ZAIRE COMMAND INTERFACE</span>
+                <div className="header-controls">
+                  <button
+                    className={`engine-toggle ${useGroqSpeech ? 'groq' : 'browser'}`}
+                    onClick={() => setUseGroqSpeech(!useGroqSpeech)}
+                    title={useGroqSpeech ? 'Using Groq AI (Whisper)' : 'Using Browser Speech'}
+                  >
+                    {useGroqSpeech ? 'GROQ' : 'BROWSER'}
+                  </button>
+                  <span className="groq-status">{groqStatus}</span>
+                  <div className={`mic-indicator ${isMicrophoneActive ? 'active' : ''}`}>
+                    <span className="mic-dot"></span>
+                    <span>{isMicrophoneActive ? 'LISTENING' : 'VOICE READY'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ... (Existing Command Box Logic) ... */}
+              <div className="command-row">
+                <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={handleFileUpload} />
+                <button className="uplink-btn" onClick={() => fileInputRef.current.click()} title="Tactical Uplink">
+                  <svg className="uplink-icon" viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-2.48-2.02-4.5-4.5-4.5S7 2.52 7 5v12.5c0 3.59 2.91 6.5 6.5 6.5s6.5-2.91 6.5-6.5V6h-1.5z" /></svg>
+                </button>
+                <div className={`command-input-wrapper ${isMicrophoneActive ? 'voice-mode' : (isTyping ? 'typing-mode' : '')}`}>
+                  <input
+                    type="text"
+                    className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
+                    placeholder={isMicrophoneActive ? 'ZAIRE LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
+                    value={isMicrophoneActive ? (recognizedText || '') : (inputValue || '')}
+                    onChange={(e) => {
+                      if (!isMicrophoneActive) {
+                        setInputValue(e.target.value);
+                        setIsTyping(e.target.value.length > 0);
+                      }
+                    }}
+                    onFocus={() => setIsTyping(true)}
+                    onBlur={() => setIsTyping(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && e.target.value.trim()) {
+                        const userText = e.target.value;
+                        setLastUserPrompt(userText);
+                        setInputValue('');
+                        setIsTyping(false);
+                        setZaireResponseStream('');
+                        setLiveCodeStream('');
+                        if (socketRef.current) socketRef.current.emit('user_message', userText, { artifactTokens: [...artifactTokens, ...pendingArtifactTokens] });
+                        if (pendingArtifactTokens.length > 0) { setArtifactTokens(prev => [...prev, ...pendingArtifactTokens]); setPendingArtifactTokens([]); }
+                      }
+                    }}
+                    disabled={isMicrophoneActive}
+                  />
+                </div>
+                <button className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`} onClick={toggleMicrophone} title="Toggle Mic">
+                  <svg className="mic-icon" viewBox="0 0 24 24"><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" /></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bottom-right">
+            <div className="camera-scan-container">
               <div className="hud-corner-brackets"></div>
               <div className="scanline-overlay"></div>
               <div className="hud-video-container">
                 {cameraStatus === 'authorized' ? (
                   <div className="hud-video-wrapper">
-                    <img 
-                      src="http://127.0.0.1:3001/security/video_feed" 
+                    <img
+                      src="http://127.0.0.1:3001/security/video_feed"
                       alt="Camera Feed"
                       className="hud-video-feed"
                     />
@@ -3225,187 +3669,190 @@ return (
                   </div>
                 )}
                 <div className="face-target-box">
-                    <div className="reticle reticle-tl"></div>
-                    <div className="reticle reticle-tr"></div>
-                    <div className="reticle reticle-bl"></div>
-                    <div className="reticle reticle-br"></div>
-                    <div className="scanning-bar"></div>
-                 </div>
-                 <div className={`biometric-status-flash ${biometricData.detected ? 'confirmed' : (isSecurityAlert ? 'threat' : '')}`}></div>
+                  <div className="reticle reticle-tl"></div>
+                  <div className="reticle reticle-tr"></div>
+                  <div className="reticle reticle-bl"></div>
+                  <div className="reticle reticle-br"></div>
+                  <div className="scanning-bar"></div>
+                </div>
+                <div className={`biometric-status-flash ${biometricData.detected ? 'confirmed' : (isSecurityAlert ? 'threat' : '')}`}></div>
                 <div className="hud-telemetry-top">
-                   <span className="telemetry-item">REC ●</span>
-                   <span className="telemetry-item blink">SYNC_[88%]</span>
+                  <span className="telemetry-item">REC ●</span>
+                  <span className="telemetry-item blink">SYNC_[88%]</span>
                 </div>
                 <div className="hud-telemetry-bottom">
-                   <span className="telemetry-item">60 FPS</span>
-                   <span className="telemetry-item">4.2 Mbps</span>
+                  <span className="telemetry-item">60 FPS</span>
+                  <span className="telemetry-item">4.2 Mbps</span>
                 </div>
               </div>
-           </div>
-        </div>
-      </div>
-
-      {/* ── FLOATING RESPONSE STREAM (FUTURISTIC SUBTITLES) ── */}
-      <div className={`floating-subtitles ${showResponsePanel && mmsResponseStream ? 'visible' : ''}`}>
-        <div className="subtitles-content">
-           <span className="subtitles-prefix">M.M.S // </span>
-           {mmsResponseStream}
-        </div>
-      </div>
-    </div>
-
-    {/* ── SECURITY ALERT OVERLAY ── */}
-    {showSecurityOverlay && activeIntruder && (
-      <div className="security-alert-overlay">
-        <div className="glitch-background"></div>
-        <div className="threat-container">
-          <div className="threat-header">🚨 SECURITY BREACH DETECTED 🚨</div>
-          <div className="intruder-card">
-            {activeIntruder.snapshot_b64 ? (
-              <img 
-                src={`data:image/jpeg;base64,${activeIntruder.snapshot_b64}`} 
-                alt="Intruder" 
-                className="intruder-face"
-              />
-            ) : (
-              <div className="intruder-placeholder">IMAGE_LOST</div>
-            )}
-            <div className="intruder-meta">
-              <div className="meta-row"><span className="L">TIMESTAMP:</span> <span className="V">{activeIntruder.timestamp}</span></div>
-              <div className="meta-row"><span className="L">THREAT_LVL:</span> <span className="V red">CRITICAL</span></div>
-              <div className="meta-row"><span className="L">ACTION:</span> <span className="V">PUSH_SENT</span></div>
             </div>
           </div>
-          <button className="threat-dismiss" onClick={() => setShowSecurityOverlay(false)}>ACKNOWLEDGE RISK</button>
         </div>
-      </div>
-    )}
 
-    <ShadowAssistant socket={socketRef.current} />
-
-    <SettingsModal
-      isOpen={isSettingsOpen}
-      onClose={() => setIsSettingsOpen(false)}
-      activeMode={activeMode}
-      blobColor={blobColor}
-      setBlobColor={setBlobColor}
-      blobSize={blobSize}
-      setBlobSize={setBlobSize}
-      hudOpacity={hudOpacity}
-      setHudOpacity={setHudOpacity}
-      neuralGlowEnabled={neuralGlowEnabled}
-      setNeuralGlowEnabled={setNeuralGlowEnabled}
-      holographicTiltEnabled={holographicTiltEnabled}
-      setHolographicTiltEnabled={setHolographicTiltEnabled}
-      halalFilterEnabled={halalFilterEnabled}
-      setHalalFilterEnabled={setHalalFilterEnabled}
-      autoLintEnabled={autoLintEnabled}
-      setAutoLintEnabled={setAutoLintEnabled}
-      onEnterDragMode={() => {
-        setIsSettingsOpen(false);
-        setIsDragging(true);
-        dragStateRef.current.isPointerDown = false;
-      }}
-    />
-
-    {isDragging && (
-      <div
-        className="drag-overlay"
-        onPointerDown={handleDragPointerDown}
-        onPointerMove={handleDragPointerMove}
-        onPointerUp={handleDragPointerUp}
-        onPointerCancel={handleDragPointerUp}
-        onPointerLeave={handleDragPointerUp}
-      >
-        <div className="drag-helper-text">
-          <span>DRAG ANYWHERE TO REPOSITION</span>
-          <button
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              setBlobPosition(dragStateRef.current.tempPosition);
-              dragStateRef.current.isPointerDown = false;
-              setIsDragging(false);
-            }}
-          >
-            SAVE POSITION
-          </button>
-        </div>
-      </div>
-    )}
-    {/* Engagement Overlay (Audio Context Fix) */}
-    {/* ── NEURAL VIDEO OVERLAY ── */}
-    {isVideoPlaying && neuralVideoData && (
-      <div className="neural-video-overlay">
-        <div className="video-header">
-          <span className="video-title">{neuralVideoData.title}</span>
-          <button className="video-close" onClick={() => setIsVideoPlaying(false)}>✕</button>
-        </div>
-        <div className="video-stage">
-          <div className="three-manifest-layer">
-            {/* Real 3D content would be rendered into a Three.js sub-canvas here */}
-            <div className="manifestation-label">3D_MANIFEST: ACTIVE</div>
-          </div>
-          <div className="subtitles-layer">
-            {mmsResponseStream}
+        {/* ── FLOATING RESPONSE STREAM (FUTURISTIC SUBTITLES) ── */}
+        <div className={`floating-subtitles ${showResponsePanel && zaireResponseStream ? 'visible' : ''}`}>
+          <div className="subtitles-content">
+            <span className="subtitles-prefix">ZAIRE // </span>
+            {zaireResponseStream}
           </div>
         </div>
-        <div className="video-timeline">
-           <div className="timeline-progress" style={{ width: '45%' }}></div>
-        </div>
       </div>
-    )}
 
-    {/* ── KNOWLEDGE PARTICLES ── */}
-    {particles.map(p => (
-      <div 
-        key={p.id} 
-        className="knowledge-particle"
-        style={{ 
-          left: p.x, 
-          top: p.y, 
-          '--target-x': `${p.tx}px`, 
-          '--target-y': `${p.ty}px` 
+      {/* ── SECURITY ALERT OVERLAY ── */}
+      {showSecurityOverlay && activeIntruder && (
+        <div className="security-alert-overlay">
+          <div className="glitch-background"></div>
+          <div className="threat-container">
+            <div className="threat-header">🚨 SECURITY BREACH DETECTED 🚨</div>
+            <div className="intruder-card">
+              {activeIntruder.snapshot_b64 ? (
+                <img
+                  src={`data:image/jpeg;base64,${activeIntruder.snapshot_b64}`}
+                  alt="Intruder"
+                  className="intruder-face"
+                />
+              ) : (
+                <div className="intruder-placeholder">IMAGE_LOST</div>
+              )}
+              <div className="intruder-meta">
+                <div className="meta-row"><span className="L">TIMESTAMP:</span> <span className="V">{activeIntruder.timestamp}</span></div>
+                <div className="meta-row"><span className="L">THREAT_LVL:</span> <span className="V red">CRITICAL</span></div>
+                <div className="meta-row"><span className="L">ACTION:</span> <span className="V">PUSH_SENT</span></div>
+              </div>
+            </div>
+            <button className="threat-dismiss" onClick={() => setShowSecurityOverlay(false)}>ACKNOWLEDGE RISK</button>
+          </div>
+        </div>
+      )}
+
+      <ShadowAssistant socket={socketRef.current} />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        activeMode={activeMode}
+        blobColor={blobColor}
+        setBlobColor={setBlobColor}
+        blobSize={blobSize}
+        setBlobSize={setBlobSize}
+        hudOpacity={hudOpacity}
+        setHudOpacity={setHudOpacity}
+        neuralGlowEnabled={neuralGlowEnabled}
+        setNeuralGlowEnabled={setNeuralGlowEnabled}
+        holographicTiltEnabled={holographicTiltEnabled}
+        setHolographicTiltEnabled={setHolographicTiltEnabled}
+        halalFilterEnabled={halalFilterEnabled}
+        setHalalFilterEnabled={setHalalFilterEnabled}
+        autoLintEnabled={autoLintEnabled}
+        setAutoLintEnabled={setAutoLintEnabled}
+        onEnterDragMode={() => {
+          setIsSettingsOpen(false);
+          setIsDragging(true);
+          dragStateRef.current.isPointerDown = false;
         }}
       />
-    ))}
 
-    {/* ── OMNI-BOX SEARCH ── */}
-    {isOmniBoxOpen && (
-      <div className="omni-box-overlay" onClick={() => setIsOmniBoxOpen(false)}>
-        <div className="omni-box-container" onClick={e => e.stopPropagation()}>
-          <div className="omni-header">OMNI_SEARCH_V2 // SYSTEM_QUERY</div>
-          <input 
-            autoFocus
-            className="omni-input" 
-            placeholder="ASK JARVIS... (Prefix 'Deep think' for 70B cores)" 
-            value={omniInput || ''}
-            onChange={e => setOmniInput(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && omniInput.trim()) {
-                if (socketRef.current) socketRef.current.emit('user_message', omniInput);
-                setOmniInput('');
-                setIsOmniBoxOpen(false);
-              }
-            }}
-          />
-          <div className="omni-footer">PRESS ESC TO DISMISS</div>
+      {isDragging && (
+        <div
+          className="drag-overlay"
+          onPointerDown={handleDragPointerDown}
+          onPointerMove={handleDragPointerMove}
+          onPointerUp={handleDragPointerUp}
+          onPointerCancel={handleDragPointerUp}
+          onPointerLeave={handleDragPointerUp}
+        >
+          <div className="drag-helper-text">
+            <span>DRAG ANYWHERE TO REPOSITION</span>
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                setBlobPosition(dragStateRef.current.tempPosition);
+                dragStateRef.current.isPointerDown = false;
+                setIsDragging(false);
+              }}
+            >
+              SAVE POSITION
+            </button>
+          </div>
         </div>
-      </div>
-    )}
+      )}
+      {/* Engagement Overlay (Audio Context Fix) */}
+      {/* ── NEURAL VIDEO OVERLAY ── */}
+      {isVideoPlaying && neuralVideoData && (
+        <div className="neural-video-overlay">
+          <div className="video-header">
+            <span className="video-title">{neuralVideoData.title}</span>
+            <button className="video-close" onClick={() => setIsVideoPlaying(false)}>✕</button>
+            <div className="zaire-response-text">
+              {zaireResponseStream || 'AWAITING NEURAL UPLINK...'}
+            </div>
+          </div>
+          <div className="video-stage">
+            <div className="three-manifest-layer">
+              {/* Real 3D content would be rendered into a Three.js sub-canvas here */}
+              <div className="manifestation-label">3D_MANIFEST: ACTIVE</div>
+            </div>
+            <div className="subtitles-layer">
+              {zaireResponseStream}
+            </div>
+          </div>
+          <div className="video-timeline">
+            <div className="timeline-progress" style={{ width: '45%' }}></div>
+          </div>
+        </div>
+      )}
 
-    {!isSystemEngaged && (
-      <div className="engagement-overlay" onClick={() => setIsSystemEngaged(true)}>
-        <div className="engagement-content">
-          <div className="power-icon">⚡</div>
-          <h2>INITIALIZE MMS NEURAL LINK</h2>
-          <p>Click to synchronize sensory arrays and audio core.</p>
-          <div className="scan-line"></div>
+      {/* ── KNOWLEDGE PARTICLES ── */}
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="knowledge-particle"
+          style={{
+            left: p.x,
+            top: p.y,
+            '--target-x': `${p.tx}px`,
+            '--target-y': `${p.ty}px`
+          }}
+        />
+      ))}
+
+      {/* ── OMNI-BOX SEARCH ── */}
+      {isOmniBoxOpen && (
+        <div className="omni-box-overlay" onClick={() => setIsOmniBoxOpen(false)}>
+          <div className="omni-box-container" onClick={e => e.stopPropagation()}>
+            <div className="omni-header">OMNI_SEARCH_V2 // SYSTEM_QUERY</div>
+            <input
+              autoFocus
+              className="omni-input"
+              placeholder="ASK ZAIRE... (Prefix 'Deep think' for 70B cores)"
+              value={omniInput || ''}
+              onChange={e => setOmniInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && omniInput.trim()) {
+                  if (socketRef.current) socketRef.current.emit('user_message', omniInput);
+                  setOmniInput('');
+                  setIsOmniBoxOpen(false);
+                }
+              }}
+            />
+            <div className="omni-footer">PRESS ESC TO DISMISS</div>
+          </div>
         </div>
-      </div>
-    )}
-  </div>
-);
+      )}
+
+      {!isSystemEngaged && (
+        <div className="engagement-overlay" onClick={() => setIsSystemEngaged(true)}>
+          <div className="engagement-content">
+            <div className="power-icon">⚡</div>
+            <h2>INITIALIZE ZAIRE NEURAL LINK</h2>
+            <p>Click to synchronize sensory arrays and audio core.</p>
+            <div className="scan-line"></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default App;

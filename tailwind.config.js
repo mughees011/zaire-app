@@ -6,11 +6,11 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'jarvis-bg': '#000000',
-        'jarvis-cyan': '#00d4ff',
-        'jarvis-teal': '#00ff88',
-        'jarvis-blue': '#0084ff',
-        'jarvis-dark': '#001026',
+        'zaire-bg': '#000000',
+        'zaire-cyan': '#00d4ff',
+        'zaire-teal': '#00ff88',
+        'zaire-blue': '#0084ff',
+        'zaire-dark': '#001026',
       },
       fontFamily: {
         'share': ['"Share Tech Mono"', 'monospace'],

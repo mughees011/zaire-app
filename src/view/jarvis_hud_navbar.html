@@ -1,381 +1,566 @@
-
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=Share+Tech+Mono&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=Share+Tech+Mono&display=swap');
 
-*{margin:0;padding:0;box-sizing:border-box}
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box
+  }
 
-body{
-  background: radial-gradient(ellipse at 50% 30%, #000d1a 0%, #000408 70%, #000 100%);
-  min-height:340px;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:flex-start;
-  padding-top:40px;
-  overflow:hidden;
-  position:relative;
-}
+  body {
+    background: radial-gradient(ellipse at 50% 30%, #000d1a 0%, #000408 70%, #000 100%);
+    min-height: 340px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 40px;
+    overflow: hidden;
+    position: relative;
+  }
 
-body::before{
-  content:'';
-  position:absolute;
-  inset:0;
-  background-image:
-    linear-gradient(rgba(0,180,255,0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,180,255,0.025) 1px, transparent 1px);
-  background-size:48px 48px;
-  pointer-events:none;
-}
+  body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0, 180, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 180, 255, 0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+  }
 
-.scene-label{
-  font-family:'Share Tech Mono',monospace;
-  font-size:9px;
-  letter-spacing:3px;
-  color:rgba(0,212,255,0.2);
-  margin-bottom:28px;
-  text-transform:uppercase;
-}
+  .scene-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: rgba(0, 212, 255, 0.2);
+    margin-bottom: 28px;
+    text-transform: uppercase;
+  }
 
-/* ── NAVBAR WRAP ─────────────────────────────── */
-.nav-wrap{
-  position:relative;
-  width:100%;
-  max-width:860px;
-  padding:0 20px;
-}
+  /* ── NAVBAR WRAP ─────────────────────────────── */
+  .nav-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 860px;
+    padding: 0 20px;
+  }
 
-/* energy line above */
-.nav-wrap::before{
-  content:'';
-  position:absolute;
-  top:-1px;
-  left:50%;
-  transform:translateX(-50%);
-  width:60%;
-  height:1px;
-  background:linear-gradient(90deg,transparent,rgba(0,212,255,0.6),transparent);
-  animation:lineBreath 3s ease-in-out infinite;
-}
-@keyframes lineBreath{
-  0%,100%{opacity:0.5;width:40%}
-  50%{opacity:1;width:70%}
-}
+  /* energy line above */
+  .nav-wrap::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.6), transparent);
+    animation: lineBreath 3s ease-in-out infinite;
+  }
 
-/* ── THE NAV BAR ─────────────────────────────── */
-.nav{
-  display:flex;
-  align-items:center;
-  gap:0;
-  background:rgba(0,8,20,0.72);
-  border:1px solid rgba(0,212,255,0.18);
-  border-radius:3px;
-  backdrop-filter:blur(24px);
-  -webkit-backdrop-filter:blur(24px);
-  position:relative;
-  overflow:visible;
-  box-shadow:
-    0 0 0 1px rgba(0,212,255,0.04),
-    0 8px 40px rgba(0,0,0,0.8),
-    inset 0 1px 0 rgba(0,212,255,0.08);
-}
+  @keyframes lineBreath {
 
-/* angular clip on right corner */
-.nav::after{
-  content:'';
-  position:absolute;
-  bottom:-1px;right:-1px;
-  width:14px;height:14px;
-  background:#000;
-  clip-path:polygon(100% 0,100% 100%,0 100%);
-  opacity:0.9;
-}
+    0%,
+    100% {
+      opacity: 0.5;
+      width: 40%
+    }
 
-/* ── LOGO BLOCK ──────────────────────────────── */
-.logo-block{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:0 22px 0 18px;
-  height:52px;
-  border-right:1px solid rgba(0,212,255,0.12);
-  position:relative;
-  flex-shrink:0;
-}
+    50% {
+      opacity: 1;
+      width: 70%
+    }
+  }
 
-.logo-arc{
-  position:relative;
-  width:30px;height:30px;
-  flex-shrink:0;
-}
-.logo-arc canvas{
-  width:30px;height:30px;
-}
+  /* ── THE NAV BAR ─────────────────────────────── */
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: rgba(0, 8, 20, 0.72);
+    border: 1px solid rgba(0, 212, 255, 0.18);
+    border-radius: 3px;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    position: relative;
+    overflow: visible;
+    box-shadow:
+      0 0 0 1px rgba(0, 212, 255, 0.04),
+      0 8px 40px rgba(0, 0, 0, 0.8),
+      inset 0 1px 0 rgba(0, 212, 255, 0.08);
+  }
 
-.logo-text{
-  font-family:'Orbitron',monospace;
-  font-size:13px;
-  font-weight:900;
-  letter-spacing:4px;
-  color:#00d4ff;
-  text-shadow:0 0 12px rgba(0,212,255,0.5);
-  line-height:1;
-}
-.logo-sub{
-  font-family:'Share Tech Mono',monospace;
-  font-size:7px;
-  letter-spacing:2px;
-  color:rgba(0,212,255,0.35);
-  margin-top:3px;
-}
+  /* angular clip on right corner */
+  .nav::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 14px;
+    height: 14px;
+    background: #000;
+    clip-path: polygon(100% 0, 100% 100%, 0 100%);
+    opacity: 0.9;
+  }
 
-/* ── NAV LINKS ───────────────────────────────── */
-.nav-links{
-  display:flex;
-  align-items:center;
-  flex:1;
-  padding:0 6px;
-}
+  /* ── LOGO BLOCK ──────────────────────────────── */
+  .logo-block {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 22px 0 18px;
+    height: 52px;
+    border-right: 1px solid rgba(0, 212, 255, 0.12);
+    position: relative;
+    flex-shrink: 0;
+  }
 
-.nav-item{
-  position:relative;
-  height:52px;
-  display:flex;
-  align-items:center;
-  padding:0 18px;
-  cursor:pointer;
-  font-family:'Share Tech Mono',monospace;
-  font-size:10px;
-  letter-spacing:2.5px;
-  color:rgba(0,212,255,0.42);
-  text-transform:uppercase;
-  transition:color 0.2s;
-  user-select:none;
-  gap:8px;
-  white-space:nowrap;
-}
+  .logo-arc {
+    position: relative;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+  }
 
-.nav-item::before{
-  content:'';
-  position:absolute;
-  bottom:0;left:50%;
-  transform:translateX(-50%);
-  width:0;height:1px;
-  background:#00d4ff;
-  box-shadow:0 0 8px rgba(0,212,255,0.8);
-  transition:width 0.25s ease;
-}
+  .logo-arc canvas {
+    width: 30px;
+    height: 30px;
+  }
 
-.nav-item:hover{color:rgba(0,212,255,0.85);}
-.nav-item:hover::before{width:70%;}
+  .logo-text {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: #00d4ff;
+    text-shadow: 0 0 12px rgba(0, 212, 255, 0.5);
+    line-height: 1;
+  }
 
-.nav-item.active{color:#00d4ff;}
-.nav-item.active::before{width:70%;}
+  .logo-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 7px;
+    letter-spacing: 2px;
+    color: rgba(0, 212, 255, 0.35);
+    margin-top: 3px;
+  }
 
-/* small icon per nav item */
-.ni-icon{
-  width:12px;height:12px;
-  opacity:0.6;
-  flex-shrink:0;
-}
-.nav-item.active .ni-icon{opacity:1;}
-.nav-item:hover .ni-icon{opacity:0.9;}
+  /* ── NAV LINKS ───────────────────────────────── */
+  .nav-links {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    padding: 0 6px;
+  }
 
-/* active dot */
-.nav-item.active::after{
-  content:'';
-  position:absolute;
-  top:10px;right:12px;
-  width:4px;height:4px;
-  border-radius:50%;
-  background:#00d4ff;
-  box-shadow:0 0 6px #00d4ff;
-  animation:dotBlink 2s ease-in-out infinite;
-}
-@keyframes dotBlink{0%,100%{opacity:1}50%{opacity:0.3}}
+  .nav-item {
+    position: relative;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    cursor: pointer;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2.5px;
+    color: rgba(0, 212, 255, 0.42);
+    text-transform: uppercase;
+    transition: color 0.2s;
+    user-select: none;
+    gap: 8px;
+    white-space: nowrap;
+  }
 
-/* divider between nav groups */
-.nav-divider{
-  width:1px;height:24px;
-  background:rgba(0,212,255,0.1);
-  margin:0 4px;
-  flex-shrink:0;
-}
+  .nav-item::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 1px;
+    background: #00d4ff;
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.8);
+    transition: width 0.25s ease;
+  }
 
-/* ── SYSTEM CONTROLS ─────────────────────────── */
-.sys-controls{
-  display:flex;
-  align-items:center;
-  gap:0;
-  padding:0 12px 0 6px;
-  border-left:1px solid rgba(0,212,255,0.12);
-  height:52px;
-}
+  .nav-item:hover {
+    color: rgba(0, 212, 255, 0.85);
+  }
 
-/* mode toggle pills */
-.mode-group{
-  display:flex;
-  align-items:center;
-  background:rgba(0,212,255,0.04);
-  border:1px solid rgba(0,212,255,0.1);
-  border-radius:2px;
-  padding:4px;
-  gap:2px;
-  margin-right:12px;
-}
+  .nav-item:hover::before {
+    width: 70%;
+  }
 
-.mode-btn{
-  font-family:'Share Tech Mono',monospace;
-  font-size:8px;
-  letter-spacing:1.5px;
-  padding:4px 9px;
-  color:rgba(0,212,255,0.4);
-  cursor:pointer;
-  border-radius:1px;
-  transition:all 0.18s;
-  user-select:none;
-  white-space:nowrap;
-}
-.mode-btn:hover{color:rgba(0,212,255,0.8);background:rgba(0,212,255,0.06);}
-.mode-btn.active{
-  background:rgba(0,212,255,0.12);
-  color:#00d4ff;
-  box-shadow:0 0 8px rgba(0,212,255,0.2),inset 0 0 8px rgba(0,212,255,0.05);
-}
+  .nav-item.active {
+    color: #00d4ff;
+  }
 
-/* icon buttons */
-.icon-btn{
-  width:34px;height:34px;
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;
-  border-radius:2px;
-  transition:all 0.2s;
-  position:relative;
-}
-.icon-btn:hover{background:rgba(0,212,255,0.08);}
-.icon-btn svg{width:14px;height:14px;stroke:rgba(0,212,255,0.45);transition:stroke 0.2s;}
-.icon-btn:hover svg{stroke:rgba(0,212,255,0.9);}
+  .nav-item.active::before {
+    width: 70%;
+  }
 
-/* status indicator */
-.sys-status{
-  display:flex;
-  flex-direction:column;
-  align-items:flex-end;
-  margin-left:8px;
-  padding-left:12px;
-  border-left:1px solid rgba(0,212,255,0.08);
-}
-.status-row{
-  display:flex;align-items:center;gap:5px;
-}
-.status-dot{
-  width:5px;height:5px;
-  border-radius:50%;
-  background:#00ff88;
-  box-shadow:0 0 6px #00ff88;
-  animation:sDot 2s ease-in-out infinite;
-}
-@keyframes sDot{0%,100%{opacity:1}50%{opacity:0.3}}
-.status-txt{
-  font-family:'Share Tech Mono',monospace;
-  font-size:8px;letter-spacing:1.5px;
-  color:rgba(0,255,136,0.6);
-}
-.status-sub{
-  font-family:'Share Tech Mono',monospace;
-  font-size:7px;letter-spacing:1px;
-  color:rgba(0,212,255,0.25);
-  margin-top:2px;
-}
+  /* small icon per nav item */
+  .ni-icon {
+    width: 12px;
+    height: 12px;
+    opacity: 0.6;
+    flex-shrink: 0;
+  }
 
-/* ── CORNER ACCENTS ──────────────────────────── */
-.corner-accent{
-  position:absolute;
-  width:10px;height:10px;
-}
-.ca-tl{top:-1px;left:-1px;border-top:1.5px solid rgba(0,212,255,0.7);border-left:1.5px solid rgba(0,212,255,0.7);}
-.ca-tr{top:-1px;right:-1px;border-top:1.5px solid rgba(0,212,255,0.7);border-right:1.5px solid rgba(0,212,255,0.7);}
-.ca-bl{bottom:-1px;left:-1px;border-bottom:1.5px solid rgba(0,212,255,0.5);border-left:1.5px solid rgba(0,212,255,0.5);}
+  .nav-item.active .ni-icon {
+    opacity: 1;
+  }
 
-/* ── FLOATING SCAN LINE on nav ───────────────── */
-.nav-scan{
-  position:absolute;
-  inset:0;
-  border-radius:3px;
-  overflow:hidden;
-  pointer-events:none;
-}
-.nav-scan::after{
-  content:'';
-  position:absolute;
-  left:0;width:100%;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(0,212,255,0.12),transparent);
-  animation:navScan 4s linear infinite;
-  top:-1px;
-}
-@keyframes navScan{0%{top:-1px;opacity:0}10%{opacity:1}90%{opacity:1}100%{top:100%;opacity:0}}
+  .nav-item:hover .ni-icon {
+    opacity: 0.9;
+  }
 
-/* ── NOTIFICATION BADGE ──────────────────────── */
-.badge{
-  position:absolute;
-  top:9px;right:7px;
-  width:5px;height:5px;
-  border-radius:50%;
-  background:#ff4040;
-  box-shadow:0 0 6px rgba(255,64,64,0.8);
-  animation:dotBlink 1.5s ease-in-out infinite;
-}
+  /* active dot */
+  .nav-item.active::after {
+    content: '';
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #00d4ff;
+    box-shadow: 0 0 6px #00d4ff;
+    animation: dotBlink 2s ease-in-out infinite;
+  }
 
-/* ── SIGNAL BARS ─────────────────────────────── */
-.signal-bars{
-  display:flex;align-items:flex-end;gap:2px;
-  height:14px;
-}
-.sig-bar{
-  width:3px;
-  background:rgba(0,212,255,0.5);
-  border-radius:1px;
-  animation:sigPulse 1.8s ease-in-out infinite;
-}
-.sig-bar:nth-child(1){height:4px;animation-delay:0s;}
-.sig-bar:nth-child(2){height:7px;animation-delay:0.15s;}
-.sig-bar:nth-child(3){height:10px;animation-delay:0.3s;}
-.sig-bar:nth-child(4){height:13px;animation-delay:0.45s;}
-@keyframes sigPulse{0%,100%{opacity:0.4}50%{opacity:1}}
+  @keyframes dotBlink {
 
-/* ── SECONDARY STRIP ─────────────────────────── */
-.sec-strip{
-  width:100%;max-width:860px;
-  padding:0 20px;
-  margin-top:3px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-}
-.sec-left,.sec-right{
-  display:flex;gap:16px;align-items:center;
-}
-.sec-item{
-  font-family:'Share Tech Mono',monospace;
-  font-size:8px;letter-spacing:2px;
-  color:rgba(0,212,255,0.2);
-  cursor:pointer;
-  transition:color 0.2s;
-  text-transform:uppercase;
-  display:flex;align-items:center;gap:6px;
-}
-.sec-item::before{
-  content:'';
-  width:3px;height:3px;
-  border-radius:50%;
-  background:rgba(0,212,255,0.3);
-}
-.sec-item:hover{color:rgba(0,212,255,0.55);}
-.breadcrumb-sep{color:rgba(0,212,255,0.15);font-size:10px;}
-.clock-val{
-  font-family:'Share Tech Mono',monospace;
-  font-size:9px;letter-spacing:2px;
-  color:rgba(0,212,255,0.3);
-}
+    0%,
+    100% {
+      opacity: 1
+    }
+
+    50% {
+      opacity: 0.3
+    }
+  }
+
+  /* divider between nav groups */
+  .nav-divider {
+    width: 1px;
+    height: 24px;
+    background: rgba(0, 212, 255, 0.1);
+    margin: 0 4px;
+    flex-shrink: 0;
+  }
+
+  /* ── SYSTEM CONTROLS ─────────────────────────── */
+  .sys-controls {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 12px 0 6px;
+    border-left: 1px solid rgba(0, 212, 255, 0.12);
+    height: 52px;
+  }
+
+  /* mode toggle pills */
+  .mode-group {
+    display: flex;
+    align-items: center;
+    background: rgba(0, 212, 255, 0.04);
+    border: 1px solid rgba(0, 212, 255, 0.1);
+    border-radius: 2px;
+    padding: 4px;
+    gap: 2px;
+    margin-right: 12px;
+  }
+
+  .mode-btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 1.5px;
+    padding: 4px 9px;
+    color: rgba(0, 212, 255, 0.4);
+    cursor: pointer;
+    border-radius: 1px;
+    transition: all 0.18s;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .mode-btn:hover {
+    color: rgba(0, 212, 255, 0.8);
+    background: rgba(0, 212, 255, 0.06);
+  }
+
+  .mode-btn.active {
+    background: rgba(0, 212, 255, 0.12);
+    color: #00d4ff;
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.2), inset 0 0 8px rgba(0, 212, 255, 0.05);
+  }
+
+  /* icon buttons */
+  .icon-btn {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .icon-btn:hover {
+    background: rgba(0, 212, 255, 0.08);
+  }
+
+  .icon-btn svg {
+    width: 14px;
+    height: 14px;
+    stroke: rgba(0, 212, 255, 0.45);
+    transition: stroke 0.2s;
+  }
+
+  .icon-btn:hover svg {
+    stroke: rgba(0, 212, 255, 0.9);
+  }
+
+  /* status indicator */
+  .sys-status {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    margin-left: 8px;
+    padding-left: 12px;
+    border-left: 1px solid rgba(0, 212, 255, 0.08);
+  }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .status-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #00ff88;
+    box-shadow: 0 0 6px #00ff88;
+    animation: sDot 2s ease-in-out infinite;
+  }
+
+  @keyframes sDot {
+
+    0%,
+    100% {
+      opacity: 1
+    }
+
+    50% {
+      opacity: 0.3
+    }
+  }
+
+  .status-txt {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 1.5px;
+    color: rgba(0, 255, 136, 0.6);
+  }
+
+  .status-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 7px;
+    letter-spacing: 1px;
+    color: rgba(0, 212, 255, 0.25);
+    margin-top: 2px;
+  }
+
+  /* ── CORNER ACCENTS ──────────────────────────── */
+  .corner-accent {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+  }
+
+  .ca-tl {
+    top: -1px;
+    left: -1px;
+    border-top: 1.5px solid rgba(0, 212, 255, 0.7);
+    border-left: 1.5px solid rgba(0, 212, 255, 0.7);
+  }
+
+  .ca-tr {
+    top: -1px;
+    right: -1px;
+    border-top: 1.5px solid rgba(0, 212, 255, 0.7);
+    border-right: 1.5px solid rgba(0, 212, 255, 0.7);
+  }
+
+  .ca-bl {
+    bottom: -1px;
+    left: -1px;
+    border-bottom: 1.5px solid rgba(0, 212, 255, 0.5);
+    border-left: 1.5px solid rgba(0, 212, 255, 0.5);
+  }
+
+  /* ── FLOATING SCAN LINE on nav ───────────────── */
+  .nav-scan {
+    position: absolute;
+    inset: 0;
+    border-radius: 3px;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .nav-scan::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.12), transparent);
+    animation: navScan 4s linear infinite;
+    top: -1px;
+  }
+
+  @keyframes navScan {
+    0% {
+      top: -1px;
+      opacity: 0
+    }
+
+    10% {
+      opacity: 1
+    }
+
+    90% {
+      opacity: 1
+    }
+
+    100% {
+      top: 100%;
+      opacity: 0
+    }
+  }
+
+  /* ── NOTIFICATION BADGE ──────────────────────── */
+  .badge {
+    position: absolute;
+    top: 9px;
+    right: 7px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #ff4040;
+    box-shadow: 0 0 6px rgba(255, 64, 64, 0.8);
+    animation: dotBlink 1.5s ease-in-out infinite;
+  }
+
+  /* ── SIGNAL BARS ─────────────────────────────── */
+  .signal-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 14px;
+  }
+
+  .sig-bar {
+    width: 3px;
+    background: rgba(0, 212, 255, 0.5);
+    border-radius: 1px;
+    animation: sigPulse 1.8s ease-in-out infinite;
+  }
+
+  .sig-bar:nth-child(1) {
+    height: 4px;
+    animation-delay: 0s;
+  }
+
+  .sig-bar:nth-child(2) {
+    height: 7px;
+    animation-delay: 0.15s;
+  }
+
+  .sig-bar:nth-child(3) {
+    height: 10px;
+    animation-delay: 0.3s;
+  }
+
+  .sig-bar:nth-child(4) {
+    height: 13px;
+    animation-delay: 0.45s;
+  }
+
+  @keyframes sigPulse {
+
+    0%,
+    100% {
+      opacity: 0.4
+    }
+
+    50% {
+      opacity: 1
+    }
+  }
+
+  /* ── SECONDARY STRIP ─────────────────────────── */
+  .sec-strip {
+    width: 100%;
+    max-width: 860px;
+    padding: 0 20px;
+    margin-top: 3px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .sec-left,
+  .sec-right {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .sec-item {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: rgba(0, 212, 255, 0.2);
+    cursor: pointer;
+    transition: color 0.2s;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .sec-item::before {
+    content: '';
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: rgba(0, 212, 255, 0.3);
+  }
+
+  .sec-item:hover {
+    color: rgba(0, 212, 255, 0.55);
+  }
+
+  .breadcrumb-sep {
+    color: rgba(0, 212, 255, 0.15);
+    font-size: 10px;
+  }
+
+  .clock-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(0, 212, 255, 0.3);
+  }
 </style>
 
 <div class="scene-label">interactive preview — click nav items & modes</div>
@@ -385,123 +570,133 @@ body::before{
   <!-- corner accents -->
   <div style="position:relative">
 
-  <nav class="nav">
-    <div class="nav-scan"></div>
-    <div class="corner-accent ca-tl"></div>
-    <div class="corner-accent ca-tr"></div>
-    <div class="corner-accent ca-bl"></div>
+    <nav class="nav">
+      <div class="nav-scan"></div>
+      <div class="corner-accent ca-tl"></div>
+      <div class="corner-accent ca-tr"></div>
+      <div class="corner-accent ca-bl"></div>
 
-    <!-- LOGO -->
-    <div class="logo-block">
-      <div class="logo-arc">
-        <canvas id="logoArc" width="60" height="60"></canvas>
-      </div>
-      <div>
-        <div class="logo-text">J·A·R·V·I·S</div>
-        <div class="logo-sub">PERSONAL AI · v0.1</div>
-      </div>
-    </div>
-
-    <!-- NAV LINKS -->
-    <div class="nav-links">
-      <div class="nav-item active" onclick="setActive(this)">
-        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-        </svg>
-        HOME
-      </div>
-
-      <div class="nav-item" onclick="setActive(this)">
-        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-          <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-        </svg>
-        DASHBOARD
-      </div>
-
-      <div class="nav-item" onclick="setActive(this)" style="position:relative">
-        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-        </svg>
-        COMMAND
-        <div class="badge"></div>
-      </div>
-
-      <div class="nav-divider"></div>
-
-      <div class="nav-item" onclick="setActive(this)">
-        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-          <path d="M1 6l11 6 11-6M1 18l11-6 11 6"/>
-        </svg>
-        MEMORY
-      </div>
-
-      <div class="nav-item" onclick="setActive(this)">
-        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-        </svg>
-        NEURAL
-      </div>
-
-      <div class="nav-divider"></div>
-
-      <div class="nav-item" onclick="setActive(this)">
-        <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-          <circle cx="12" cy="8" r="4"/>
-          <path d="M6 20v-2a6 6 0 0112 0v2"/>
-        </svg>
-        PROFILE
-      </div>
-    </div>
-
-    <!-- SYSTEM CONTROLS -->
-    <div class="sys-controls">
-
-      <!-- Mode pills -->
-      <div class="mode-group">
-        <div class="mode-btn active" onclick="setMode(this)">VOICE</div>
-        <div class="mode-btn" onclick="setMode(this)">AGENT</div>
-        <div class="mode-btn" onclick="setMode(this)">FOCUS</div>
-      </div>
-
-      <!-- Signal -->
-      <div class="icon-btn" title="Network">
-        <div class="signal-bars">
-          <div class="sig-bar"></div>
-          <div class="sig-bar"></div>
-          <div class="sig-bar"></div>
-          <div class="sig-bar"></div>
+      <!-- LOGO -->
+      <div class="logo-block">
+        <div class="logo-arc">
+          <canvas id="logoArc" width="60" height="60"></canvas>
+        </div>
+        <div>
+          <div class="logo-text">ZAIRE</div>
+          <div class="logo-sub">ZAIRE AI REASONING ENTITY · v0.1</div>
         </div>
       </div>
 
-      <!-- Settings -->
-      <div class="icon-btn" title="Settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-        </svg>
-      </div>
-
-      <!-- Power -->
-      <div class="icon-btn" title="Power" style="margin-left:2px">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round">
-          <path d="M18.36 6.64A9 9 0 0112 3a9 9 0 00-6.36 15.36"/>
-          <line x1="12" y1="3" x2="12" y2="12"/>
-        </svg>
-      </div>
-
-      <!-- Status -->
-      <div class="sys-status">
-        <div class="status-row">
-          <div class="status-dot"></div>
-          <div class="status-txt">ONLINE</div>
+      <!-- NAV LINKS -->
+      <div class="nav-links">
+        <div class="nav-item active" onclick="setActive(this)">
+          <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+          </svg>
+          HOME
         </div>
-        <div class="status-sub" id="clockDisp">00:00:00</div>
+
+        <div class="nav-item" onclick="setActive(this)">
+          <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+          </svg>
+          DASHBOARD
+        </div>
+
+        <div class="nav-item" onclick="setActive(this)" style="position:relative">
+          <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+          </svg>
+          COMMAND
+          <div class="badge"></div>
+        </div>
+
+        <div class="nav-divider"></div>
+
+        <div class="nav-item" onclick="setActive(this)">
+          <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round">
+            <path d="M1 6l11 6 11-6M1 18l11-6 11 6" />
+          </svg>
+          MEMORY
+        </div>
+
+        <div class="nav-item" onclick="setActive(this)">
+          <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+          </svg>
+          NEURAL
+        </div>
+
+        <div class="nav-divider"></div>
+
+        <div class="nav-item" onclick="setActive(this)">
+          <svg class="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M6 20v-2a6 6 0 0112 0v2" />
+          </svg>
+          PROFILE
+        </div>
       </div>
 
-    </div>
-  </nav>
+      <!-- SYSTEM CONTROLS -->
+      <div class="sys-controls">
+
+        <!-- Mode pills -->
+        <div class="mode-group">
+          <div class="mode-btn active" onclick="setMode(this)">VOICE</div>
+          <div class="mode-btn" onclick="setMode(this)">AGENT</div>
+          <div class="mode-btn" onclick="setMode(this)">FOCUS</div>
+        </div>
+
+        <!-- Signal -->
+        <div class="icon-btn" title="Network">
+          <div class="signal-bars">
+            <div class="sig-bar"></div>
+            <div class="sig-bar"></div>
+            <div class="sig-bar"></div>
+            <div class="sig-bar"></div>
+          </div>
+        </div>
+
+        <!-- Settings -->
+        <div class="icon-btn" title="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+          </svg>
+        </div>
+
+        <!-- Power -->
+        <div class="icon-btn" title="Power" style="margin-left:2px">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round">
+            <path d="M18.36 6.64A9 9 0 0112 3a9 9 0 00-6.36 15.36" />
+            <line x1="12" y1="3" x2="12" y2="12" />
+          </svg>
+        </div>
+
+        <!-- Status -->
+        <div class="sys-status">
+          <div class="status-row">
+            <div class="status-dot"></div>
+            <div class="status-txt">ONLINE</div>
+          </div>
+          <div class="status-sub" id="clockDisp">00:00:00</div>
+        </div>
+
+      </div>
+    </nav>
 
   </div>
 </div>
@@ -523,55 +718,55 @@ body::before{
 </div>
 
 <script>
-function setActive(el){
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  el.classList.add('active');
-}
-function setMode(el){
-  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active');
-}
+  function setActive(el) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+  }
+  function setMode(el) {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
 
-function tick(){
-  const now=new Date();
-  const hms=[now.getHours(),now.getMinutes(),now.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':');
-  const days=['SUN','MON','TUE','WED','THU','FRI','SAT'];
-  document.getElementById('clockDisp').textContent=hms;
-  document.getElementById('clockFull').textContent=days[now.getDay()]+' '+hms.slice(0,5);
-}
-setInterval(tick,1000);tick();
+  function tick() {
+    const now = new Date();
+    const hms = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
+    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    document.getElementById('clockDisp').textContent = hms;
+    document.getElementById('clockFull').textContent = days[now.getDay()] + ' ' + hms.slice(0, 5);
+  }
+  setInterval(tick, 1000); tick();
 
-const lc=document.getElementById('logoArc');
-const lctx=lc.getContext('2d');
-let lt=0;
-function drawLogo(){
-  lt+=0.025;
-  lctx.clearRect(0,0,60,60);
-  const cx=30,cy=30;
-  [22,16,10].forEach((r,i)=>{
-    const speeds=[1,-1.6,2.2];
-    const a=lt*speeds[i];
-    const dashL=[1.8,1.2,0.8][i];
+  const lc = document.getElementById('logoArc');
+  const lctx = lc.getContext('2d');
+  let lt = 0;
+  function drawLogo() {
+    lt += 0.025;
+    lctx.clearRect(0, 0, 60, 60);
+    const cx = 30, cy = 30;
+    [22, 16, 10].forEach((r, i) => {
+      const speeds = [1, -1.6, 2.2];
+      const a = lt * speeds[i];
+      const dashL = [1.8, 1.2, 0.8][i];
+      lctx.beginPath();
+      lctx.arc(cx, cy, r, a, a + dashL);
+      lctx.strokeStyle = `rgba(0,212,255,${[0.7, 0.5, 0.4][i]})`;
+      lctx.lineWidth = [1.5, 1, 0.8][i];
+      lctx.stroke();
+      lctx.beginPath();
+      lctx.arc(cx, cy, r, a + Math.PI, a + Math.PI + dashL * 0.5);
+      lctx.strokeStyle = `rgba(0,212,255,${[0.3, 0.2, 0.15][i]})`;
+      lctx.lineWidth = [1, 0.7, 0.5][i];
+      lctx.stroke();
+    });
+    const coreR = 5 + Math.sin(lt * 2) * 0.8;
+    const g = lctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
+    g.addColorStop(0, 'rgba(0,212,255,0.9)');
+    g.addColorStop(1, 'rgba(0,212,255,0)');
     lctx.beginPath();
-    lctx.arc(cx,cy,r,a,a+dashL);
-    lctx.strokeStyle=`rgba(0,212,255,${[0.7,0.5,0.4][i]})`;
-    lctx.lineWidth=[1.5,1,0.8][i];
-    lctx.stroke();
-    lctx.beginPath();
-    lctx.arc(cx,cy,r,a+Math.PI,a+Math.PI+dashL*0.5);
-    lctx.strokeStyle=`rgba(0,212,255,${[0.3,0.2,0.15][i]})`;
-    lctx.lineWidth=[1,0.7,0.5][i];
-    lctx.stroke();
-  });
-  const coreR=5+Math.sin(lt*2)*0.8;
-  const g=lctx.createRadialGradient(cx,cy,0,cx,cy,coreR);
-  g.addColorStop(0,'rgba(0,212,255,0.9)');
-  g.addColorStop(1,'rgba(0,212,255,0)');
-  lctx.beginPath();
-  lctx.arc(cx,cy,coreR,0,Math.PI*2);
-  lctx.fillStyle=g;
-  lctx.fill();
-  requestAnimationFrame(drawLogo);
-}
-drawLogo();
+    lctx.arc(cx, cy, coreR, 0, Math.PI * 2);
+    lctx.fillStyle = g;
+    lctx.fill();
+    requestAnimationFrame(drawLogo);
+  }
+  drawLogo();
 </script>

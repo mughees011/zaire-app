@@ -40,7 +40,7 @@ function SettingsModal({
         <div className="panel-corner-accent br"></div>
 
         <div className="settings-header">
-          <span className="settings-title">M.M.S. SYSTEM CONTROL</span>
+          <span className="settings-title">ZAIRE SYSTEM CONTROL</span>
           <div style={{ fontSize: '8px', color: 'rgba(255,255,255,0.2)', letterSpacing: '1px' }}>
             CORE_SYNC: ACTIVE // VER: 2.0.0
           </div>
@@ -193,7 +193,7 @@ function SettingsModal({
                 <div className="setting-row">
                   <div className="setting-info">
                     <span className="setting-label">VOICE WAKE_WORD</span>
-                    <span className="setting-desc">Sensitivity for "Jarvis" / "MMS" detection.</span>
+                    <span className="setting-desc">Sensitivity for "ZAIRE" / "ZAIRE" detection.</span>
                   </div>
                   <div className="cyber-slider-group">
                     <input type="range" min="0" max="100" className="cyber-slider" defaultValue="85" />
@@ -238,7 +238,7 @@ function SettingsModal({
           <div style={{ display: 'flex', gap: '10px' }}>
             <button className="footer-btn" onClick={onClose}>DISMISS</button>
             <button className="footer-btn primary" onClick={() => {
-              window.dispatchEvent(new CustomEvent('MMS_PERSIST_CONFIG'));
+              window.dispatchEvent(new CustomEvent('zaire_PERSIST_CONFIG'));
               onClose();
             }}>APPLY CORE_SYNC</button>
           </div>

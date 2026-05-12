@@ -20,7 +20,7 @@ function Navbar() {
       setTimeStr(hms);
       setDateStr(days[now.getDay()] + ' ' + hms.slice(0, 5));
     };
-    
+
     const interval = setInterval(tick, 1000);
     tick();
 
@@ -39,13 +39,13 @@ function Navbar() {
         const speeds = [1, -1.6, 2.2];
         const a = lt * speeds[i];
         const dashL = [1.8, 1.2, 0.8][i];
-        
+
         lctx.beginPath();
         lctx.arc(cx, cy, r, a, a + dashL);
         lctx.strokeStyle = `rgba(0,212,255,${[0.7, 0.5, 0.4][i]})`;
         lctx.lineWidth = [1.5, 1, 0.8][i];
         lctx.stroke();
-        
+
         lctx.beginPath();
         lctx.arc(cx, cy, r, a + Math.PI, a + Math.PI + dashL * 0.5);
         lctx.strokeStyle = `rgba(0,212,255,${[0.3, 0.2, 0.15][i]})`;
@@ -57,15 +57,15 @@ function Navbar() {
       const g = lctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
       g.addColorStop(0, 'rgba(0,212,255,0.9)');
       g.addColorStop(1, 'rgba(0,212,255,0)');
-      
+
       lctx.beginPath();
       lctx.arc(cx, cy, coreR, 0, Math.PI * 2);
       lctx.fillStyle = g;
       lctx.fill();
-      
+
       animationId = requestAnimationFrame(drawLogo);
     };
-    
+
     drawLogo();
 
     return () => {
@@ -79,7 +79,7 @@ function Navbar() {
       id: 'HOME',
       icon: (
         <svg className="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
         </svg>
       )
     },
@@ -87,8 +87,8 @@ function Navbar() {
       id: 'DASHBOARD',
       icon: (
         <svg className="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-          <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+          <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+          <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
         </svg>
       )
     },
@@ -97,7 +97,7 @@ function Navbar() {
       badge: true,
       icon: (
         <svg className="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
         </svg>
       )
     },
@@ -106,7 +106,7 @@ function Navbar() {
       id: 'MEMORY',
       icon: (
         <svg className="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <path d="M1 6l11 6 11-6M1 18l11-6 11 6"/>
+          <path d="M1 6l11 6 11-6M1 18l11-6 11 6" />
         </svg>
       )
     },
@@ -114,8 +114,8 @@ function Navbar() {
       id: 'NEURAL',
       icon: (
         <svg className="ni-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
         </svg>
       )
     }
@@ -137,8 +137,8 @@ function Navbar() {
                 <canvas ref={logoCanvasRef} width="60" height="60"></canvas>
               </div>
               <div>
-                <div className="logo-text">M·M·S</div>
-                <div className="logo-sub">MUGHEES MANAGEMENT SYSTEM · v2.0</div>
+                <div className="logo-text">ZAIRE</div>
+                <div className="logo-sub">ZAIRE AI REASONING ENTITY · v2.0</div>
               </div>
             </div>
 
@@ -147,8 +147,8 @@ function Navbar() {
               {navItems.map((item, idx) => {
                 if (item === 'DIVIDER') return <div key={`div-${idx}`} className="nav-divider"></div>;
                 return (
-                  <div 
-                    key={item.id} 
+                  <div
+                    key={item.id}
                     className={`nav-item ${activeItem === item.id ? 'active' : ''}`}
                     onClick={() => setActiveItem(item.id)}
                     style={item.badge ? { position: 'relative' } : {}}
@@ -177,7 +177,7 @@ function Navbar() {
 
       <div className="sec-strip">
         <div className="sec-left">
-          <span className="sec-item">M.M.S. CORE</span>
+          <span className="sec-item">ZAIRE CORE</span>
           <span className="breadcrumb-sep">›</span>
           <span className="sec-item" style={{ color: 'rgba(0,212,255,0.7)' }}>v2.0.0</span>
           <span className="sec-item" style={{ marginLeft: '15px', color: 'var(--accent-green)' }}>AUTH: VERIFIED</span>
