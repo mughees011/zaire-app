@@ -22,6 +22,44 @@ function App() {
   const cameraRef = useRef(null);
   const dragStateRef = useRef({ isPointerDown: false, tempPosition: { x: 0, y: 0 } });
 
+  // ── HUD Customization States ──
+  const [hudOpacity, setHudOpacity] = useState(() => parseFloat(localStorage.getItem('zaire_hud_opacity')) || 0.85);
+  const [neuralGlowEnabled, setNeuralGlowEnabled] = useState(() => localStorage.getItem('zaire_neural_glow') !== 'false');
+  const [holographicTiltEnabled, setHolographicTiltEnabled] = useState(() => localStorage.getItem('zaire_holographic_tilt') !== 'false');
+
+  // ── Mode-Specific Advanced Toggles ──
+  const [halalFilterEnabled, setHalalFilterEnabled] = useState(true);
+  const [autoLintEnabled, setAutoLintEnabled] = useState(true);
+
+  // Real-time Socket states
+  const socketRef = useRef(null);
+  const [zaireResponseStream, setZaireResponseStream] = useState('');
+  const [showResponsePanel, setShowResponsePanel] = useState(false);
+  const [isNeuralInterruptActive, setIsNeuralInterruptActive] = useState(false);
+  const responseTimeoutRef = useRef(null);
+
+  const [zaireActionFeed, setZaireActionFeed] = useState([
+    { time: '15:47', message: 'System boot complete' },
+    { time: '15:46', message: 'Neural core initialized' },
+    { time: '15:45', message: 'Voice synthesis online' },
+    { time: '15:44', message: 'Loading ZAIRE protocol' },
+    { time: '15:43', message: 'Mounting file system' },
+  ]);
+
+  // Biometric State
+  const [biometricData, setBiometricData] = useState({ detected: false, name: 'ABSENT', confidence: 0 });
+  const [isSecurityAlert, setIsSecurityAlert] = useState(false);
+  const [intruderSnapshots, setIntruderSnapshots] = useState([]);
+  const [showSecurityOverlay, setShowSecurityOverlay] = useState(false);
+  const [activeIntruder, setActiveIntruder] = useState(null);
+
+  const [liveMetrics, setLiveMetrics] = useState({ cpu: 0, ram: 0, gpu: 0, latency: 4 });
+  const [isOmniBoxOpen, setIsOmniBoxOpen] = useState(false);
+  const [omniInput, setOmniInput] = useState('');
+  const [isSystemEngaged, setIsSystemEngaged] = useState(false);
+
+
+
   const [activeMode, setActiveMode] = useState('ZAIRE');
   const [zaireStatus, setZaireStatus] = useState('online');
   const [isDeepThinking, setIsDeepThinking] = useState(false);
@@ -90,6 +128,13 @@ function App() {
   const [lastSystemAction, setLastSystemAction] = useState(null);
   const [systemActionLog, setSystemActionLog] = useState([]);
   const [isDiagnosticActive, setIsDiagnosticActive] = useState(false);
+  const [chatSessions, setChatSessions] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [isChatHistoryLoading, setIsChatHistoryLoading] = useState(false);
+  const [chatSearch, setChatSearch] = useState('');
+  const [editingSessionId, setEditingSessionId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [isArchivesOpen, setIsArchivesOpen] = useState(false);
 
   // ── System State Engine ──
   const [systemState, setSystemState] = useState('IDLE'); // IDLE, LISTENING, THINKING, ALERT, SUCCESS
@@ -112,6 +157,17 @@ function App() {
   const [swarmPhase, setSwarmPhase] = useState('IDLE'); // IDLE, RECRUITING, ANALYZING, SYNTHESIZING
   const [swarmMessages, setSwarmMessages] = useState([]);
 
+  const [specialistData, setSpecialistData] = useState({
+    active_persona: 'STARK_GRADE',
+    forge_telemetry: { neural_alignment: 0, thermal_hud: false },
+    active_projects: [],
+    forge_build_log: [],
+    portfolio_value: '0.00',
+    risk_level: 'LOW',
+    alpha_feed: []
+  });
+
+
   const modes = ['ZAIRE', 'TRADER', 'PROFESSOR', 'ENGINEER', 'SWARM'];
 
   const [lastUserPrompt, setLastUserPrompt] = useState('');
@@ -132,185 +188,54 @@ function App() {
     }
   };
 
-  // ── Engineer Mode Showcase Simulator ──
+  // -- Specialist Data Synchronization --
   useEffect(() => {
-    if (activeMode !== 'ENGINEER') {
-      setEngineerPhase('IDLE');
-      setForgeCode('');
-      setForgeProgress(0);
-      return;
-    }
-
-    const phases = ['BLUEPRINT', 'RESEARCH', 'FORGE', 'AUDIT', 'DEPLOY'];
-    let currentIdx = 0;
-
-    const interval = setInterval(() => {
-      if (currentIdx < phases.length) {
-        setEngineerPhase(phases[currentIdx]);
-
-        if (phases[currentIdx] === 'FORGE') {
-          // Simulate code streaming
-          const sampleCode = `import React from 'react';\nimport './App.css';\n\nconst AutonomousSite = () => {\n  return (\n    <div className="manifest-container">\n      <h1>ZAIRE ENGINEERED STUDIO</h1>\n      <p>Neural Link Sync: Active</p>\n    </div>\n  );\n};`;
-          let charIdx = 0;
-          const codeInterval = setInterval(() => {
-            if (charIdx < sampleCode.length) {
-              setForgeCode(sampleCode.substring(0, charIdx));
-              setForgeProgress(Math.min(100, (charIdx / sampleCode.length) * 100));
-              charIdx += 2;
-            } else {
-              clearInterval(codeInterval);
-            }
-          }, 30);
-        } else {
-          setForgeProgress((currentIdx + 1) * 20);
-        }
-
-        currentIdx++;
-      } else {
-        clearInterval(interval);
+    if (activeMode === 'ZAIRE') return;
+    
+    const fetchStatus = () => {
+      if (socketRef.current) {
+        socketRef.current.emit('REQUEST_SPECIALIST_SYNC', { mode: activeMode });
       }
-    }, 4000);
+    };
 
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
   }, [activeMode]);
 
-  // ── Professor Mode Learning Hall Simulator ──
   useEffect(() => {
-    if (activeMode !== 'PROFESSOR') {
-      setProfessorPhase('IDLE');
-      return;
-    }
+    if (!specialistData) return;
 
-    const phases = ['ARCHITECTING', 'SYNCING', 'LECTURE', 'QUIZ', 'GRADUATION'];
-    let currentIdx = 0;
-
-    const interval = setInterval(() => {
-      if (currentIdx < phases.length) {
-        setProfessorPhase(phases[currentIdx]);
-        setLearningProgress((currentIdx + 1) * 20);
-
-        if (phases[currentIdx] === 'QUIZ') {
-          setProfessorSubMode('LECTURE'); // Quiz is now a sub-state of Lecture via specialistData
-        }
-
-        currentIdx++;
-      } else {
-        clearInterval(interval);
+    if (activeMode === 'TRADER') {
+      if (specialistData.phase) setTraderPhase(specialistData.phase);
+      if (specialistData.progress !== undefined) setTraderProgress(specialistData.progress);
+      if (specialistData.live_pulse) {
+         const pulses = Object.entries(specialistData.live_pulse).map(([pair, d]) => ({
+           id: pair,
+           pair: `${pair}/USDT`,
+           type: d.percent > 0 ? 'LONG' : 'SHORT',
+           price: d.price.toLocaleString(),
+           amount: 'LIVE',
+           status: 'MONITORING'
+         }));
+         setLiveTrades(pulses);
       }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [activeMode]);
-
-  // ── Swarm Mode Master Protocol Simulator ──
-  useEffect(() => {
-    if (activeMode !== 'SWARM') {
-      setSwarmPhase('IDLE');
-      return;
+    } else if (activeMode === 'PROFESSOR') {
+      if (specialistData.phase) setProfessorPhase(specialistData.phase);
+      if (specialistData.progress !== undefined) setLearningProgress(specialistData.progress);
+    } else if (activeMode === 'ENGINEER') {
+      if (specialistData.phase) setEngineerPhase(specialistData.phase);
+      if (specialistData.progress !== undefined) setForgeProgress(specialistData.progress);
+    } else if (activeMode === 'SWARM') {
+       if (specialistData.phase) setSwarmPhase(specialistData.phase);
+       if (specialistData.messages) setSwarmMessages(specialistData.messages);
     }
-
-    const phases = ['RECRUITING', 'ANALYZING', 'SYNTHESIZING'];
-    let currentIdx = 0;
-
-    const messages = [
-      { from: 'TRADER', text: 'Market liquidity confirmed. Alpha detected in SOL/USDT.' },
-      { from: 'PROFESSOR', text: 'Architecting educational module for the detected signal.' },
-      { from: 'ENGINEER', text: 'Neural Forge ready. Manifesting automation script...' },
-      { from: 'MASTER', text: 'Global sync established. Commencing neural fusion.' }
-    ];
-
-    const interval = setInterval(() => {
-      if (currentIdx < phases.length) {
-        setSwarmPhase(phases[currentIdx]);
-        if (messages[currentIdx]) {
-          setSwarmMessages(prev => [...prev, messages[currentIdx]]);
-        }
-        currentIdx++;
-      } else {
-        if (currentIdx === phases.length && messages[3]) {
-          setSwarmMessages(prev => [...prev, messages[3]]);
-          currentIdx++;
-        }
-      }
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [activeMode]);
-
-  // ── Trader Mode Floor Simulator ──
-  useEffect(() => {
-    if (activeMode !== 'TRADER') {
-      setTraderPhase('IDLE');
-      setTraderProgress(0);
-      setLiveTrades([]);
-      return;
-    }
-
-    const phases = ['ANALYSIS', 'SIGNAL', 'EXECUTION', 'AUDIT', 'HARVEST'];
-    let currentIdx = 0;
-
-    const interval = setInterval(() => {
-      if (currentIdx < phases.length) {
-        setTraderPhase(phases[currentIdx]);
-        setTraderProgress((currentIdx + 1) * 20);
-
-        if (phases[currentIdx] === 'EXECUTION') {
-          setLiveTrades(prev => [
-            { id: Date.now(), pair: 'BTC/USDT', type: 'BUY', price: '67,432.12', amount: '0.42 BTC', status: 'FILLED' },
-            ...prev
-          ]);
-        }
-
-        currentIdx++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 4500);
-
-    return () => clearInterval(interval);
-  }, [activeMode]);
+  }, [specialistData, activeMode]);
 
 
 
-  // ── HUD Customization States ──
-  const [hudOpacity, setHudOpacity] = useState(() => parseFloat(localStorage.getItem('zaire_hud_opacity')) || 0.85);
-  const [neuralGlowEnabled, setNeuralGlowEnabled] = useState(() => localStorage.getItem('zaire_neural_glow') !== 'false');
-  const [holographicTiltEnabled, setHolographicTiltEnabled] = useState(() => localStorage.getItem('zaire_holographic_tilt') !== 'false');
 
-  // ── Mode-Specific Advanced Toggles ──
-  const [halalFilterEnabled, setHalalFilterEnabled] = useState(true);
-  const [autoLintEnabled, setAutoLintEnabled] = useState(true);
 
-  // Real-time Socket states
-  const socketRef = useRef(null);
-  const [zaireResponseStream, setZaireResponseStream] = useState('');
-  const [showResponsePanel, setShowResponsePanel] = useState(false);
-  const [isNeuralInterruptActive, setIsNeuralInterruptActive] = useState(false);
-  const responseTimeoutRef = useRef(null);
-
-  const [zaireActionFeed, setZaireActionFeed] = useState([
-    { time: '15:47', message: 'System boot complete' },
-    { time: '15:46', message: 'Neural core initialized' },
-    { time: '15:45', message: 'Voice synthesis online' },
-    { time: '15:44', message: 'Loading ZAIRE protocol' },
-    { time: '15:43', message: 'Mounting file system' },
-  ]);
-
-  // Biometric State
-  const [biometricData, setBiometricData] = useState({ detected: false, name: 'ABSENT', confidence: 0 });
-  const [isSecurityAlert, setIsSecurityAlert] = useState(false);
-  const [intruderSnapshots, setIntruderSnapshots] = useState([]);
-  const [showSecurityOverlay, setShowSecurityOverlay] = useState(false);
-  const [activeIntruder, setActiveIntruder] = useState(null);
-  const [specialistData, setSpecialistData] = useState({
-    active_persona: 'STARK_GRADE',
-    forge_telemetry: { neural_alignment: 0, thermal_hud: false },
-    active_projects: [],
-    forge_build_log: [],
-    portfolio_value: '0.00',
-    risk_level: 'LOW',
-    alpha_feed: []
-  });
 
   const [previewUrl, setPreviewUrl] = useState('http://localhost:3005');
   const [showDiff, setShowDiff] = useState(false);
@@ -355,7 +280,7 @@ function App() {
       }
     }
   }, [specialistData, activeMode, forgeCode]);
-  const [liveMetrics, setLiveMetrics] = useState({ cpu: 0, ram: 0, gpu: 0, latency: 4 });
+
   const [liveCodeStream, setLiveCodeStream] = useState('');
   const [professorSlides] = useState([
     { title: 'Neural Architectures', content: 'Understanding multi-head attention mechanisms in Transformers.', image: null },
@@ -433,11 +358,13 @@ function App() {
   }, [hudOpacity, neuralGlowEnabled, holographicTiltEnabled, systemState]);
 
   const [selectedComponent, setSelectedComponent] = useState('');
-  const [isOmniBoxOpen, setIsOmniBoxOpen] = useState(false);
-  const [omniInput, setOmniInput] = useState('');
 
   useEffect(() => {
-    if (isSecurityAlert || (biometricData && biometricData.intruders > 0)) {
+    // Red Light Override: If master is present, we NEVER show ALERT state
+    const masterPresent = biometricData && biometricData.name === 'Master';
+    const activeIntruder = biometricData && biometricData.intruder_present;
+
+    if (!masterPresent && (isSecurityAlert || activeIntruder)) {
       setSystemState('ALERT');
     } else if (isMicrophoneActive) {
       setSystemState('LISTENING');
@@ -491,13 +418,13 @@ function App() {
     );
   };
 
-  const [isGlitchActive, setIsGlitchActive] = useState(false);
+
   const [artifactTokens, setArtifactTokens] = useState([]);
   const [pendingArtifactTokens, setPendingArtifactTokens] = useState([]);
   const [isMinigameActive, setIsMinigameActive] = useState(false);
   const [minigameScore, setMinigameScore] = useState(0);
   const [gameNodes, setGameNodes] = useState([]);
-  const [isSystemEngaged, setIsSystemEngaged] = useState(false);
+
 
   // Neural Video State
   const [neuralVideoData, setNeuralVideoData] = useState(null);
@@ -642,8 +569,7 @@ function App() {
     setGameNodes(prev => prev.filter(n => n.id !== id));
 
     // Ripple effect
-    setIsGlitchActive(true);
-    setTimeout(() => setIsGlitchActive(false), 200);
+    // Removed glitch effect
 
     // Spawn new node after a delay
     setTimeout(() => {
@@ -800,6 +726,56 @@ function App() {
     }
   }, [fetchTTSAudio]);
 
+  useEffect(() => {
+    fetchChatSessions();
+  }, []);
+
+  const fetchChatSessions = async () => {
+    try {
+      const res = await fetch('http://127.0.0.1:3001/chats');
+      const data = await res.json();
+      if (data.success) {
+        setChatSessions(data.sessions);
+      }
+    } catch (e) {
+      console.error('Failed to fetch chat sessions:', e);
+    }
+  };
+
+  const handleNewChat = () => {
+    if (socketRef.current) {
+      socketRef.current.emit('new_chat');
+      setZaireResponseStream('');
+    }
+  };
+
+  const handleLoadSession = (sessionId) => {
+    if (socketRef.current) {
+      socketRef.current.emit('load_session', { sessionId });
+    }
+  };
+
+  const handleDeleteSession = async (e, sessionId) => {
+    e.stopPropagation();
+    if (window.confirm('Erase this neural thread from memory?')) {
+      try {
+        await fetch(`http://127.0.0.1:3001/chats/${sessionId}`, { method: 'DELETE' });
+        fetchChatSessions();
+        if (currentSessionId === sessionId) {
+          handleNewChat();
+        }
+      } catch (e) {
+        console.error('Failed to delete session:', e);
+      }
+    }
+  };
+
+  const handleRenameSession = (sessionId, newTitle) => {
+    if (socketRef.current) {
+      socketRef.current.emit('rename_session', { sessionId, title: newTitle });
+    }
+  };
+
   // Load memories and system config from backend on startup
   useEffect(() => {
     fetch('http://127.0.0.1:3001/memories')
@@ -844,11 +820,32 @@ function App() {
       }
     });
 
+    socketRef.current.on('session_started', (data) => {
+      setCurrentSessionId(data.sessionId);
+      fetchChatSessions();
+    });
+
+    socketRef.current.on('session_renamed', ({ sessionId, title }) => {
+      fetchChatSessions();
+      if (currentSessionId === sessionId) {
+        // Optional: update anything else related to current session
+      }
+    });
+
+    socketRef.current.on('session_loaded', (session) => {
+      setCurrentSessionId(session.id);
+      // Re-populate the stream with previous messages
+      const historyText = session.messages
+        .map(m => `${m.role === 'user' ? 'USER' : 'ZAIRE'}: ${m.content}`)
+        .join('\n\n');
+      setZaireResponseStream(historyText);
+      setShowResponsePanel(true);
+    });
+
     socketRef.current.on('ai_error', (err) => {
       const msg = typeof err === 'string' ? err : (err.message || "Unknown neural link error");
       console.error('[SOCKET] AI Error:', msg);
-      setIsGlitchActive(true);
-      setTimeout(() => setIsGlitchActive(false), 3000);
+      // Removed glitch effect
       setSystemActionLog(prev => [{ time: new Date().toLocaleTimeString(), message: `ERR: ${msg}` }, ...prev]);
     });
 
@@ -924,6 +921,7 @@ function App() {
 
     socketRef.current.on('ai_text_complete', () => {
       // Sequence will reset on next index 0
+      fetchChatSessions();
     });
 
     // Handle text chunks - fetch audio via HTTP for each chunk
@@ -974,6 +972,12 @@ function App() {
         setZaireActionFeed(prev => [{ time, message: data.content }, ...prev].slice(0, 5));
       }
     });
+
+    socketRef.current.on('SPECIALIST_DATA', (data) => {
+      console.log('[SOCKET] Specialist Telemetry:', data);
+      setSpecialistData(data);
+    });
+
 
     // System action events (mouse/keyboard)
     socketRef.current.on('system_action', (action) => {
@@ -1067,11 +1071,13 @@ function App() {
             name: data.master_present ? 'Master' : (data.running ? 'Scanning...' : 'Offline'),
             locked: data.pc_locked,
             enabled: data.face_lock_enabled,
-            intruders: data.total_intruders
+            intruders: data.total_intruders,
+            intruder_present: data.intruder_present,
+            disabled: data.security_disabled
           });
 
           // If master present, clear alerts
-          if (data.master_present) {
+          if (data.master_present || data.security_disabled) {
             setIsSecurityAlert(false);
             setShowSecurityOverlay(false);
           }
@@ -1080,6 +1086,23 @@ function App() {
         // Security daemon offline?
       }
     };
+
+    const toggleSecuritySystem = async (disabled) => {
+      try {
+        const res = await fetch('http://127.0.0.1:3001/security/toggle_system', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ disabled })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setBiometricData(prev => ({ ...prev, disabled }));
+        }
+      } catch (e) {
+        console.error("Failed to toggle security:", e);
+      }
+    };
+    window.toggleSecuritySystem = toggleSecuritySystem; // Expose for SettingsModal if needed
 
     const biometricInterval = setInterval(pollBiometrics, 3000);
 
@@ -1858,8 +1881,7 @@ function App() {
     };
 
     const handleGlobalClick = () => {
-      setIsGlitchActive(true);
-      setTimeout(() => setIsGlitchActive(false), 120);
+      // Removed glitch effect
     };
 
     window.addEventListener('resize', handleResize);
@@ -2165,7 +2187,8 @@ function App() {
       zaire-container 
       ${isDiagnosticActive ? 'diagnostic-active' : ''} 
       ${isSecurityAlert ? 'security-alert' : ''} 
-      ${isGlitchActive ? 'glitch-active' : ''} 
+      
+
       ${isNeuralPulseActive ? 'neural-pulse-active' : ''} 
       ${isNeuralInterruptActive ? 'neural-interrupt-flash' : ''}
     `.trim()}
@@ -2211,7 +2234,6 @@ function App() {
 
       <div className="grid-overlay"></div>
       <div className="vignette"></div>
-      <div className="scanline"></div>
       <div className="hex-overlay"></div>
 
       <div
@@ -2258,6 +2280,13 @@ function App() {
             <div className="status-indicator">
               <div className={`status-dot ${zaireStatus}`}></div>
               <span className="status-text">{zaireStatus.toUpperCase().replace('_', ' ')}</span>
+            </div>
+            <div className="archive-toggle" onClick={() => setIsArchivesOpen(!isArchivesOpen)} title="Neural Archives">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
             </div>
             <div className="clock-display">{timeStr}</div>
           </div>
@@ -2329,6 +2358,13 @@ function App() {
                       <span className="memory-text">{m.text}</span>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label">LAST COMMAND</div>
+                <div className="last-command" style={{ minHeight: '60px' }}>
+                  <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
                 </div>
               </div>
 
@@ -3546,7 +3582,99 @@ function App() {
           </div>
         </div>
 
-        {/* ROW 3: BOTTOM BAR */}
+        {/* NEURAL ARCHIVES DRAWER */}
+        <div className={`neural-archives-drawer ${isArchivesOpen ? 'open' : ''}`}>
+          <div className="drawer-header">
+            <div className="drawer-title">NEURAL ARCHIVES</div>
+            <button className="drawer-close" onClick={() => setIsArchivesOpen(false)}>×</button>
+          </div>
+          
+          <div className="drawer-content">
+            <div className="chat-actions-global">
+              <button className="new-chat-btn-large" onClick={() => { handleNewChat(); setIsArchivesOpen(false); }}>
+                + INITIALIZE NEW NEURAL THREAD
+              </button>
+            </div>
+
+            <div className="chat-search-box">
+              <input
+                type="text"
+                placeholder="SEARCH ARCHIVES..."
+                value={chatSearch}
+                onChange={(e) => setChatSearch(e.target.value)}
+                className="chat-search-input"
+              />
+              <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </div>
+
+            <div className="chat-session-list-premium">
+              {chatSessions.length === 0 && <div className="session-empty">NO THREADS ARCHIVED</div>}
+              {chatSessions
+                .filter(s => s.title.toLowerCase().includes(chatSearch.toLowerCase()))
+                .map(session => (
+                  <div
+                    key={session.id}
+                    className={`session-item-premium ${currentSessionId === session.id ? 'active' : ''}`}
+                    onClick={() => { handleLoadSession(session.id); setIsArchivesOpen(false); }}
+                  >
+                    <div className="session-info">
+                      {editingSessionId === session.id ? (
+                        <input
+                          autoFocus
+                          className="session-rename-input"
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          onBlur={() => {
+                            handleRenameSession(session.id, editingTitle);
+                            setEditingSessionId(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleRenameSession(session.id, editingTitle);
+                              setEditingSessionId(null);
+                            }
+                            if (e.key === 'Escape') setEditingSessionId(null);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <div className="session-title">{session.title}</div>
+                      )}
+                      <div className="session-meta">
+                        <span>{new Date(session.timestamp).toLocaleDateString()}</span>
+                        <span>{session.messageCount} MSGS</span>
+                      </div>
+                    </div>
+                    <div className="session-item-actions">
+                      <button
+                        className="session-action-btn rename"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingSessionId(session.id);
+                          setEditingTitle(session.title);
+                        }}
+                        title="Rename"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        className="session-action-btn delete"
+                        onClick={(e) => handleDeleteSession(e, session.id)}
+                        title="Delete"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ROW 3: BOTTOM PANEL */}
         <div className="grid-bottom">
           <div className="bottom-left">
             {/* ── SECURITY ALERT HUD (IMAGE OVERLAY) ── */}
@@ -3731,6 +3859,7 @@ function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         activeMode={activeMode}
+        biometricData={biometricData}
         blobColor={blobColor}
         setBlobColor={setBlobColor}
         blobSize={blobSize}

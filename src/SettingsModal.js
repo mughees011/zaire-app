@@ -260,6 +260,7 @@ function SettingsModal({
   autoLintEnabled,
   setAutoLintEnabled,
   onEnterDragMode,
+  biometricData,
 }) {
   const [activePage, setActivePage] = useState('hud');
   const [scanlines, setScanlines] = useState(true);
@@ -701,6 +702,17 @@ function SettingsModal({
                 </SettingRow>
                 <SettingRow name="INTRUDER SNAPSHOT" desc="Auto-capture camera feed on failed authentication">
                   <Toggle checked={intruderSnapshot} onChange={setIntruderSnapshot} />
+                </SettingRow>
+                <div style={{ margin: '15px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
+                <SettingRow name="FULLY DISABLE SECURITY" desc="Turn off all biometric scanning and locking">
+                  <Toggle 
+                    checked={biometricData?.disabled || false} 
+                    onChange={(val) => {
+                      if (window.toggleSecuritySystem) {
+                        window.toggleSecuritySystem(val);
+                      }
+                    }} 
+                  />
                 </SettingRow>
               </Section>
             </div>
