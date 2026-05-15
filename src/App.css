@@ -7847,3 +7847,253 @@ input[type=range]::-webkit-slider-thumb {
 .session-item-premium:hover .session-item-actions {
   opacity: 1;
 }
+
+/* ── ZAIRE AUTHENTICATION SCREEN ── */
+.zaire-auth-container-glass {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 5, 15, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.auth-box-wrapper {
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: authFadeIn 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes authFadeIn {
+  from { opacity: 0; transform: translateY(20px); filter: blur(5px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+.auth-brand-title {
+  font-family: var(--font-orbitron);
+  font-size: 32px;
+  color: var(--primary);
+  text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+  letter-spacing: 10px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+/* Clerk Overrides - High End Glassmorphism */
+.zaire-clerk-card {
+  background: rgba(0, 5, 10, 0.4) !important;
+  border: 1px solid rgba(0, 212, 255, 0.2) !important;
+  box-shadow: 0 0 50px rgba(0, 212, 255, 0.05), inset 0 0 20px rgba(0, 212, 255, 0.05) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-radius: 8px !important;
+  padding: 32px 36px !important;
+}
+
+.zaire-clerk-title {
+  color: #fff !important;
+  font-family: var(--font-orbitron) !important;
+  letter-spacing: 3px !important;
+  font-size: 24px !important;
+  text-shadow: 0 0 10px rgba(0, 212, 255, 0.5) !important;
+}
+
+.zaire-clerk-subtitle {
+  color: rgba(0, 212, 255, 0.6) !important;
+  font-family: var(--font-share) !important;
+  letter-spacing: 1px !important;
+}
+
+.zaire-clerk-label {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-family: var(--font-share) !important;
+  letter-spacing: 1px !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+}
+
+.zaire-clerk-input {
+  background: rgba(0, 15, 30, 0.5) !important;
+  border: 1px solid rgba(0, 212, 255, 0.2) !important;
+  color: #fff !important;
+  font-family: var(--font-share) !important;
+  border-radius: 4px !important;
+  padding: 10px 14px !important;
+  transition: all 0.3s ease !important;
+}
+
+.zaire-clerk-input:focus {
+  border-color: #00d4ff !important;
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.3), inset 0 0 5px rgba(0, 212, 255, 0.2) !important;
+  outline: none !important;
+}
+
+.zaire-clerk-button {
+  background: linear-gradient(90deg, rgba(0, 212, 255, 0.1), rgba(0, 120, 255, 0.2)) !important;
+  border: 1px solid #00d4ff !important;
+  color: #00d4ff !important;
+  font-family: var(--font-orbitron) !important;
+  border-radius: 4px !important;
+  padding: 12px !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 3px !important;
+  font-size: 12px !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.zaire-clerk-button:hover {
+  background: rgba(0, 212, 255, 0.2) !important;
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.5) !important;
+  transform: translateY(-1px) !important;
+}
+
+.zaire-clerk-button::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(rgba(255, 255, 255, 0.1), transparent, transparent);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.zaire-clerk-link {
+  color: #00d4ff !important;
+  opacity: 0.7 !important;
+  font-family: var(--font-share) !important;
+  transition: all 0.2s !important;
+  text-decoration: none !important;
+}
+
+.zaire-clerk-link:hover {
+  opacity: 1 !important;
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.5) !important;
+}
+
+.zaire-clerk-dividerLine {
+  background: rgba(0, 212, 255, 0.2) !important;
+}
+
+.zaire-clerk-dividerText {
+  color: rgba(255, 255, 255, 0.4) !important;
+  font-family: var(--font-share) !important;
+}
+
+.zaire-clerk-social-btn {
+  border: 1px solid rgba(0, 212, 255, 0.2) !important;
+  background: rgba(0, 10, 20, 0.6) !important;
+  transition: all 0.3s !important;
+}
+
+.zaire-clerk-social-btn:hover {
+  background: rgba(0, 212, 255, 0.1) !important;
+  border-color: #00d4ff !important;
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.2) !important;
+}
+
+.zaire-clerk-show-password {
+  color: rgba(0, 212, 255, 0.6) !important;
+}
+
+.zaire-clerk-show-password:hover {
+  color: #00d4ff !important;
+}
+
+/* ── UPGRADE BUTTON & USER PROFILE ── */
+.upgrade-btn {
+  background: linear-gradient(90deg, rgba(249, 115, 22, 0.2), rgba(249, 115, 22, 0.4));
+  border: 1px solid #f97316;
+  color: #f97316;
+  padding: 4px 12px;
+  font-family: var(--font-orbitron);
+  font-size: 10px;
+  letter-spacing: 2px;
+  border-radius: 2px;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.3);
+  transition: all 0.2s ease;
+  margin-right: 15px;
+}
+
+.upgrade-btn:hover {
+  background: #f97316;
+  color: #000;
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.6);
+}
+
+.clerk-user-profile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 15px;
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 50%;
+  padding: 2px;
+  transition: all 0.3s;
+}
+
+.clerk-user-profile:hover {
+  border-color: #00d4ff;
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+}
+
+.zaire-clerk-avatar {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+}
+
+/* Fix Apple Logo & Input Overrides */
+.cl-socialButtonsProviderIcon__apple, 
+img[src*="apple"] {
+  filter: invert(1) brightness(2) !important;
+}
+
+.zaire-clerk-input,
+.cl-formFieldInput,
+.cl-internal-1x7y18p,
+.cl-card input {
+  background: rgba(0, 15, 30, 0.8) !important;
+  border: 1px solid rgba(0, 212, 255, 0.4) !important;
+  color: #00d4ff !important;
+  padding: 12px 14px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  font-size: 14px !important;
+  letter-spacing: 0.5px !important;
+}
+
+.cl-internal-1x7y18p:focus,
+.cl-card input:focus {
+  background: rgba(0, 25, 45, 0.9) !important;
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.5) !important;
+  outline: none !important;
+  border-color: #00d4ff !important;
+}
+
+/* Force text colors inside input */
+.cl-formFieldInput::-webkit-input-placeholder,
+.cl-card input::-webkit-input-placeholder {
+  color: rgba(0, 212, 255, 0.4) !important;
+}
+
+/* Chrome Autofill overrides */
+.cl-card input:-webkit-autofill,
+.cl-card input:-webkit-autofill:hover, 
+.cl-card input:-webkit-autofill:focus, 
+.cl-card input:-webkit-autofill:active{
+    -webkit-box-shadow: 0 0 0 30px rgba(0, 15, 30, 0.9) inset !important;
+    -webkit-text-fill-color: #00d4ff !important;
+    transition: background-color 5000s ease-in-out 0s !important;
+}

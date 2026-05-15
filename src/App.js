@@ -6,6 +6,7 @@ import GroqSpeechService from './groqSpeechService';
 import { io } from 'socket.io-client';
 import './App.css';
 import ShadowAssistant from './components/ShadowAssistant';
+import { SignedIn, SignedOut, SignIn, SignUp, UserButton, useUser } from '@clerk/clerk-react';
 
 const DEFAULT_BLOB_COLOR = '#00b4ff';
 const API_BASE_URL = 'http://localhost:3001';
@@ -17,6 +18,7 @@ function normalizeHexColor(value) {
 }
 
 function App() {
+  const { user } = useUser();
   const threeCanvasRef = useRef(null);
   const gridCanvasRef = useRef(null);
   const cameraRef = useRef(null);
@@ -30,6 +32,17 @@ function App() {
   // ── Mode-Specific Advanced Toggles ──
   const [halalFilterEnabled, setHalalFilterEnabled] = useState(true);
   const [autoLintEnabled, setAutoLintEnabled] = useState(true);
+
+  const [authView, setAuthView] = useState(() => window.location.hash.includes('sign-up') ? 'signup' : 'signin');
+
+  useEffect(() => {
+    const handleHash = () => {
+      if (window.location.hash.includes('sign-up')) setAuthView('signup');
+      else setAuthView('signin');
+    };
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
 
   // Real-time Socket states
   const socketRef = useRef(null);
@@ -2167,6 +2180,26 @@ function App() {
 
   const navItems = ['ZAIRE', 'TRADER', 'PROFESSOR', 'ENGINEER', 'SWARM'];
 
+  const handleUpgradePro = async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/billing/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          userId: user.id, 
+          userEmail: user.primaryEmailAddress?.emailAddress 
+        })
+      });
+      const data = await res.json();
+      if (data.checkoutUrl) {
+        window.open(data.checkoutUrl, '_blank');
+      }
+    } catch (e) {
+      console.error("Upgrade checkout failed:", e);
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === 'k') {
@@ -2184,6 +2217,7 @@ function App() {
   return (
     <div
       className={`
+
       zaire-container 
       ${isDiagnosticActive ? 'diagnostic-active' : ''} 
       ${isSecurityAlert ? 'security-alert' : ''} 
@@ -2208,6 +2242,8 @@ function App() {
       <canvas id="three-canvas" ref={threeCanvasRef}></canvas>
       <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
 
+      {/* <SignedIn> - Auth Disabled for Dev */}
+      <>
       {/* Neural Pulse Arena Overlay */}
       {isMinigameActive && (
         <div className="neural-pulse-arena">
@@ -2287,6 +2323,16 @@ function App() {
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
+            </div>
+            <div className="upgrade-btn" onClick={handleUpgradePro}>
+              UPGRADE PRO
+            </div>
+            <div className="clerk-user-profile">
+              <UserButton appearance={{
+                elements: {
+                  avatarBox: "zaire-clerk-avatar"
+                }
+              }}/>
             </div>
             <div className="clock-display">{timeStr}</div>
           </div>
@@ -3979,6 +4025,22 @@ function App() {
             <div className="scan-line"></div>
           </div>
         </div>
+        )}
+      </>
+
+      {false && (
+      <SignedOut>
+        <div className="zaire-auth-container-glass">
+          <div className="auth-box-wrapper">
+            <h1 className="auth-brand-title">ZAIRE OS</h1>
+            {authView === 'signin' ? (
+              <SignIn routing="hash" signUpUrl="#sign-up" forceRedirectUrl="/" />
+            ) : (
+              <SignUp routing="hash" signInUrl="#sign-in" forceRedirectUrl="/" />
+            )}
+          </div>
+        </div>
+      </SignedOut>
       )}
     </div>
   );
