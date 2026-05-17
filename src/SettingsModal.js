@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './SettingsModal.css';
 
 const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
@@ -97,6 +97,10 @@ const blankCreatorDraft = {
   color: '#00d4ff',
   capabilities: ['WEB SEARCH', 'FILE SYSTEM', 'SCREEN VISION', 'COMPUTER USE'],
   persona: '',
+  goals: '',
+  preferredOutput: 'Action Plan',
+  components: ['TOPBAR', 'LEFT_PANEL', 'CENTER_STAGE'],
+  routingPriority: 'Balanced',
 };
 
 const navGroups = [
@@ -127,6 +131,7 @@ const navGroups = [
     items: [
       { id: 'voice', label: 'VOICE & WAKE', icon: '\u25c9' },
       { id: 'security', label: 'PROTECTION', icon: '\u25a3' },
+      { id: 'licensing', label: 'LICENSING', icon: '\uD83D\uDD12', badge: 'SECURE' },
       { id: 'memory', label: 'MEMORY', icon: '\u25a6' },
       { id: 'notif', label: 'ALERTS', icon: '\u25cc' },
     ],
@@ -203,7 +208,7 @@ function Segment({ value, options, onChange }) {
   );
 }
 
-function ApiSlot({ slot, status, provider, purpose, empty = false }) {
+function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empty = false, onChange }) {
   return (
     <div className="api-slot">
       <div className="api-slot-header">
@@ -212,30 +217,52 @@ function ApiSlot({ slot, status, provider, purpose, empty = false }) {
           {status}
         </span>
       </div>
-      <select className="api-provider-select" defaultValue={provider} style={{ width: '100%', marginBottom: 6 }}>
+      <select
+        className="api-provider-select"
+        value={provider}
+        onChange={(e) => onChange({ provider: e.target.value })}
+        style={{ width: '100%', marginBottom: 6 }}
+      >
         <option>OpenAI</option>
         <option>Groq</option>
         <option>Anthropic</option>
         <option>Google Gemini</option>
         <option>DeepSeek</option>
+        <option>Azure OpenAI</option>
+        <option>Cohere</option>
+        <option>Mistral</option>
+        <option>SiliconFlow</option>
         <option>Empty</option>
       </select>
-      <input className="api-key-input" type="password" placeholder={empty ? 'Paste provider key...' : 'sk-... encrypted key stored locally'} />
+      <input
+        className="api-key-input"
+        type="password"
+        value={apiKey || ''}
+        onChange={(e) => onChange({ apiKey: e.target.value, hasKey: Boolean(e.target.value) })}
+        placeholder={empty ? 'Paste provider key...' : 'sk-... encrypted key stored locally'}
+      />
+      <input
+        className="api-key-input"
+        type="text"
+        value={baseUrl || ''}
+        onChange={(e) => onChange({ baseUrl: e.target.value })}
+        placeholder="Optional custom base URL (OpenAI-compatible)"
+      />
       <div className="api-row">
-        <select className="api-model-select" defaultValue={empty ? 'Auto' : 'Auto'}>
+        <select className="api-model-select" value={model || 'Auto'} onChange={(e) => onChange({ model: e.target.value })}>
           <option>Auto</option>
           <option>Fast</option>
           <option>Deep Reasoning</option>
           <option>Code Specialist</option>
         </select>
-        <select className="api-purpose" defaultValue={purpose}>
+        <select className="api-purpose" value={purpose} onChange={(e) => onChange({ purpose: e.target.value })}>
           <option>Primary</option>
           <option>Coding</option>
           <option>Research</option>
           <option>Vision</option>
           <option>Fallback</option>
         </select>
-        <button type="button" className="api-test-btn">TEST</button>
+        <button type="button" className="api-test-btn" onClick={() => onChange({ enabled: !empty })}>SET</button>
       </div>
     </div>
   );
@@ -261,6 +288,8 @@ function SettingsModal({
   setAutoLintEnabled,
   onEnterDragMode,
   biometricData,
+  customModes,
+  onCustomModesChange,
 }) {
   const [activePage, setActivePage] = useState('hud');
   const [scanlines, setScanlines] = useState(true);
@@ -279,25 +308,152 @@ function SettingsModal({
   const [missionDigest, setMissionDigest] = useState(true);
   const [selectedTemplateId, setSelectedTemplateId] = useState(modeTemplates[0].id);
   const [creatorDraft, setCreatorDraft] = useState(blankCreatorDraft);
-  const [customModes, setCustomModes] = useState(() => {
+  const [localModes, setLocalModes] = useState(customModes && customModes.length ? customModes : defaultCustomModes);
+  const [aiSlots, setAiSlots] = useState(() => ([
+    { provider: 'Groq', apiKey: '', hasKey: false, model: 'Auto', purpose: 'Primary', baseUrl: '', enabled: true },
+    { provider: 'OpenAI', apiKey: '', hasKey: false, model: 'Auto', purpose: 'Coding', baseUrl: '', enabled: true },
+    { provider: 'Empty', apiKey: '', hasKey: false, model: 'Auto', purpose: 'Fallback', baseUrl: '', enabled: false }
+  ]));
+
+  const [licenseKeyInput, setLicenseKeyInput] = useState('');
+  const [licensingInfo, setLicensingInfo] = useState(null);
+  const [licensingError, setLicensingError] = useState(null);
+  const [licensingLoading, setLicensingLoading] = useState(false);
+
+  const fetchLicensingInfo = async () => {
+    setLicensingLoading(true);
     try {
-      const saved = localStorage.getItem(MODE_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : defaultCustomModes;
-    } catch {
-      return defaultCustomModes;
+      const storedLicense = localStorage.getItem('zaire_license_key') || '';
+      if (storedLicense) {
+        setLicenseKeyInput(storedLicense);
+        const response = await fetch('http://127.0.0.1:3001/api/license/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            license_key: storedLicense,
+            machine_id: 'BROWSER_HUD'
+          })
+        });
+        const data = await response.json();
+        if (data.valid) {
+          setLicensingInfo(data);
+          setLicensingError(null);
+        } else {
+          setLicensingError(data.error || 'INVALID_KEY');
+          setLicensingInfo(null);
+        }
+      }
+    } catch (err) {
+      console.warn('Licensing check failed:', err.message);
+    } finally {
+      setLicensingLoading(false);
     }
-  });
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchLicensingInfo();
+    }
+  }, [isOpen]);
+
+  const activateNewKey = async () => {
+    if (!licenseKeyInput.trim()) return;
+    setLicensingLoading(true);
+    setLicensingError(null);
+    try {
+      const response = await fetch('http://127.0.0.1:3001/api/license/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          license_key: licenseKeyInput.trim(),
+          machine_id: 'BROWSER_HUD',
+          machine_name: 'ZAIRE Web HUD Console',
+          os_version: 'Web Client'
+        })
+      });
+      const data = await response.json();
+      if (data.valid) {
+        localStorage.setItem('zaire_license_key', licenseKeyInput.trim());
+        setLicensingInfo(data);
+        setLicensingError(null);
+      } else {
+        setLicensingError(data.error || 'INVALID_KEY');
+        setLicensingInfo(null);
+      }
+    } catch (err) {
+      setLicensingError('CONNECTION_FAILED');
+    } finally {
+      setLicensingLoading(false);
+    }
+  };
+
+  const deactivateDevice = async (machineId) => {
+    if (!licensingInfo?.license_key) return;
+    setLicensingLoading(true);
+    try {
+      const response = await fetch('http://127.0.0.1:3001/api/license/deactivate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          license_key: licensingInfo.license_key,
+          machine_id: machineId
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        fetchLicensingInfo();
+      } else {
+        alert(data.error || 'Failed to deactivate device.');
+      }
+    } catch (err) {
+      alert('Connection failed.');
+    } finally {
+      setLicensingLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (Array.isArray(customModes) && customModes.length > 0) {
+      setLocalModes(customModes);
+    }
+  }, [customModes]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let isActive = true;
+    fetch('http://127.0.0.1:3001/llm/providers')
+      .then((r) => r.json())
+      .then((data) => {
+        if (!isActive) return;
+        const slots = data?.slots;
+        if (Array.isArray(slots) && slots.length > 0) {
+          const normalized = [0, 1, 2].map((i) => ({
+            provider: slots[i]?.provider || 'Empty',
+            apiKey: slots[i]?.apiKey || '',
+            hasKey: Boolean(slots[i]?.hasKey),
+            model: slots[i]?.model || 'Auto',
+            purpose: slots[i]?.purpose || (i === 0 ? 'Primary' : i === 1 ? 'Coding' : 'Fallback'),
+            baseUrl: slots[i]?.baseUrl || '',
+            enabled: Boolean(slots[i]?.enabled ?? true)
+          }));
+          setAiSlots(normalized);
+        }
+      })
+      .catch(() => {});
+    return () => { isActive = false; };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const hudOpacityPercent = Math.round(hudOpacity * 100);
   const setHudOpacityPercent = (value) => setHudOpacity(value / 100);
   const selectedTemplate = modeTemplates.find((template) => template.id === selectedTemplateId) || modeTemplates[0];
-  const modeCount = customModes.length;
+  const modeCount = localModes.length;
 
   const persistCustomModes = (nextModes) => {
-    setCustomModes(nextModes);
+    setLocalModes(nextModes);
     localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(nextModes));
+    if (onCustomModesChange) onCustomModesChange(nextModes);
   };
 
   const applyTemplateToDraft = (template) => {
@@ -307,6 +463,10 @@ function SettingsModal({
       color: template.color,
       capabilities: template.capabilities,
       persona: template.persona,
+      goals: '',
+      preferredOutput: 'Action Plan',
+      components: ['TOPBAR', 'LEFT_PANEL', 'CENTER_STAGE'],
+      routingPriority: 'Balanced',
     });
     setSelectedTemplateId(template.id);
     setActivePage('creator');
@@ -337,18 +497,22 @@ function SettingsModal({
       color: creatorDraft.color,
       capabilities: creatorDraft.capabilities,
       persona: creatorDraft.persona.trim() || 'Custom ZAIRE specialist',
+      goals: creatorDraft.goals.trim(),
+      preferredOutput: creatorDraft.preferredOutput,
+      components: creatorDraft.components,
+      routingPriority: creatorDraft.routingPriority,
       enabled: true,
       source: selectedTemplateId ? `template:${selectedTemplateId}` : 'custom',
       createdAt: new Date().toISOString(),
     };
 
-    persistCustomModes([nextMode, ...customModes]);
+    persistCustomModes([nextMode, ...localModes]);
     setCreatorDraft(blankCreatorDraft);
     setActivePage('mymodes');
   };
 
   const toggleModeEnabled = (modeId) => {
-    persistCustomModes(customModes.map((mode) => (
+    persistCustomModes(localModes.map((mode) => (
       mode.id === modeId ? { ...mode, enabled: !mode.enabled } : mode
     )));
   };
@@ -496,10 +660,40 @@ function SettingsModal({
               <div className="page-title">AI VAULT</div>
               <div className="page-sub">Connect up to 3 AI providers. ZAIRE routes tasks to the optimal model automatically.</div>
               <Section title="PRIMARY INTELLIGENCE SLOTS (MAX 3)">
-                <ApiSlot slot="1 - PRIMARY" status="CONNECTED" provider="Groq" purpose="Primary" />
-                <ApiSlot slot="2 - CODING" status="PENDING" provider="DeepSeek" purpose="Coding" />
-                <ApiSlot slot="3 - EMPTY" status="EMPTY" provider="Empty" purpose="Fallback" empty />
-                <div className="api-limit-note">Provider keys remain local until a secure vault backend is configured.</div>
+                <ApiSlot
+                  slot="1 - PRIMARY"
+                  status={(aiSlots[0]?.apiKey || aiSlots[0]?.hasKey) ? 'CONNECTED' : 'PENDING'}
+                  provider={aiSlots[0]?.provider || 'Empty'}
+                  purpose={aiSlots[0]?.purpose || 'Primary'}
+                  model={aiSlots[0]?.model || 'Auto'}
+                  apiKey={aiSlots[0]?.apiKey || ''}
+                  baseUrl={aiSlots[0]?.baseUrl || ''}
+                  empty={(aiSlots[0]?.provider || 'Empty') === 'Empty'}
+                  onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => i === 0 ? { ...s, ...patch } : s))}
+                />
+                <ApiSlot
+                  slot="2 - CODING"
+                  status={(aiSlots[1]?.apiKey || aiSlots[1]?.hasKey) ? 'CONNECTED' : 'PENDING'}
+                  provider={aiSlots[1]?.provider || 'Empty'}
+                  purpose={aiSlots[1]?.purpose || 'Coding'}
+                  model={aiSlots[1]?.model || 'Auto'}
+                  apiKey={aiSlots[1]?.apiKey || ''}
+                  baseUrl={aiSlots[1]?.baseUrl || ''}
+                  empty={(aiSlots[1]?.provider || 'Empty') === 'Empty'}
+                  onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => i === 1 ? { ...s, ...patch } : s))}
+                />
+                <ApiSlot
+                  slot="3 - FALLBACK"
+                  status={(aiSlots[2]?.apiKey || aiSlots[2]?.hasKey) ? 'CONNECTED' : 'EMPTY'}
+                  provider={aiSlots[2]?.provider || 'Empty'}
+                  purpose={aiSlots[2]?.purpose || 'Fallback'}
+                  model={aiSlots[2]?.model || 'Auto'}
+                  apiKey={aiSlots[2]?.apiKey || ''}
+                  baseUrl={aiSlots[2]?.baseUrl || ''}
+                  empty={(aiSlots[2]?.provider || 'Empty') === 'Empty'}
+                  onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => i === 2 ? { ...s, ...patch } : s))}
+                />
+                <div className="api-limit-note">Keys are saved locally in your ZAIRE system config and applied at runtime.</div>
               </Section>
             </div>
           )}
@@ -598,6 +792,37 @@ function SettingsModal({
                     />
                   </div>
                   <div className="wizard-field">
+                    <label className="wf-label">MISSION GOALS (ASK MORE)</label>
+                    <textarea
+                      className="wf-textarea"
+                      placeholder="What outcomes should this mode optimize for every session?"
+                      value={creatorDraft.goals}
+                      onChange={(event) => setCreatorDraft({ ...creatorDraft, goals: event.target.value })}
+                    />
+                  </div>
+                  <div className="wizard-field">
+                    <label className="wf-label">PREFERRED OUTPUT STYLE</label>
+                    <select
+                      className="hud-select"
+                      value={creatorDraft.preferredOutput}
+                      onChange={(event) => setCreatorDraft({ ...creatorDraft, preferredOutput: event.target.value })}
+                    >
+                      <option>Action Plan</option>
+                      <option>Deep Analysis</option>
+                      <option>Checklist</option>
+                      <option>Executive Summary</option>
+                      <option>Teach Me</option>
+                    </select>
+                  </div>
+                  <div className="wizard-field">
+                    <label className="wf-label">ROUTING PRIORITY</label>
+                    <Segment
+                      value={creatorDraft.routingPriority}
+                      options={['Speed', 'Balanced', 'Reasoning']}
+                      onChange={(value) => setCreatorDraft({ ...creatorDraft, routingPriority: value })}
+                    />
+                  </div>
+                  <div className="wizard-field">
                     <label className="wf-label">SIGNAL COLOR</label>
                     <div className="color-row">
                       {['#00d4ff', '#00ff88', '#a78bfa', '#fbbf24', '#f97316', '#ec4899', '#60a5fa', '#34d399'].map((color) => (
@@ -627,6 +852,29 @@ function SettingsModal({
                       ))}
                     </div>
                   </div>
+                  <div className="wizard-field">
+                    <label className="wf-label">HUD COMPONENTS</label>
+                    <div className="component-grid">
+                      {['TOPBAR', 'LEFT_PANEL', 'CENTER_STAGE', 'RIGHT_PANEL', 'BOTTOM_COMMAND', 'ARCHIVE_ACCESS'].map((item) => (
+                        <button
+                          type="button"
+                          className={`comp-opt ${creatorDraft.components.includes(item) ? 'selected' : ''}`}
+                          key={item}
+                          onClick={() => {
+                            const has = creatorDraft.components.includes(item);
+                            setCreatorDraft({
+                              ...creatorDraft,
+                              components: has
+                                ? creatorDraft.components.filter((x) => x !== item)
+                                : [...creatorDraft.components, item]
+                            });
+                          }}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="wizard-nav">
                     <button type="button" className="wiz-btn wiz-btn-back" onClick={() => setCreatorDraft(blankCreatorDraft)}>CLEAR</button>
                     <button type="button" className="wiz-btn wiz-btn-create" onClick={manifestMode}>MANIFEST MODE</button>
@@ -641,7 +889,7 @@ function SettingsModal({
               <div className="page-title">MY CUSTOM MODES</div>
               <div className="page-sub">Your personally created specialist modes</div>
               <Section title="ACTIVE CUSTOM MODES">
-                {customModes.map((mode) => (
+                {localModes.map((mode) => (
                   <div className="custom-mode-card" key={mode.id}>
                     <span className="mode-color-dot" style={{ background: mode.color, boxShadow: `0 0 5px ${mode.color}` }} />
                     <div className="mode-card-copy">
@@ -733,6 +981,92 @@ function SettingsModal({
             </div>
           )}
 
+          {activePage === 'licensing' && (
+            <div className="page active">
+              <div className="page-title">LICENSING & DEPLOYED DEVICES</div>
+              <div className="page-sub">Verify subscription authority and manage hardware nodes</div>
+              <Section title="LICENSE ACTIVATION">
+                <div style={{ display: 'flex', gap: 10, marginBottom: 15 }}>
+                  <input
+                    className="wf-input"
+                    placeholder="e.g. ZAIRE-XXXX-XXXX-XXXX-XXXX"
+                    value={licenseKeyInput}
+                    onChange={(e) => setLicenseKeyInput(e.target.value)}
+                    style={{ flex: 1, textTransform: 'uppercase', fontFamily: 'Courier New', fontWeight: 'bold', fontSize: 13 }}
+                  />
+                  <button type="button" className="footer-btn footer-btn-apply" style={{ padding: '0 20px', height: 35 }} onClick={activateNewKey}>
+                    ACTIVATE
+                  </button>
+                </div>
+                {licensingError && (
+                  <div style={{ color: '#ff3333', fontSize: 11, fontFamily: 'Courier New', marginBottom: 15 }}>
+                    FAIL_ERROR: {licensingError === 'INVALID_KEY' ? 'INVALID OR ACTIVE SLOTS DEPLETED' : licensingError}
+                  </div>
+                )}
+                {licensingLoading && (
+                  <div style={{ color: '#00f2ff', fontSize: 11, fontFamily: 'Courier New', marginBottom: 15 }}>
+                    ESTABLISHING SECURE PORTAL DEPLOYMENT...
+                  </div>
+                )}
+              </Section>
+
+              {licensingInfo ? (
+                <>
+                  <Section title="SUBSCRIPTION MATRIX">
+                    <SettingRow name="PLAN PROFILE" desc="Current operational authority level">
+                      <span className="api-status connected">{licensingInfo.plan?.toUpperCase()}</span>
+                    </SettingRow>
+                    <SettingRow name="USER INTEGRITY EMAIL" desc="Authorized account linked to licensing">
+                      <span style={{ color: '#ffffff', fontFamily: 'Courier New', fontSize: 12 }}>{licensingInfo.user_email}</span>
+                    </SettingRow>
+                    <SettingRow name="EXPIRY SCHEDULE" desc="Subscription expiration deadline">
+                      <span style={{ color: '#fbbf24', fontFamily: 'Courier New', fontSize: 12 }}>
+                        {licensingInfo.expiry ? new Date(licensingInfo.expiry).toLocaleString() : 'PERPETUAL CORES'}
+                      </span>
+                    </SettingRow>
+                  </Section>
+
+                  <Section title="DEPLOYED HARDWARE CORES">
+                    {licensingInfo.machines && licensingInfo.machines.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {licensingInfo.machines.map((m) => (
+                          <div key={m.machine_id} style={{ background: '#001528', border: '1px solid rgba(0, 242, 255, 0.1)', padding: 10, borderRadius: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ color: '#00f2ff', fontFamily: 'Courier New', fontSize: 12, fontWeight: 'bold' }}>
+                                {m.machine_name} {m.machine_id === 'BROWSER_HUD' ? '(Console)' : ''}
+                              </div>
+                              <div style={{ color: '#888', fontSize: 10, fontFamily: 'Courier New' }}>
+                                OS: {m.os_version} | ID: {m.machine_id?.substring(0, 12)}...
+                              </div>
+                              <div style={{ color: '#666', fontSize: 9, fontFamily: 'Courier New' }}>
+                                LAST ACTIVE: {m.last_seen ? new Date(m.last_seen).toLocaleString() : 'Never'}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => deactivateDevice(m.machine_id)}
+                              style={{ background: '#ff3333', color: '#fff', border: 'none', padding: '4px 8px', fontFamily: 'Courier New', fontSize: 9, fontWeight: 'bold', cursor: 'pointer', borderRadius: 2 }}
+                            >
+                              DEACTIVATE
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ color: '#888', fontSize: 11, fontStyle: 'italic' }}>
+                        No physical client cores deployed. Validate on your desktop system to register.
+                      </div>
+                    )}
+                  </Section>
+                </>
+              ) : (
+                <div style={{ color: '#888', fontSize: 12, fontStyle: 'italic', padding: '10px 0' }}>
+                  ZAIRE HUD is currently locked to Standard Free Trial capabilities. Activate a premium license to deploy Advanced Multi-Modes.
+                </div>
+              )}
+            </div>
+          )}
+
           {activePage === 'notif' && (
             <div className="page active">
               <div className="page-title">ALERTS</div>
@@ -766,7 +1100,13 @@ function SettingsModal({
               type="button"
               className="footer-btn footer-btn-apply"
               onClick={() => {
-                window.dispatchEvent(new CustomEvent('zaire_PERSIST_CONFIG'));
+                window.dispatchEvent(new CustomEvent('ZAIRE_PERSIST_CONFIG', {
+                  detail: {
+                    aiVault: {
+                      slots: aiSlots.slice(0, 3)
+                    }
+                  }
+                }));
                 onClose();
               }}
             >

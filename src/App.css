@@ -7848,6 +7848,225 @@ input[type=range]::-webkit-slider-thumb {
   opacity: 1;
 }
 
+.neural-archives-page {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  background: radial-gradient(circle at 18% 20%, rgba(0, 212, 255, 0.14), transparent 30%),
+              radial-gradient(circle at 82% 16%, rgba(57, 255, 20, 0.10), transparent 32%),
+              linear-gradient(135deg, rgba(2, 7, 16, 0.98), rgba(0, 3, 8, 0.98));
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 26px;
+}
+
+.neural-archives-shell {
+  width: min(1500px, 100%);
+  height: 100%;
+  border: 1px solid rgba(0, 212, 255, 0.25);
+  background: linear-gradient(165deg, rgba(6, 14, 26, 0.95), rgba(3, 8, 16, 0.95));
+  box-shadow: 0 20px 80px rgba(0, 212, 255, 0.14), inset 0 0 40px rgba(0, 212, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.archives-page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  padding: 22px 28px;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.20);
+  background: linear-gradient(90deg, rgba(0, 212, 255, 0.08), rgba(0, 212, 255, 0.02), transparent);
+}
+
+.archives-kicker {
+  font-family: var(--font-share);
+  font-size: 11px;
+  color: rgba(0, 242, 255, 0.65);
+  letter-spacing: 3px;
+}
+
+.archives-title {
+  font-family: var(--font-orbitron);
+  font-size: clamp(20px, 2.3vw, 34px);
+  color: #dcf8ff;
+  letter-spacing: 4px;
+  text-shadow: 0 0 20px rgba(0, 212, 255, 0.28);
+}
+
+.archives-subtitle {
+  font-family: var(--font-share);
+  color: rgba(184, 233, 245, 0.62);
+  font-size: 12px;
+  letter-spacing: 1.1px;
+}
+
+.archives-header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.archive-head-btn {
+  border: 1px solid rgba(0, 212, 255, 0.35);
+  background: rgba(0, 212, 255, 0.08);
+  color: #b9f6ff;
+  font-family: var(--font-share);
+  letter-spacing: 1.5px;
+  font-size: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.archive-head-btn:hover {
+  background: rgba(0, 212, 255, 0.2);
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.26);
+}
+
+.archive-head-btn.close {
+  border-color: rgba(255, 132, 132, 0.4);
+  color: rgba(255, 183, 183, 0.9);
+  background: rgba(255, 76, 76, 0.08);
+}
+
+.archives-page-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 0.95fr 1.35fr;
+  min-height: 0;
+}
+
+.archives-list-pane {
+  border-right: 1px solid rgba(0, 212, 255, 0.14);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.archives-search {
+  margin-bottom: 14px;
+}
+
+.archives-list-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.archive-card {
+  border: 1px solid rgba(168, 226, 255, 0.16);
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.03), rgba(0, 212, 255, 0.02));
+  padding: 14px;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.archive-card:hover {
+  border-color: rgba(0, 212, 255, 0.36);
+  transform: translateY(-1px);
+}
+
+.archive-card.active {
+  border-color: rgba(0, 242, 255, 0.85);
+  box-shadow: 0 0 24px rgba(0, 212, 255, 0.18);
+}
+
+.archive-card-title {
+  color: #f6fcff;
+  font-family: var(--font-orbitron);
+  font-size: 12px;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.archive-card-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: rgba(194, 236, 248, 0.52);
+  font-size: 10px;
+  margin-bottom: 10px;
+}
+
+.archive-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.session-action-btn.active-like {
+  border-color: rgba(70, 255, 140, 0.7);
+  color: rgba(168, 255, 201, 0.95);
+}
+
+.session-action-btn.active-dislike {
+  border-color: rgba(255, 108, 108, 0.74);
+  color: rgba(255, 171, 171, 0.95);
+}
+
+.archives-detail-pane {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.archives-detail-head {
+  border-bottom: 1px solid rgba(0, 212, 255, 0.16);
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+}
+
+.archives-detail-title {
+  font-family: var(--font-orbitron);
+  color: #e8fbff;
+  letter-spacing: 2px;
+  font-size: 14px;
+}
+
+.archives-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  margin: 0;
+  font-family: 'JetBrains Mono', var(--font-share), monospace;
+  line-height: 1.55;
+  font-size: 12px;
+  color: rgba(221, 247, 255, 0.84);
+  background: rgba(0, 7, 16, 0.55);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  padding: 16px;
+}
+
+.archives-empty-state {
+  margin: auto;
+  color: rgba(190, 233, 245, 0.62);
+  letter-spacing: 1.2px;
+  font-family: var(--font-share);
+}
+
+@media (max-width: 980px) {
+  .neural-archives-page {
+    padding: 10px;
+  }
+  .archives-page-body {
+    grid-template-columns: 1fr;
+  }
+  .archives-list-pane {
+    max-height: 44%;
+    border-right: 0;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.14);
+  }
+}
+
 /* ── ZAIRE AUTHENTICATION SCREEN ── */
 .zaire-auth-container-glass {
   position: absolute;

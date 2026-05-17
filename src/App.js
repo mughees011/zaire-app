@@ -10,6 +10,8 @@ import { SignedIn, SignedOut, SignIn, SignUp, UserButton, useUser } from '@clerk
 
 const DEFAULT_BLOB_COLOR = '#00b4ff';
 const API_BASE_URL = 'http://localhost:3001';
+const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
+const CORE_MODES = ['ZAIRE', 'TRADER', 'PROFESSOR', 'ENGINEER', 'SWARM'];
 
 function normalizeHexColor(value) {
   if (!value || typeof value !== 'string') return DEFAULT_BLOB_COLOR;
@@ -74,6 +76,14 @@ function App() {
 
 
   const [activeMode, setActiveMode] = useState('ZAIRE');
+  const [customModes, setCustomModes] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(MODE_STORAGE_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [activeCustomMode, setActiveCustomMode] = useState(null);
   const [zaireStatus, setZaireStatus] = useState('online');
   const [isDeepThinking, setIsDeepThinking] = useState(false);
   const [timeStr, setTimeStr] = useState('00:00:00');
@@ -147,7 +157,16 @@ function App() {
   const [chatSearch, setChatSearch] = useState('');
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [editingTitle, setEditingTitle] = useState('');
-  const [isArchivesOpen, setIsArchivesOpen] = useState(false);
+  const [isArchivesPageOpen, setIsArchivesPageOpen] = useState(false);
+  const [selectedArchiveId, setSelectedArchiveId] = useState(null);
+  const [archiveSessionCache, setArchiveSessionCache] = useState({});
+  const [archiveReactions, setArchiveReactions] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('zaire_archive_reactions_v1') || '{}');
+    } catch {
+      return {};
+    }
+  });
 
   // ── System State Engine ──
   const [systemState, setSystemState] = useState('IDLE'); // IDLE, LISTENING, THINKING, ALERT, SUCCESS
@@ -181,7 +200,6 @@ function App() {
   });
 
 
-  const modes = ['ZAIRE', 'TRADER', 'PROFESSOR', 'ENGINEER', 'SWARM'];
 
   const [lastUserPrompt, setLastUserPrompt] = useState('');
 
@@ -511,6 +529,19 @@ function App() {
     playSpatialSound('switch', newMode === 'ZAIRE' ? 'center' : (newMode === 'TRADER' ? 'left' : 'right'));
   }, [activeMode, playSpatialSound]);
 
+  const activateNavbarMode = React.useCallback((modeName) => {
+    if (CORE_MODES.includes(modeName)) {
+      setActiveCustomMode(null);
+      handleModeChange(modeName);
+      return;
+    }
+    const modeDef = customModes.find((m) => m.name === modeName && m.enabled);
+    if (!modeDef) return;
+    setActiveCustomMode(modeDef.name);
+    // Custom modes run on ZAIRE base layout for full HUD compatibility.
+    if (activeMode !== 'ZAIRE') handleModeChange('ZAIRE');
+  }, [activeMode, customModes, handleModeChange]);
+
   const handleModeSync = React.useCallback((newMode) => {
     setActiveMode(newMode);
 
@@ -743,6 +774,14 @@ function App() {
     fetchChatSessions();
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(customModes));
+  }, [customModes]);
+
+  useEffect(() => {
+    localStorage.setItem('zaire_archive_reactions_v1', JSON.stringify(archiveReactions));
+  }, [archiveReactions]);
+
   const fetchChatSessions = async () => {
     try {
       const res = await fetch('http://127.0.0.1:3001/chats');
@@ -765,7 +804,75 @@ function App() {
   const handleLoadSession = (sessionId) => {
     if (socketRef.current) {
       socketRef.current.emit('load_session', { sessionId });
+      setIsArchivesPageOpen(false);
     }
+  };
+
+  const loadArchiveSessionDetail = React.useCallback(async (sessionId) => {
+    if (!sessionId || archiveSessionCache[sessionId]) return archiveSessionCache[sessionId];
+    try {
+      const res = await fetch(`http://127.0.0.1:3001/chats/${sessionId}`);
+      const data = await res.json();
+      if (data.success && data.session) {
+        setArchiveSessionCache(prev => ({ ...prev, [sessionId]: data.session }));
+        return data.session;
+      }
+    } catch (e) {
+      console.error('Failed to load archive session detail:', e);
+    }
+    return null;
+  }, [archiveSessionCache]);
+
+  useEffect(() => {
+    if (!isArchivesPageOpen) return;
+    if (!selectedArchiveId && chatSessions.length > 0) {
+      setSelectedArchiveId(chatSessions[0].id);
+      loadArchiveSessionDetail(chatSessions[0].id);
+    }
+  }, [isArchivesPageOpen, chatSessions, selectedArchiveId, loadArchiveSessionDetail]);
+
+  const transcriptFromSession = (session) => {
+    if (!session?.messages) return '';
+    return session.messages
+      .map(m => `${m.role === 'user' ? 'USER' : 'ZAIRE'}: ${m.content}`)
+      .join('\n\n');
+  };
+
+  const handleArchiveCopy = async (sessionId) => {
+    const detail = await loadArchiveSessionDetail(sessionId);
+    if (!detail) return;
+    const transcript = transcriptFromSession(detail);
+    if (!transcript) return;
+    try {
+      await navigator.clipboard.writeText(transcript);
+      setSystemActionLog(prev => [{ time: new Date().toLocaleTimeString(), message: `ARCHIVE COPIED: ${detail.title || sessionId}` }, ...prev]);
+    } catch (e) {
+      console.error('Copy failed:', e);
+    }
+  };
+
+  const handleArchiveShare = async (sessionId) => {
+    const detail = await loadArchiveSessionDetail(sessionId);
+    if (!detail) return;
+    const transcript = transcriptFromSession(detail);
+    const payload = {
+      title: `ZAIRE Archive: ${detail.title || 'Untitled Chat'}`,
+      text: transcript.slice(0, 4000)
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(payload);
+      } else {
+        await navigator.clipboard.writeText(payload.text);
+      }
+      setSystemActionLog(prev => [{ time: new Date().toLocaleTimeString(), message: `ARCHIVE SHARED: ${detail.title || sessionId}` }, ...prev]);
+    } catch (e) {
+      console.error('Share failed:', e);
+    }
+  };
+
+  const handleArchiveReaction = (sessionId, reaction) => {
+    setArchiveReactions(prev => ({ ...prev, [sessionId]: reaction }));
   };
 
   const handleDeleteSession = async (e, sessionId) => {
@@ -1121,12 +1228,14 @@ function App() {
 
 
 
-    const handlePersist = () => {
+    const handlePersist = (event) => {
+      const incoming = event?.detail || {};
       if (socketRef.current) {
         socketRef.current.emit('SAVE_CONFIG', {
           blobColor: normalizeHexColor(localStorage.getItem('blobColor')),
           blobSize: parseFloat(localStorage.getItem('blobSize') || '1.0'),
-          blobPosition: JSON.parse(localStorage.getItem('blobPosition') || '{"x":0,"y":0}')
+          blobPosition: JSON.parse(localStorage.getItem('blobPosition') || '{"x":0,"y":0}'),
+          ...incoming
         });
       }
     };
@@ -2178,7 +2287,11 @@ function App() {
     return () => cancelAnimationFrame(animationId);
   }, [biometricData?.detected]);
 
-  const navItems = ['ZAIRE', 'TRADER', 'PROFESSOR', 'ENGINEER', 'SWARM'];
+  const enabledCustomNavModes = customModes
+    .filter((m) => m.enabled && m.name)
+    .map((m) => m.name.toUpperCase());
+  const navItems = [...CORE_MODES, ...enabledCustomNavModes.filter((m) => !CORE_MODES.includes(m))];
+  const displayedMode = activeCustomMode || activeMode;
 
   const handleUpgradePro = async () => {
     if (!user) return;
@@ -2285,16 +2398,16 @@ function App() {
         {/* ROW 1: NAVBAR */}
         <div className="grid-navbar">
           <div className="nav-logo">
-            <span className="logo-text">ZAIRE</span>
-            <span className="logo-sub">ZAIRE ARTIFICIAL INTELLIGENCE · REVOLUTIONARY ENGINE · v2.0</span>
+            <span className="logo-text">Z.A.I.R.E</span>
+            <span className="logo-sub">ARTIFICIAL INTELLIGENCE · v2.0</span>
           </div>
 
           <div className="nav-links">
             {navItems.map(item => (
               <div
                 key={item}
-                className={`nav-item ${activeMode === item ? 'active' : ''}`}
-                onClick={() => handleModeChange(item)}
+                className={`nav-item ${displayedMode === item ? 'active' : ''}`}
+                onClick={() => activateNavbarMode(item)}
               >
                 <span className="nav-arrow">›</span>
                 {item}
@@ -2311,13 +2424,13 @@ function App() {
             </div>
             <div className="mode-indicator">
               <div className="mode-dot"></div>
-              <span className="mode-text">MODE: {activeMode}</span>
+              <span className="mode-text">MODE: {displayedMode}</span>
             </div>
             <div className="status-indicator">
               <div className={`status-dot ${zaireStatus}`}></div>
               <span className="status-text">{zaireStatus.toUpperCase().replace('_', ' ')}</span>
             </div>
-            <div className="archive-toggle" onClick={() => setIsArchivesOpen(!isArchivesOpen)} title="Neural Archives">
+            <div className="archive-toggle" onClick={() => { fetchChatSessions(); setIsArchivesPageOpen(true); }} title="Neural Archives">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
                 <polyline points="7 10 12 15 17 10" />
@@ -3628,99 +3741,99 @@ function App() {
           </div>
         </div>
 
-        {/* NEURAL ARCHIVES DRAWER */}
-        <div className={`neural-archives-drawer ${isArchivesOpen ? 'open' : ''}`}>
-          <div className="drawer-header">
-            <div className="drawer-title">NEURAL ARCHIVES</div>
-            <button className="drawer-close" onClick={() => setIsArchivesOpen(false)}>×</button>
-          </div>
-          
-          <div className="drawer-content">
-            <div className="chat-actions-global">
-              <button className="new-chat-btn-large" onClick={() => { handleNewChat(); setIsArchivesOpen(false); }}>
-                + INITIALIZE NEW NEURAL THREAD
-              </button>
-            </div>
+                {isArchivesPageOpen && (
+          <div className="neural-archives-page">
+            <div className="neural-archives-shell">
+              <div className="archives-page-header">
+                <div>
+                  <div className="archives-kicker">ZAIRE MEMORY CORE</div>
+                  <div className="archives-title">NEURAL ARCHIVES</div>
+                  <div className="archives-subtitle">All saved sessions with export-grade controls.</div>
+                </div>
+                <div className="archives-header-actions">
+                  <button className="archive-head-btn" onClick={() => { handleNewChat(); setIsArchivesPageOpen(false); }}>NEW THREAD</button>
+                  <button className="archive-head-btn" onClick={fetchChatSessions}>REFRESH</button>
+                  <button className="archive-head-btn close" onClick={() => setIsArchivesPageOpen(false)}>CLOSE</button>
+                </div>
+              </div>
 
-            <div className="chat-search-box">
-              <input
-                type="text"
-                placeholder="SEARCH ARCHIVES..."
-                value={chatSearch}
-                onChange={(e) => setChatSearch(e.target.value)}
-                className="chat-search-input"
-              />
-              <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </div>
-
-            <div className="chat-session-list-premium">
-              {chatSessions.length === 0 && <div className="session-empty">NO THREADS ARCHIVED</div>}
-              {chatSessions
-                .filter(s => s.title.toLowerCase().includes(chatSearch.toLowerCase()))
-                .map(session => (
-                  <div
-                    key={session.id}
-                    className={`session-item-premium ${currentSessionId === session.id ? 'active' : ''}`}
-                    onClick={() => { handleLoadSession(session.id); setIsArchivesOpen(false); }}
-                  >
-                    <div className="session-info">
-                      {editingSessionId === session.id ? (
-                        <input
-                          autoFocus
-                          className="session-rename-input"
-                          value={editingTitle}
-                          onChange={(e) => setEditingTitle(e.target.value)}
-                          onBlur={() => {
-                            handleRenameSession(session.id, editingTitle);
-                            setEditingSessionId(null);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleRenameSession(session.id, editingTitle);
-                              setEditingSessionId(null);
-                            }
-                            if (e.key === 'Escape') setEditingSessionId(null);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <div className="session-title">{session.title}</div>
-                      )}
-                      <div className="session-meta">
-                        <span>{new Date(session.timestamp).toLocaleDateString()}</span>
-                        <span>{session.messageCount} MSGS</span>
-                      </div>
-                    </div>
-                    <div className="session-item-actions">
-                      <button
-                        className="session-action-btn rename"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingSessionId(session.id);
-                          setEditingTitle(session.title);
-                        }}
-                        title="Rename"
-                      >
-                        ✎
-                      </button>
-                      <button
-                        className="session-action-btn delete"
-                        onClick={(e) => handleDeleteSession(e, session.id)}
-                        title="Delete"
-                      >
-                        ×
-                      </button>
-                    </div>
+              <div className="archives-page-body">
+                <div className="archives-list-pane">
+                  <div className="chat-search-box archives-search">
+                    <input
+                      type="text"
+                      placeholder="SEARCH ARCHIVES..."
+                      value={chatSearch}
+                      onChange={(e) => setChatSearch(e.target.value)}
+                      className="chat-search-input"
+                    />
                   </div>
-                ))}
+
+                  <div className="archives-list-grid">
+                    {chatSessions.length === 0 && <div className="session-empty">NO THREADS ARCHIVED</div>}
+                    {chatSessions
+                      .filter(s => s.title.toLowerCase().includes(chatSearch.toLowerCase()))
+                      .map(session => (
+                        <div
+                          key={session.id}
+                          className={`archive-card ${selectedArchiveId === session.id ? 'active' : ''}`}
+                          onClick={() => {
+                            setSelectedArchiveId(session.id);
+                            loadArchiveSessionDetail(session.id);
+                          }}
+                        >
+                          <div className="archive-card-title">{session.title}</div>
+                          <div className="archive-card-meta">
+                            <span>{new Date(session.timestamp).toLocaleString()}</span>
+                            <span>{session.messageCount} MSGS</span>
+                          </div>
+                          <div className="archive-card-actions">
+                            <button className="session-action-btn rename" onClick={(e) => { e.stopPropagation(); setEditingSessionId(session.id); setEditingTitle(session.title); }}>RENAME</button>
+                            <button className="session-action-btn" onClick={(e) => { e.stopPropagation(); handleArchiveCopy(session.id); }}>COPY</button>
+                            <button className="session-action-btn" onClick={(e) => { e.stopPropagation(); handleArchiveShare(session.id); }}>SHARE</button>
+                            <button className={`session-action-btn ${archiveReactions[session.id] === 'like' ? 'active-like' : ''}`} onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'like'); }}>LIKE</button>
+                            <button className={`session-action-btn ${archiveReactions[session.id] === 'dislike' ? 'active-dislike' : ''}`} onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'dislike'); }}>DISLIKE</button>
+                            <button className="session-action-btn open" onClick={(e) => { e.stopPropagation(); handleLoadSession(session.id); }}>OPEN</button>
+                            <button className="session-action-btn delete" onClick={(e) => handleDeleteSession(e, session.id)}>DELETE</button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                <div className="archives-detail-pane">
+                  {selectedArchiveId ? (
+                    <>
+                      <div className="archives-detail-head">
+                        {editingSessionId === selectedArchiveId ? (
+                          <input
+                            autoFocus
+                            className="session-rename-input"
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            onBlur={() => { handleRenameSession(selectedArchiveId, editingTitle); setEditingSessionId(null); fetchChatSessions(); }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') { handleRenameSession(selectedArchiveId, editingTitle); setEditingSessionId(null); fetchChatSessions(); }
+                              if (e.key === 'Escape') setEditingSessionId(null);
+                            }}
+                          />
+                        ) : (
+                          <div className="archives-detail-title">{(chatSessions.find(s => s.id === selectedArchiveId)?.title) || 'SESSION'}</div>
+                        )}
+                      </div>
+                      <pre className="archives-transcript">
+                        {transcriptFromSession(archiveSessionCache[selectedArchiveId]) || 'Select and load a session to preview full transcript.'}
+                      </pre>
+                    </>
+                  ) : (
+                    <div className="archives-empty-state">Select a chat from the left to inspect, export, and open it.</div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* ROW 3: BOTTOM PANEL */}
+        )}
+{/* ROW 3: BOTTOM PANEL */}
         <div className="grid-bottom">
           <div className="bottom-left">
             {/* ── SECURITY ALERT HUD (IMAGE OVERLAY) ── */}
@@ -3905,6 +4018,13 @@ function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         activeMode={activeMode}
+        customModes={customModes}
+        onCustomModesChange={(nextModes) => {
+          setCustomModes(nextModes);
+          if (activeCustomMode && !nextModes.some((m) => m.enabled && m.name === activeCustomMode)) {
+            setActiveCustomMode(null);
+          }
+        }}
         biometricData={biometricData}
         blobColor={blobColor}
         setBlobColor={setBlobColor}
@@ -4047,3 +4167,5 @@ function App() {
 }
 
 export default App;
+
+
