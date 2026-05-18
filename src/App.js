@@ -222,7 +222,7 @@ function App() {
   // -- Specialist Data Synchronization --
   useEffect(() => {
     if (activeMode === 'ZAIRE') return;
-    
+
     const fetchStatus = () => {
       if (socketRef.current) {
         socketRef.current.emit('REQUEST_SPECIALIST_SYNC', { mode: activeMode });
@@ -241,15 +241,15 @@ function App() {
       if (specialistData.phase) setTraderPhase(specialistData.phase);
       if (specialistData.progress !== undefined) setTraderProgress(specialistData.progress);
       if (specialistData.live_pulse) {
-         const pulses = Object.entries(specialistData.live_pulse).map(([pair, d]) => ({
-           id: pair,
-           pair: `${pair}/USDT`,
-           type: d.percent > 0 ? 'LONG' : 'SHORT',
-           price: d.price.toLocaleString(),
-           amount: 'LIVE',
-           status: 'MONITORING'
-         }));
-         setLiveTrades(pulses);
+        const pulses = Object.entries(specialistData.live_pulse).map(([pair, d]) => ({
+          id: pair,
+          pair: `${pair}/USDT`,
+          type: d.percent > 0 ? 'LONG' : 'SHORT',
+          price: d.price.toLocaleString(),
+          amount: 'LIVE',
+          status: 'MONITORING'
+        }));
+        setLiveTrades(pulses);
       }
     } else if (activeMode === 'PROFESSOR') {
       if (specialistData.phase) setProfessorPhase(specialistData.phase);
@@ -258,8 +258,8 @@ function App() {
       if (specialistData.phase) setEngineerPhase(specialistData.phase);
       if (specialistData.progress !== undefined) setForgeProgress(specialistData.progress);
     } else if (activeMode === 'SWARM') {
-       if (specialistData.phase) setSwarmPhase(specialistData.phase);
-       if (specialistData.messages) setSwarmMessages(specialistData.messages);
+      if (specialistData.phase) setSwarmPhase(specialistData.phase);
+      if (specialistData.messages) setSwarmMessages(specialistData.messages);
     }
   }, [specialistData, activeMode]);
 
@@ -2299,9 +2299,9 @@ function App() {
       const res = await fetch(`${API_BASE_URL}/billing/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId: user.id, 
-          userEmail: user.primaryEmailAddress?.emailAddress 
+        body: JSON.stringify({
+          userId: user.id,
+          userEmail: user.primaryEmailAddress?.emailAddress
         })
       });
       const data = await res.json();
@@ -2357,1810 +2357,1810 @@ function App() {
 
       {/* <SignedIn> - Auth Disabled for Dev */}
       <>
-      {/* Neural Pulse Arena Overlay */}
-      {isMinigameActive && (
-        <div className="neural-pulse-arena">
-          <div className="arena-score">SYNC: {minigameScore}</div>
-          {gameNodes.map(node => (
-            <div
-              key={node.id}
-              className="neural-node"
-              style={{
-                top: node.top,
-                left: node.left,
-                width: node.size,
-                height: node.size,
-                animationDelay: node.delay
-              }}
-              onClick={() => handleNodeClick(node.id)}
-            >
-              <div className="node-core"></div>
-              <div className="node-ring"></div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="grid-overlay"></div>
-      <div className="vignette"></div>
-      <div className="hex-overlay"></div>
-
-      <div
-        className={`main-grid ${isTransitioning ? 'is-transitioning' : ''}`}
-        data-mode={activeMode}
-        data-state={systemState}
-        style={{
-          '--left-width': `${layoutOffsets.leftWidth}px`,
-          '--right-width': `${layoutOffsets.rightWidth}px`,
-          '--bottom-height': `${layoutOffsets.bottomHeight}px`
-        }}
-      >
-        {/* ROW 1: NAVBAR */}
-        <div className="grid-navbar">
-          <div className="nav-logo">
-            <span className="logo-text">Z.A.I.R.E</span>
-            <span className="logo-sub">ARTIFICIAL INTELLIGENCE · v2.0</span>
-          </div>
-
-          <div className="nav-links">
-            {navItems.map(item => (
+        {/* Neural Pulse Arena Overlay */}
+        {isMinigameActive && (
+          <div className="neural-pulse-arena">
+            <div className="arena-score">SYNC: {minigameScore}</div>
+            {gameNodes.map(node => (
               <div
-                key={item}
-                className={`nav-item ${displayedMode === item ? 'active' : ''}`}
-                onClick={() => activateNavbarMode(item)}
+                key={node.id}
+                className="neural-node"
+                style={{
+                  top: node.top,
+                  left: node.left,
+                  width: node.size,
+                  height: node.size,
+                  animationDelay: node.delay
+                }}
+                onClick={() => handleNodeClick(node.id)}
               >
-                <span className="nav-arrow">›</span>
-                {item}
+                <div className="node-core"></div>
+                <div className="node-ring"></div>
               </div>
             ))}
           </div>
-
-          <div className="nav-status">
-            <div className="settings-icon" onClick={() => setIsSettingsOpen(!isSettingsOpen)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 1.65 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-              </svg>
-            </div>
-            <div className="mode-indicator">
-              <div className="mode-dot"></div>
-              <span className="mode-text">MODE: {displayedMode}</span>
-            </div>
-            <div className="status-indicator">
-              <div className={`status-dot ${zaireStatus}`}></div>
-              <span className="status-text">{zaireStatus.toUpperCase().replace('_', ' ')}</span>
-            </div>
-            <div className="archive-toggle" onClick={() => { fetchChatSessions(); setIsArchivesPageOpen(true); }} title="Neural Archives">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-            </div>
-            <div className="upgrade-btn" onClick={handleUpgradePro}>
-              UPGRADE PRO
-            </div>
-            <div className="clerk-user-profile">
-              <UserButton appearance={{
-                elements: {
-                  avatarBox: "zaire-clerk-avatar"
-                }
-              }}/>
-            </div>
-            <div className="clock-display">{timeStr}</div>
-          </div>
-        </div>
-
-        {/* ROW 2: LEFT PANEL */}
-        <div className="grid-left">
-          {/* ── ZAIRE MODE PANEL ── */}
-          {activeMode === 'ZAIRE' && (
-            <>
-
-              <div className="panel-section" style={getComponentStyle('SYSTEM_VITALS')}>
-                <div className="section-label">SYSTEM VITALS</div>
-                <div className="vitals-bars">
-                  <div className="vital-row">
-                    <span className="vital-label">CPU</span>
-                    <div className="vital-bar"><div className="vital-fill" style={{ width: `${liveMetrics.cpu}%` }}></div></div>
-                  </div>
-                  <div className="vital-row">
-                    <span className="vital-label">MEM</span>
-                    <div className="vital-bar"><div className="vital-fill" style={{ width: `${liveMetrics.ram}%` }}></div></div>
-                  </div>
-                  <div className="vital-row">
-                    <span className="vital-label gpu">GPU</span>
-                    <div className="vital-bar gpu"><div className="vital-fill" style={{ width: `${liveMetrics.gpu}%` }}></div></div>
-                  </div>
-                  <div className="vital-row">
-                    <span className="vital-label net">NET</span>
-                    <div className="vital-bar net"><div className="vital-fill" style={{ width: `${liveMetrics.net}%` }}></div></div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="panel-section" style={getComponentStyle('MODULE_STATUS')}>
-                <div className="section-label">MODULE STATUS</div>
-                <div className="module-list">
-                  {[
-                    { name: 'VISION', status: 'READY' },
-                    { name: 'VOICE', status: 'ACTIVE' },
-                    { name: 'WEB', status: 'LIVE' },
-                    { name: 'FILES', status: 'MOUNTED' },
-                  ].map(mod => (
-                    <div key={mod.name} className="module-row">
-                      <span className="module-name">{mod.name}</span>
-                      <span className={`module-status ${mod.status === 'OFFLINE' ? 'offline' : 'online'}`}>{mod.status}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="panel-section" style={getComponentStyle('VOICE_MONITOR')}>
-                <div className="section-label">VOICE MONITOR</div>
-                <canvas ref={voiceWaveformRef} className="voice-waveform"></canvas>
-              </div>
-
-              {/* ── MEMORY CORE ── */}
-              <div className={`panel-section memory-panel ${memoryFlash ? 'memory-flash' : ''}`} style={getComponentStyle('MEMORY_CORE')}>
-                <div className="section-label memory-label">
-                  <span>MEMORY CORE</span>
-                  <span className="memory-count">{storedMemories.length} STORED</span>
-                </div>
-                <div className="memory-list">
-                  {storedMemories.length === 0 && (
-                    <div className="memory-empty">— NO MEMORIES YET —</div>
-                  )}
-                  {storedMemories.map((m, i) => (
-                    <div key={m.id || i} className="memory-item">
-                      <span className="memory-dot">◆</span>
-                      <span className="memory-text">{m.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label">LAST COMMAND</div>
-                <div className="last-command" style={{ minHeight: '60px' }}>
-                  <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label">LAST COMMAND</div>
-                <div className="last-command" style={{ minHeight: '60px' }}>
-                  <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ── TRADER MODE PANEL ── */}
-          {activeMode === 'TRADER' && (
-            <>
-              <div className="panel-section">
-                <div className="section-label" >PORTFOLIO</div>
-                <div className="metrics-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                  <div className="metric-card" style={{ padding: '8px' }}>
-                    <span className="metric-value" style={{ color: '#00ff88', fontSize: '14px' }}>
-                      ${specialistData?.portfolio_value || '2,847'}
-                    </span>
-                    <span className="metric-label">TOTAL VALUE</span>
-                  </div>
-                  <div className="metric-card" style={{ padding: '8px' }}>
-                    <span className="metric-value" style={{ color: '#00ff88', fontSize: '14px' }}>+4.2%</span>
-                    <span className="metric-label">24H CHANGE</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >HOLDINGS</div>
-                <div className="holding-list" style={{ maxHeight: '120px', overflowY: 'auto' }}>
-                  {['BTC', 'ETH', 'SOL', 'LINK'].map(asset => (
-                    <div key={asset} className="mini-bar-row">
-                      <span className="mbl">{asset}</span>
-                      <div className="mbt"><div className="mbf" style={{ width: '70%', background: '#00ff88' }}></div></div>
-                      <span className="mbv">82%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >HALAL FILTER</div>
-                <div style={{ padding: '8px', background: 'rgba(0,255,136,0.04)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '2px' }}>
-                  <div style={{ fontSize: '8px', color: '#00ff88', letterSpacing: '1px' }}>✓ {specialistData?.halal_filter || 'ACTIVE'}</div>
-                  <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>LEVERAGE: BLOCKED</div>
-                  <div style={{ fontSize: '7px', opacity: 0.4 }}>MEME COINS: BLOCKED</div>
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label">TRADING TIMELINE</div>
-                <div className="manifestation-timeline">
-                  {[
-                    { phase: 'ANALYSIS', label: 'MARKET ANALYSIS', icon: '🔍' },
-                    { phase: 'SIGNAL', label: 'SIGNAL DETECTION', icon: '⚡' },
-                    { phase: 'EXECUTION', label: 'EXECUTION FORGE', icon: '⚔' },
-                    { phase: 'AUDIT', label: 'RISK AUDIT', icon: '🛡' },
-                    { phase: 'HARVEST', label: 'PROFIT HARVEST', icon: '💰' },
-                  ].map((p, i) => (
-                    <div
-                      key={p.phase}
-                      className={`timeline-step ${traderPhase === p.phase ? 'active' : ''} ${i < ['ANALYSIS', 'SIGNAL', 'EXECUTION', 'AUDIT', 'HARVEST'].indexOf(traderPhase) ? 'completed' : ''}`}
-                    >
-                      <div className="step-icon" style={{ borderColor: traderPhase === p.phase ? '#00ff88' : '', color: traderPhase === p.phase ? '#00ff88' : '' }}>{p.icon}</div>
-                      <div className="step-info">
-                        <span className="step-name">{p.label}</span>
-                        <span className="step-status">{traderPhase === p.phase ? 'SCANNING' : (i < ['ANALYSIS', 'SIGNAL', 'EXECUTION', 'AUDIT', 'HARVEST'].indexOf(traderPhase) ? 'SUCCESS' : 'AWAITING')}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >ALGO SYNC</div>
-                <div className="mini-bar-row">
-                  <span className="mbl" style={{ width: '40px' }}>PRECISION</span>
-                  <div className="mbt"><div className="mbf" style={{ width: `${traderProgress}%`, background: '#00ff88' }}></div></div>
-                  <span className="mbv">{Math.round(traderProgress)}%</span>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ── PROFESSOR MODE PANEL ── */}
-          {activeMode === 'PROFESSOR' && (
-            <>
-              <div className="panel-section">
-                <div className="section-label" >CURRICULUM</div>
-                <div className="curriculum-list">
-                  {['Quantum Physics', 'Neural Networks', 'Linear Algebra'].map(c => (
-                    <div key={c} className="curriculum-item">
-                      <div className="cur-dot" ></div>
-                      <span className="cur-name">{c.toUpperCase()}</span>
-                      <span className="cur-status">ACTIVE</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label">LEARNING TIMELINE</div>
-                <div className="manifestation-timeline">
-                  {[
-                    { phase: 'ARCHITECTING', label: 'CURRICULUM DESIGN', icon: '✎' },
-                    { phase: 'SYNCING', label: 'KNOWLEDGE SYNC', icon: '❈' },
-                    { phase: 'LECTURE', label: 'LECTURE MANIFEST', icon: '🕮' },
-                    { phase: 'QUIZ', label: 'EVALUATION (QUIZ)', icon: '❓' },
-                    { phase: 'GRADUATION', label: 'CERTIFICATION', icon: '🎓' },
-                  ].map((p, i) => (
-                    <div
-                      key={p.phase}
-                      className={`timeline-step ${professorPhase === p.phase ? 'active' : ''} ${i < ['ARCHITECTING', 'SYNCING', 'LECTURE', 'QUIZ', 'GRADUATION'].indexOf(professorPhase) ? 'completed' : ''}`}
-                    >
-                      <div className="step-icon" style={{ borderColor: professorPhase === p.phase ? '#a78bfa' : '', color: professorPhase === p.phase ? '#a78bfa' : '' }}>{p.icon}</div>
-                      <div className="step-info">
-                        <span className="step-name">{p.label}</span>
-                        <span className="step-status">{professorPhase === p.phase ? 'IN PROGRESS' : (i < ['ARCHITECTING', 'SYNCING', 'LECTURE', 'QUIZ', 'GRADUATION'].indexOf(professorPhase) ? 'COMPLETE' : 'PENDING')}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >CURRICULUM SYNC</div>
-                <div className="mini-bar-row">
-                  <span className="mbl" style={{ width: '40px' }}>OVERALL</span>
-                  <div className="mbt"><div className="mbf" style={{ width: `${learningProgress}%`, background: '#a78bfa' }}></div></div>
-                  <span className="mbv">{Math.round(learningProgress)}%</span>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ── ENGINEER MODE PANEL ── */}
-          {activeMode === 'ENGINEER' && (
-            <>
-              <div className="panel-section">
-                <div className="section-label" >ACTIVE PROJECT</div>
-                <div style={{ padding: '8px', background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: '2px' }}>
-                  <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '10px', color: '#f97316', letterSpacing: '1.5px' }}>ZAIRE CORE</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.5, marginTop: '4px' }}>
-                    <span>TYPE: NEXT.JS 15</span>
-                    <span>BUILD: STABLE</span>
-                  </div>
-                  <div className="mbt" style={{ marginTop: '6px' }}><div className="mbf" style={{ width: '65%', background: '#f97316' }}></div></div>
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >MANIFESTATION PROGRESS</div>
-                <div className="build-stats-sidebar">
-                  <div className="stat-row">
-                    <span>SYSTEM_LOAD</span>
-                    <span>{Math.round(forgeProgress)}%</span>
-                  </div>
-                  <div className="mbt"><div className="mbf" style={{ width: `${forgeProgress}%`, background: '#f97316' }}></div></div>
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label">MANIFESTATION TIMELINE</div>
-                <div className="manifestation-timeline">
-                  {[
-                    { phase: 'BLUEPRINT', label: 'NEURAL ARCHITECT', icon: '◈' },
-                    { phase: 'RESEARCH', label: 'INTELLIGENCE SYNC', icon: '❈' },
-                    { phase: 'FORGE', label: 'ACTIVE MANIFEST', icon: '⚔' },
-                    { phase: 'AUDIT', label: 'VANGUARD AUDIT', icon: '🛡' },
-                    { phase: 'DEPLOY', label: 'CORE DEPLOY', icon: '🚀' },
-                  ].map((p, i) => (
-                    <div
-                      key={p.phase}
-                      className={`timeline-step ${engineerPhase === p.phase ? 'active' : ''} ${i < ['BLUEPRINT', 'RESEARCH', 'FORGE', 'AUDIT', 'DEPLOY'].indexOf(engineerPhase) ? 'completed' : ''}`}
-                    >
-                      <div className="step-icon">{p.icon}</div>
-                      <div className="step-info">
-                        <span className="step-name">{p.label}</span>
-                        <span className="step-status">{engineerPhase === p.phase ? 'PROCESSING' : (i < ['BLUEPRINT', 'RESEARCH', 'FORGE', 'AUDIT', 'DEPLOY'].indexOf(engineerPhase) ? 'COMPLETE' : 'AWAITING')}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >FILE TREE</div>
-                <div className="file-tree" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                  {['src/App.js', 'src/App.css', 'src/index.js', 'api/core.py'].map(f => (
-                    <div key={f} className="file-tree-item">
-                      <span className="file-icon">📄</span>
-                      <span>{f}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* ROW 2: CENTER (ORB / TACTICAL CONTENT) */}
-        <div className={`grid-center ${activeMode !== 'ZAIRE' ? 'has-content' : ''}`}>
-
-          {/* ── TRADER CENTER: Sovereign Trading Floor ── */}
-          {activeMode === 'TRADER' && (
-            <div className="trader-floor">
-              <div className="hall-nav">
-                {['CHART', 'STRATEGY', 'ALPHA'].map(m => (
-                  <button key={m} className={`h-nav-btn ${traderSubMode === m ? 'active' : ''}`} onClick={() => setTraderSubMode(m)}>{m}</button>
-                ))}
-              </div>
-
-              {traderSubMode === 'CHART' && (
-                <div className="floor-top">
-                  <div className="neural-chart-wrap">
-                    <div className="chart-header">
-                      <div className="pair-info">BTC/USDT <span className="live-dot pulse"></span></div>
-                      <div className="chart-controls">
-                        <span>15M</span>
-                        <span onClick={() => handleSpecialistAction('TRADER', 'WHALE_FORENSICS', { asset: 'BTC' })}>WHALE_SCAN</span>
-                      </div>
-                    </div>
-                    <div className="chart-canvas-area">
-                      <canvas ref={traderChartRef} style={{ width: '100%', height: '100%' }}></canvas>
-                      <div className="neural-overlay-text">NEURAL_SENTIMENT: {specialistData?.sentiment || 'BULLISH (84%)'}</div>
-                    </div>
-                  </div>
-
-                  <div className="execution-side">
-                    <div className="side-label">LIVE EXECUTION</div>
-                    <div className="execution-log">
-                      {specialistData?.live_trades?.length === 0 && <div className="log-empty">SCANNING FOR SIGNALS...</div>}
-                      {(specialistData?.live_trades || liveTrades).map(trade => (
-                        <div key={trade.id} className="trade-entry">
-                          <div className="t-row">
-                            <span className={`t-type ${trade.type.toLowerCase()}`}>{trade.type}</span>
-                            <span className="t-pair">{trade.pair}</span>
-                          </div>
-                          <div className="t-row sub">
-                            <span>{trade.price}</span>
-                            <span className="t-status">{trade.status}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {traderSubMode === 'STRATEGY' && (
-                <div className="strategy-manifest">
-                  <div className="strategy-header">NEURAL STRATEGY FORGE // {specialistData?.active_strategy?.risk_score || '0'} RISK SCORE</div>
-                  <div className="strategy-grid">
-                    {specialistData?.active_strategy?.steps?.map((s, i) => (
-                      <div key={i} className="strategy-node">
-                        <div className="node-id">STEP 0{i + 1}</div>
-                        <div className="node-content">
-                          <div className="node-title">{s.name}</div>
-                          <div className="node-desc">{s.desc}</div>
-                        </div>
-                      </div>
-                    )) || <div className="strategy-empty">FORGE A STRATEGY TO MANIFEST TACTICAL BLUEPRINTS.</div>}
-                  </div>
-                </div>
-              )}
-
-              {traderSubMode === 'ALPHA' && (
-                <div className="alpha-manifest">
-                  <div className="alpha-header">WHALE FORENSICS // LIVE ALPHA FEED</div>
-                  <div className="alpha-list">
-                    {specialistData?.alpha_feed?.map((a, i) => (
-                      <div key={i} className={`alpha-item ${a.sentiment}`}>
-                        <span className="alpha-time">{new Date(a.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        <span className="alpha-event">{a.event}</span>
-                        <span className="alpha-sentiment-tag">{a.sentiment}</span>
-                      </div>
-                    )) || <div className="alpha-empty">SCANNING ON-CHAIN PROTOCOLS...</div>}
-                  </div>
-                </div>
-              )}
-
-              <div className="floor-bottom">
-                <div className="floor-stats">
-                  <div className="f-stat">
-                    <span className="fs-label">PORTFOLIO</span>
-                    <span className="fs-val positive">${specialistData?.portfolio_value || '2,847.00'}</span>
-                  </div>
-                  <div className="f-stat">
-                    <span className="fs-label">ACTIVE RISK</span>
-                    <span className="fs-val">{specialistData?.risk_level || 'LOW'}</span>
-                  </div>
-                  <div className="f-stat">
-                    <div className="trader-actions">
-                      <button className="t-btn buy" onClick={() => handleSpecialistAction('TRADER', 'EXECUTE_TRADE', { symbol: 'BTCUSDT', side: 'BUY', qty: 0.01 })}>BUY BTC</button>
-                      <button className="t-btn buy" onClick={() => handleSpecialistAction('TRADER', 'STRATEGY_FORGE', { asset: 'BTC' })}>FORGE STRATEGY</button>
-                      <button className="t-btn report" onClick={() => handleSpecialistAction('TRADER', 'WHALE_FORENSICS', { asset: 'BTC' })}>WHALE SCAN</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── PROFESSOR CENTER: Sovereign Learning Hall ── */}
-          {activeMode === 'PROFESSOR' && (
-            <div className="professor-learning-hall">
-              <div className="hall-nav">
-                {['LECTURE', 'ROADMAP', 'LAB'].map(m => (
-                  <button key={m} className={`h-nav-btn ${professorSubMode === m ? 'active' : ''}`} onClick={() => setProfessorSubMode(m)}>{m}</button>
-                ))}
-              </div>
-
-              {professorSubMode === 'LECTURE' && (
-                <>
-                  {!specialistData?.active_quiz ? (
-                    <div className="lecture-manifest">
-                      <div className="lecture-header">
-                        <div className="topic-badge">{professorTopic} {'//'} MODULE {specialistData?.module || '04'}</div>
-                        <div className="persona-dna-tag" title="Adaptive Teaching Style">DNA: {specialistData?.persona?.replace('_', ' ') || 'SERIOUS ACADEMIC'}</div>
-                        <div className="slide-counter">{specialistData?.slide_index || '04'} / {specialistData?.total_slides || '12'}</div>
-                      </div>
-                      <div className="manifest-content">
-                        <div className="concept-title">{specialistData?.current_concept?.title || 'Neural Entanglement & Superposition'}</div>
-                        <div className="concept-body">
-                          <p>{specialistData?.current_concept?.body || 'In the quantum realm, information is not binary. It exists in a state of probability, defined by the wave function Ψ. ZAIRE is currently synchronizing this knowledge core with your neural baseline.'}</p>
-                          <ul className="learning-points">
-                            {specialistData?.current_concept?.points?.map((p, i) => (
-                              <li key={i}>✦ {p}</li>
-                            )) || (
-                                <>
-                                  <li>✦ Superposition: N-dimensional state vectors.</li>
-                                  <li>✦ Interference: Constructive reinforcement of data.</li>
-                                  <li>✦ Decoherence: The primary bottleneck in neural sync.</li>
-                                </>
-                              )}
-                          </ul>
-                        </div>
-                      </div>
-                      <div className="lecture-footer">
-                        <div className="professor-note">
-                          <span className="note-label">PROFESSOR_INSIGHT:</span>
-                          {specialistData?.current_concept?.insight || 'Focus on the relationship between entropy and information density.'}
-                        </div>
-                        <div className="professor-controls">
-                          <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'GENERATE_QUIZ', { topic: lastUserPrompt || professorTopic })}>GENERATE QUIZ</button>
-                          <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'ARCHITECT_ROADMAP', { topic: lastUserPrompt || professorTopic })}>ARCHITECT ROADMAP</button>
-                          <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'MANIFEST_VISUAL_LAB', { concept: lastUserPrompt || professorTopic })}>INITIALIZE LAB</button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="quiz-manifest">
-                      <div className="quiz-header">
-                        <div className="quiz-title">NEURAL EVALUATION // STAGE 01</div>
-                        <div className="timer">04:52 REMAINING</div>
-                      </div>
-                      <div className="quiz-question">
-                        <div className="q-label">QUESTION 01</div>
-                        <div className="q-text">{specialistData?.active_quiz?.question || 'What is the primary cause of decoherence in a neural-sync environment?'}</div>
-                        <div className="q-options">
-                          {specialistData?.active_quiz?.options?.map((opt, i) => (
-                            <button key={i} className={`q-opt ${opt.correct ? 'correct' : ''}`} onClick={() => handleSpecialistAction('PROFESSOR', 'SUBMIT_QUIZ', { answer: opt.text, is_correct: opt.correct })}>
-                              {String.fromCharCode(65 + i)}) {opt.text}
-                            </button>
-                          )) || (
-                              <>
-                                <button className="q-opt">A) Atmospheric Pressure</button>
-                                <button className="q-opt correct">B) Quantum Interference</button>
-                                <button className="q-opt">C) Clock Speed Mismatch</button>
-                                <button className="q-opt">D) Thermal Exhaustion</button>
-                              </>
-                            )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {professorSubMode === 'ROADMAP' && (
-                <div className="roadmap-manifest">
-                  <div className="roadmap-header">SOVEREIGN STUDY ROADMAP // {professorTopic}</div>
-                  <div className="roadmap-grid">
-                    {specialistData?.roadmap?.modules?.map((m, i) => (
-                      <div key={i} className={`roadmap-node ${m.status}`}>
-                        <div className="node-id">0{i + 1}</div>
-                        <div className="node-content">
-                          <div className="node-title">{m.title}</div>
-                          <div className="node-desc">{m.desc}</div>
-                        </div>
-                        <div className="node-status-tag">{m.status || 'LOCKED'}</div>
-                      </div>
-                    )) || <div className="roadmap-empty">AWAITING ARCHITECTURAL COMMAND...</div>}
-                  </div>
-                </div>
-              )}
-
-              {professorSubMode === 'LAB' && (
-                <div className="lab-manifest">
-                  <div className="lab-header">VISUALIZATION LAB // {specialistData?.lab?.title || 'AWAITING NEURAL SYNC'}</div>
-                  <div className="lab-viewport">
-                    {specialistData?.lab ? (
-                      <div className="lab-sim-placeholder">
-                        <div className="sim-pulse"></div>
-                        <span>{specialistData.lab.status}...</span>
-                        <p>Synchronizing with Engineer Forge for {specialistData.lab.engine} manifestation.</p>
-                      </div>
-                    ) : (
-                      <div className="lab-empty">INITIALIZE THE LAB TO MANIFEST INTERACTIVE SIMULATIONS.</div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="research-summary">
-                <div className="summary-label">NEURAL SUMMARY FEED</div>
-                <div className="summary-items">
-                  {specialistData?.research_feed?.map((f, i) => (
-                    <div key={i} className="s-item">✦ Source: {f.source} {'//'} {f.title}</div>
-                  )) || <div className="s-item opacity-30">PARSING GLOBAL KNOWLEDGE CORES...</div>}
-                </div>
-              </div>
-
-              <div className="learning-hall-sidebar">
-                <div className="sidebar-section">
-                  <div className="sidebar-label">TEACHING PERSONA</div>
-                  <div className="persona-grid">
-                    {['SERIOUS_ACADEMIC', 'STARK_ENTHUSIAST', 'ZEN_SOCRATIC', 'NEURAL_COACH'].map(p => (
-                      <button
-                        key={p}
-                        className={`persona-btn ${specialistData?.persona === p ? 'active' : ''}`}
-                        onClick={() => handleSpecialistAction('PROFESSOR', 'SET_PERSONA', { persona: p })}
-                        title={p.replace('_', ' ')}
-                      >
-                        {p.split('_')[1][0]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="sidebar-section">
-                  <div className="sidebar-label">NEURAL NOTEBOOK</div>
-                  <div className="notebook-entries">
-                    {specialistData?.notebook?.map((n, i) => (
-                      <div key={i} className="note-entry">
-                        <span className="note-time">{new Date(n.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        <span className="note-text">{n.note}</span>
-                      </div>
-                    )) || <div className="note-empty">NO ATOMIC NOTES ARCHIVED.</div>}
-                  </div>
-                  <div className="note-input-wrap">
-                    <input
-                      type="text"
-                      placeholder="Capture atomic note..."
-                      value={professorNoteInput}
-                      onChange={(e) => setProfessorNoteInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && professorNoteInput) {
-                          handleSpecialistAction('PROFESSOR', 'TAKE_NOTE', { note: professorNoteInput });
-                          setProfessorNoteInput('');
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── ENGINEER CENTER: Forge Build Log ── */}
-          {activeMode === 'ENGINEER' && (
-            <div className="engineer-studio">
-              <div className="studio-top">
-                <div className="editor-panel">
-                  <div className="editor-header">
-                    <div className="tabs-container">
-                      {manifestedFiles.length > 0 ? manifestedFiles.map((file, i) => (
-                        <div
-                          key={i}
-                          className={`file-tab ${activeTab === i ? 'active' : ''}`}
-                          onClick={() => {
-                            setActiveTab(i);
-                          }}
-                        >
-                          {file.name} <span className="tab-status-dot pulse"></span>
-                        </div>
-                      )) : (
-                        <div className="file-tab active">MANIFEST.js <span className="tab-status-dot pulse"></span></div>
-                      )}
-                    </div>
-                    <div className="editor-metrics">
-                      <span>LINES: {forgeCode.split('\n').length}</span>
-                      <span className="diff-toggle" onClick={() => setShowDiff(!showDiff)}>
-                        DIFF: <span style={{ color: showDiff ? '#f97316' : '#446677' }}>{showDiff ? 'ON' : 'OFF'}</span>
-                      </span>
-                      <span>ALIGN: <span style={{ color: '#00ff88' }}>{specialistData?.manifestation_sync?.alignment || '99%'}</span></span>
-                    </div>
-                  </div>
-                  <div className="editor-content-wrapper">
-                    <div className="line-numbers">
-                      {forgeCode.split('\n').map((_, i) => <div key={i}>{i + 1}</div>)}
-                    </div>
-                    <div className="editor-main">
-                      <pre className="code-block">
-                        <code>
-                          {showDiff && diffData ? (
-                            <div className="diff-viewer">
-                              {diffData.map((line, i) => (
-                                <div key={i} className={`diff-line ${line.type}`}>
-                                  <span className="line-marker">{line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' '}</span>
-                                  {line.content}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            (manifestedFiles[activeTab]?.code || forgeCode) || '// AWAITING NEURAL FORGE MANIFESTATION...'
-                          )}
-                        </code>
-                      </pre>
-                      <div className="editor-cursor pulse"></div>
-                    </div>
-                    <div className="code-minimap">
-                      <div className="minimap-content" style={{ transform: `scale(0.1)`, transformOrigin: 'top right' }}>
-                        <pre><code>{forgeCode}</code></pre>
-                      </div>
-                      <div className="minimap-viewport"></div>
-                    </div>
-                  </div>
-
-                  {darwinResults && (
-                    <div className="darwin-overlay">
-                      <div className="darwin-header">NEURAL DARWINISM: VARIANT COMPETITION</div>
-                      <div className="darwin-grid">
-                        {Object.entries(darwinResults).map(([variant, score], i) => (
-                          <div key={i} className="darwin-variant">
-                            <div className="variant-label">{variant}</div>
-                            <div className="variant-preview-small"></div>
-                            <div className="variant-score-bar">
-                              <div className="score-fill" style={{ width: `${score}%` }}></div>
-                            </div>
-                            <div className="variant-score-val">{score}%</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="research-panel">
-                  <div className="panel-label">
-                    LIVE PREVIEW
-                    <span className="preview-refresh" style={{ marginLeft: '10px' }} onClick={() => setShowMatrix(!showMatrix)}>
-                      {showMatrix ? 'HIDE MATRIX' : 'SHOW MATRIX'}
-                    </span>
-                    <span className="preview-refresh" onClick={() => {
-                      const current = previewUrl;
-                      setPreviewUrl('');
-                      setTimeout(() => setPreviewUrl(current), 10);
-                    }}>↻</span>
-                  </div>
-                  <div className="preview-container">
-                    {thermalActive && (
-                      <div className="thermal-overlay pulse">
-                        <div className="fracture-marker" style={{ top: '20%', left: '30%', width: '100px', height: '40px' }}>
-                          <span className="fracture-label">ALIGNMENT_FRACTURE: 4px</span>
-                        </div>
-                        <div className="fracture-marker danger" style={{ top: '60%', left: '50%', width: '150px', height: '60px' }}>
-                          <span className="fracture-label">LOW_CONTRAST_DETECTED</span>
-                        </div>
-                      </div>
-                    )}
-                    {showMatrix ? (
-                      <div className="responsive-matrix-grid">
-                        {['mobile', 'tablet', 'laptop', 'desktop'].map(v => (
-                          <div key={v} className="matrix-item">
-                            <span className="matrix-label">{v.toUpperCase()}</span>
-                            <div className="matrix-frame">
-                              {/* Since these are local files in backend/memory/components, we might need a proxy or serve them */}
-                              {/* For now, we simulate with the iframe at different widths */}
-                              <iframe src={previewUrl} style={{ width: v === 'mobile' ? '375px' : v === 'tablet' ? '768px' : '100%', height: '100%', border: 'none', transform: 'scale(0.5)', transformOrigin: 'top left' }} />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <>
-                        <iframe
-                          src={previewUrl}
-                          className="live-preview-iframe"
-                          title="Engineer Live Preview"
-                          onError={() => console.log("Preview not available yet")}
-                        />
-                        {specialistData?.project_status?.server !== 'RUNNING' && (
-                          <div className="preview-placeholder">
-                            <div className="pulse-ring"></div>
-                            <span>AWAITING SERVER...</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  {specialistData?.tech_stack_reasoning && (
-                    <div className="reasoning-box">
-                      <div className="panel-label" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>ARCHITECTURAL REASONING</div>
-                      <div className="reasoning-text">{specialistData.tech_stack_reasoning}</div>
-                    </div>
-                  )}
-
-                  <div className="surveillance-brief">
-                    <div className="panel-label">COMPETITOR SURVEILLANCE</div>
-                    <div className="brief-feed">
-                      <div className="brief-item">✦ ROLEX: NEW TYPOGRAPHY DETECTED (MUSEO → INTER)</div>
-                      <div className="brief-item">✦ AP: ADDED CINEMATIC HERO PARALLAX</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="studio-bottom">
-                <div className="studio-console">
-                  <div className="console-header">
-                    <span>
-                      SYSTEM_CONSOLE {'//'} {specialistData?.forge_telemetry?.dna_locked ? `DNA_LOCKED: ${specialistData.forge_telemetry.dna_locked}` : (specialistData?.status || 'STABLE')}
-                      {specialistData?.forge_telemetry?.is_healing && <span className="healing-tag pulse">SELF-HEALING ACTIVE</span>}
-                      <span className="dna-indicator" title="User Design DNA Alignment">DNA: <span style={{ color: '#00ff88' }}>OPTIMIZED</span></span>
-                    </span>
-                    <div className="console-actions">
-                      <button className="c-btn" onClick={() => handleSpecialistAction('ENGINEER', 'MANIFEST_PROJECT', { prompt: lastUserPrompt, project_name: 'zaire-engineered-site' })}>MANIFEST</button>
-                      <button className={`c-btn ${specialistData?.forge_telemetry?.is_healing ? 'healing-active' : ''}`} onClick={() => handleSpecialistAction('ENGINEER', 'VISION_AUDIT')}>
-                        {specialistData?.forge_telemetry?.is_healing ? 'HEALING...' : 'AUDIT'}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="console-output">
-                    {specialistData?.forge_build_log?.length > 0 ? (
-                      specialistData.forge_build_log.map((log, i) => (
-                        <div key={i} className="log-line">
-                          <span className="log-ts">[{log.timestamp}]</span>
-                          <span className={`log-tag ${log.status.toLowerCase()}`}>{log.status}</span>
-                          <span className="log-msg">{log.activity}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <>
-                        <div className="log-line"><span className="log-ts">[17:28:01]</span> <span className="log-tag init">INIT</span> <span className="log-msg">Autonomous Web Studio Manifested.</span></div>
-                        <div className="log-line"><span className="log-ts">[17:28:05]</span> <span className="log-tag ok">OK</span> <span className="log-msg">Neural Link Synchronized.</span></div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── SWARM CENTER: Master Protocol ── */}
-          {activeMode === 'SWARM' && (
-            <div className="swarm-chamber">
-              <div className="chamber-header">
-                <div className="chamber-title">NEURAL SWARM {'//'} MASTER PROTOCOL</div>
-                <div className={`swarm-status-badge ${swarmPhase.toLowerCase()}`}>{swarmPhase}</div>
-              </div>
-
-              <div className="swarm-visualizer">
-                <div className="central-node pulse">MASTER</div>
-                <div className={`agent-node trader ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>TRADER</div>
-                <div className={`agent-node professor ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>PROFESSOR</div>
-                <div className={`agent-node engineer ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>ENGINEER</div>
-                <div className="swarm-stream">
-                  {swarmMessages.map((m, i) => (
-                    <div key={i} className={`s-msg ${m.from.toLowerCase()}`}>
-                      <span className="s-from">[{m.from}]</span> {m.text}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="swarm-controls">
-                <button className="swarm-btn" onClick={() => handleSpecialistAction('SWARM', 'INITIATE_TASK', { task: lastUserPrompt })}>INITIATE GLOBAL SYNC</button>
-              </div>
-            </div>
-          )}
-
-          {/* ZAIRE CENTER: Orb fills via fixed canvas */}
-        </div>
-
-        {/* ROW 2: RIGHT PANEL */}
-        <div className="grid-right">
-          {/* ── ZAIRE MODE RIGHT PANEL ── */}
-          {activeMode === 'ZAIRE' && (
-            <>
-              <div className={`panel-section biometric-panel ${biometricData.detected ? 'detected' : ''} ${isSecurityAlert ? 'threat' : ''}`} style={getComponentStyle('BIOMETRIC_SCAN')}>
-                <div className="section-label">BIOMETRIC SCAN</div>
-                <div className="biometric-hud">
-                  <div className="bio-status-row">
-                    <span className="bio-label">IDENTITY:</span>
-                    <span className={`bio-value ${biometricData.name === 'Master' ? 'master' : (isSecurityAlert ? 'alert' : '')}`}>
-                      {isSecurityAlert ? 'UNKNOWN_THREAT' : (biometricData.detected ? biometricData.name.toUpperCase() : 'ABSENT')}
-                    </span>
-                  </div>
-                  <div className="bio-status-row">
-                    <span className="bio-label">SCAN LOCK:</span>
-                    <div className="bio-lock-bar">
-                      <div className={`bio-lock-fill ${biometricData.detected ? 'active' : ''} ${isSecurityAlert ? 'threat' : ''}`} style={{ width: biometricData.detected || isSecurityAlert ? '100%' : '0%' }}></div>
-                    </div>
-                  </div>
-                  <div className="bio-status-row">
-                    <span className="bio-label">FACE-LOCK:</span>
-                    <span className={`bio-value ${biometricData.enabled ? 'online' : 'offline'}`}>{biometricData.enabled ? 'ACTIVE' : 'DISABLED'}</span>
-                  </div>
-                  <div className="bio-meta">
-                    <div className="bio-btn-group">
-                      <span className="bio-tag-btn active">SYSTEM READY</span>
-                      <span className="bio-tag-btn">LOCKED</span>
-                      <span className="bio-tag-btn">UNLOCKED</span>
-                    </div>
-                    <div className="bio-timer">30.01</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className={`panel-section vision-panel ${isVisionScanning ? 'vision-active' : ''}`} style={getComponentStyle('SCREEN_VISION')}>
-                <div className="section-label vision-label">
-                  <span>SCREEN VISION</span>
-                </div>
-                <div className="vision-feed">
-                  {isVisionScanning ? (
-                    <div className="vision-scan-box">
-                      <div className="scan-line-vision"></div>
-                      <div className="vision-meta">OCR: ENABLED | NEURAL: SYNCING</div>
-                    </div>
-                  ) : (
-                    <div className="vision-placeholder">
-                      <div className="vision-off-text">VISION CORE OFFLINE</div>
-                      <div className="vision-hint-text">Say: "What's on my screen?"</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="panel-section" style={getComponentStyle('SLEEP_AWAKE')}>
-                <div className="section-label">SLEEP / AWAKE</div>
-                <div className="sleep-hud">
-                  <div className="sleep-main">
-                    <span className="sleep-val">8</span>
-                    <span className="sleep-unit">H</span>
-                    <span className="sleep-state">STANDBY</span>
-                  </div>
-                  <div className="panel-section" style={getComponentStyle('ZAIRE_FEED')}>
-                    <div className="section-label">SYSTEM_LOGS</div>
-                    <div className="log-feed">
-                      {zaireActionFeed.map((log, idx) => (
-                        <div key={idx} className="log-entry">
-                          <span className="log-time">[{log.time}]</span>
-                          <span className="log-msg">{log.message}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="panel-section" style={getComponentStyle('SYSTEM_METRICS')}>
-                <div className="section-label">SYSTEM METRICS</div>
-                <div className="metrics-grid">
-                  <div className="metric-card">
-                    <span className="metric-value">{liveMetrics.latency}ms</span>
-                    <span className="metric-label">LATENCY</span>
-                  </div>
-                  <div className="metric-card">
-                    <span className="metric-value good">{liveMetrics.cpu}%</span>
-                    <span className="metric-label">CPU LOAD</span>
-                  </div>
-                  <div className="metric-card">
-                    <span className="metric-value">{liveMetrics.ram}%</span>
-                    <span className="metric-label">RAM USAGE</span>
-                  </div>
-                  <div className="metric-card">
-                    <span className="metric-value">{(audioFrequency * 100).toFixed(0)}%</span>
-                    <span className="metric-label">VOICE PULSE</span>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ── TRADER MODE RIGHT PANEL ── */}
-          {activeMode === 'TRADER' && (
-            <>
-              <div className="panel-section">
-                <div className="section-label" >NEURAL VERDICT</div>
-                <div className="verdict-box" style={{ margin: 0 }}>
-                  <div className="v-label">MARKET SIGNAL</div>
-                  <div className="v-val" >STRONG BUY</div>
-                  <div className="v-conf">CONFIDENCE: 94%</div>
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >TOP OPPORTUNITY</div>
-                <div className="trade-card">
-                  <div className="tc-head">
-                    <span className="tc-asset" >SOL/USDT</span>
-                    <span className="tc-badge">HALAL</span>
-                  </div>
-                  <div style={{ fontSize: '8px', opacity: 0.6, lineHeight: '1.4' }}>Breakout detected at $142.50. Target: $158.00.</div>
-                  <div className="tc-btns">
-                    <div className="tc-btn" style={{ borderColor: '#00ff88', color: '#00ff88' }}>CONFIRM</div>
-                    <div className="tc-btn" style={{ borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)' }}>CANCEL</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >RECENT TRADES</div>
-                <div className="macro-row"><span className="macro-key">BTC/USDT</span><span className="macro-val" >+$142.50</span></div>
-                <div className="macro-row"><span className="macro-key">ETH/USDT</span><span className="macro-val" style={{ color: '#ff3366' }}>-$24.12</span></div>
-              </div>
-            </>
-          )}
-
-          {/* ── PROFESSOR MODE RIGHT PANEL ── */}
-          {activeMode === 'PROFESSOR' && (
-            <>
-              <div className="panel-section">
-                <div className="section-label" >NEURAL LOAD</div>
-                <div className="neural-gauge" style={{ margin: '10px auto', position: 'relative', width: '80px', height: '80px' }}>
-                  <canvas ref={neuralGaugeRef} width="80" height="80"></canvas>
-                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '14px', color: '#a78bfa', fontWeight: 'bold' }}>84%</div>
-                    <div style={{ fontSize: '6px', opacity: 0.4 }}>SYNC</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >QUICK ACTIONS</div>
-                <div className="macro-row"><span className="macro-key">SUMMARIZE</span><span className="macro-val">READY</span></div>
-                <div className="macro-row"><span className="macro-key">EXPLAIN</span><span className="macro-val">READY</span></div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >SESSION UPTIME</div>
-                <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '18px', color: '#a78bfa', textAlign: 'center' }}>02:45:12</div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >SPACED REVIEW</div>
-                <div style={{ padding: '10px', background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.2)' }}>
-                  <div style={{ fontSize: '8px', color: '#a78bfa' }}>Next Review in 4h</div>
-                  <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>Topic: Backpropagation</div>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ── ENGINEER MODE RIGHT PANEL ── */}
-          {activeMode === 'ENGINEER' && (
-            <>
-              <div className="panel-section">
-                <div className="section-label" >BLUEPRINT</div>
-                <div className="macro-row"><span className="macro-key">NODES</span><span className="macro-val">24</span></div>
-                <div className="macro-row"><span className="macro-key">EDGES</span><span className="macro-val">56</span></div>
-                <div className="macro-row"><span className="macro-key">DEPTH</span><span className="macro-val">4</span></div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >VANGUARD AUDIT</div>
-                <div className="macro-row"><span className="macro-key">SECURITY</span><span className="macro-val" >PASS</span></div>
-                <div className="macro-row"><span className="macro-key">PERF</span><span className="macro-val" >OPTIMAL</span></div>
-                <div className="macro-row"><span className="macro-key">LINT</span><span className="macro-val" style={{ color: '#ff3366' }}>2 ERR</span></div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label">DESIGNER PERSONALITY</div>
-                <div className="persona-grid-engineer">
-                  {[
-                    'STARK_GRADE', 'STEVE_JOBS', 'JONY_IVE', 'MASSIMO_VIGNELLI',
-                    'PAULA_SCHER', 'DAVID_CARSON', 'NERI_OXMAN', 'VIRGIL_ABLOH',
-                    'DIETER_RAMS', 'ZAHA_HADID'
-                  ].map(p => (
-                    <button
-                      key={p}
-                      className={`e-persona-btn ${specialistData?.active_persona === p ? 'active' : ''}`}
-                      onClick={() => handleSpecialistAction('ENGINEER', 'SET_DESIGNER_PERSONA', { persona: p })}
-                      title={p.replace('_', ' ')}
-                    >
-                      {p.split('_')[0][0]}{p.split('_')[1] ? p.split('_')[1][0] : ''}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >DNA PROFILE</div>
-                <div className="dna-viz-container">
-                  <div className="dna-strand"></div>
-                  <div className="dna-stats">
-                    <span>TYPO: 98%</span>
-                    <span>COLOR: 94%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label">TACTICAL OPS</div>
-                <div className="ops-grid">
-                  <button className="ops-btn" onClick={() => setThermalActive(!thermalActive)}>
-                    {thermalActive ? 'THERMAL: ON' : 'THERMAL: OFF'}
-                  </button>
-                  <button className="ops-btn" onClick={() => handleSpecialistAction('ENGINEER', 'MIRROR_SANDBOX_SYNC')}>
-                    SYNC MIRROR
-                  </button>
-                  <button className="ops-btn" onClick={() => setShowHallOfFame(!showHallOfFame)}>
-                    HALL OF FAME
-                  </button>
-                </div>
-              </div>
-
-              <div className="panel-section">
-                <div className="section-label" >DESIGN BRIEF</div>
-                <div style={{ fontSize: '7px', opacity: 0.5, lineHeight: '1.4' }}>
-                  "Ensure high-fidelity glassmorphism across all modules."
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeMode === 'ZAIRE' && (
-            <>
-              {/* ── PERSISTENT LAYOUT CALIBRATION ── */}
-              <div className="panel-section" style={{ marginTop: 'auto', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <div className="section-label">{activeMode} LAYOUT CALIBRATION</div>
-                <div className="calibration-controls" style={{ padding: '4px' }}>
-                  <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                      <label>LEFT WIDTH</label>
-                      <span>{layoutOffsets.leftWidth}px</span>
-                    </div>
-                    <input type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200}
-                      onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })}
-                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
-                  </div>
-                  <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                      <label>RIGHT WIDTH</label>
-                      <span>{layoutOffsets.rightWidth}px</span>
-                    </div>
-                    <input type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200}
-                      onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })}
-                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
-                  </div>
-                  <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                      <label>CMD HEIGHT</label>
-                      <span>{layoutOffsets.bottomHeight}px</span>
-                    </div>
-                    <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150}
-                      onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })}
-                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
-                  </div>
-
-                  <div style={{ margin: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                    <div className="cal-col">
-                      <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
-                      <div style={{ marginBottom: '6px' }}>
-                        <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
-                        <input type="range" min="-100" max="100" value={layoutOffsets.leftX}
-                          onChange={(e) => updateCurrentLayout({ leftX: parseInt(e.target.value) })}
-                          style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
-                        <input type="range" min="-100" max="100" value={layoutOffsets.leftY}
-                          onChange={(e) => updateCurrentLayout({ leftY: parseInt(e.target.value) })}
-                          style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                      </div>
-                    </div>
-
-                    <div className="cal-col">
-                      <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
-                      <div style={{ marginBottom: '6px' }}>
-                        <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
-                        <input type="range" min="-100" max="100" value={layoutOffsets.rightX}
-                          onChange={(e) => updateCurrentLayout({ rightX: parseInt(e.target.value) })}
-                          style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
-                        <input type="range" min="-100" max="100" value={layoutOffsets.rightY}
-                          onChange={(e) => updateCurrentLayout({ rightY: parseInt(e.target.value) })}
-                          style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                      </div>
-                    </div>
-
-                    <div className="cal-col">
-                      <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
-                      <div style={{ marginBottom: '6px' }}>
-                        <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
-                        <input type="range" min="-100" max="100" value={layoutOffsets.bottomX}
-                          onChange={(e) => updateCurrentLayout({ bottomX: parseInt(e.target.value) })}
-                          style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
-                        <input type="range" min="-100" max="100" value={layoutOffsets.bottomY}
-                          onChange={(e) => updateCurrentLayout({ bottomY: parseInt(e.target.value) })}
-                          style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    className="cmd-btn"
-                    style={{ width: '100%', marginTop: '12px', fontSize: '7px', padding: '4px', opacity: 0.6 }}
-                    onClick={() => {
-                      const defaults = {
-                        'ZAIRE': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                        'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                        'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                        'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
-                      };
-                      updateCurrentLayout(defaults[activeMode]);
-                    }}
-                  >
-                    RESET {activeMode} LAYOUT
-                  </button>
-                </div>
-              </div>
-
-              {/* ── COMPONENT CALIBRATION ── */}
-              <div className="panel-section" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-                <div className="section-label">COMPONENT CALIBRATION</div>
-                <div className="calibration-controls" style={{ padding: '4px' }}>
-                  <select
-                    value={selectedComponent}
-                    onChange={(e) => setSelectedComponent(e.target.value)}
-                    style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '8px', padding: '4px', marginBottom: '8px' }}
-                  >
-                    <option value="">SELECT COMPONENT...</option>
-                    {(({
-                      'ZAIRE': ['ACTIVE_MODE', 'SYSTEM_VITALS', 'BIOMETRIC_SCAN', 'SCREEN_VISION', 'SYSTEM_METRICS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
-                      'TRADER': ['PORTFOLIO', 'WATCHLIST', 'HALAL_FILTER', 'TOP_OPPORTUNITY', 'MACRO_SIGNALS'],
-                      'PROFESSOR': ['CURRICULUM', 'STUDY_METRICS', 'LEARNING_PROGRESS', 'STUDY_GOALS'],
-                      'ENGINEER': ['ACTIVE_PROJECT', 'FILE_TREE', 'FORGE_TELEMETRY', 'MANIFESTATION_SYNC', 'SYSTEM_ACTIONS']
-                    })[activeMode] || []).map(id => (
-                      <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ── PERSISTENT LAYOUT CALIBRATION ── */}
-          <div className="panel-section" style={{ marginTop: 'auto', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <div className="section-label">{activeMode} LAYOUT CALIBRATION</div>
-            <div className="calibration-controls" style={{ padding: '4px' }}>
-              <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                  <label>LEFT WIDTH</label>
-                  <span>{layoutOffsets.leftWidth}px</span>
-                </div>
-                <input type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200}
-                  onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })}
-                  style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
-              </div>
-              <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                  <label>RIGHT WIDTH</label>
-                  <span>{layoutOffsets.rightWidth}px</span>
-                </div>
-                <input type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200}
-                  onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })}
-                  style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
-              </div>
-              <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                  <label>CMD HEIGHT</label>
-                  <span>{layoutOffsets.bottomHeight}px</span>
-                </div>
-                <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150}
-                  onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })}
-                  style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
-              </div>
-
-              <div style={{ margin: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                <div className="cal-col">
-                  <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
-                  <div style={{ marginBottom: '6px' }}>
-                    <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
-                    <input type="range" min="-100" max="100" value={layoutOffsets.leftX}
-                      onChange={(e) => updateCurrentLayout({ leftX: parseInt(e.target.value) })}
-                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
-                    <input type="range" min="-100" max="100" value={layoutOffsets.leftY}
-                      onChange={(e) => updateCurrentLayout({ leftY: parseInt(e.target.value) })}
-                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                  </div>
-                </div>
-
-                <div className="cal-col">
-                  <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
-                  <div style={{ marginBottom: '6px' }}>
-                    <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
-                    <input type="range" min="-100" max="100" value={layoutOffsets.rightX}
-                      onChange={(e) => updateCurrentLayout({ rightX: parseInt(e.target.value) })}
-                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
-                    <input type="range" min="-100" max="100" value={layoutOffsets.rightY}
-                      onChange={(e) => updateCurrentLayout({ rightY: parseInt(e.target.value) })}
-                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                  </div>
-                </div>
-
-                <div className="cal-col">
-                  <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
-                  <div style={{ marginBottom: '6px' }}>
-                    <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
-                    <input type="range" min="-100" max="100" value={layoutOffsets.bottomX}
-                      onChange={(e) => updateCurrentLayout({ bottomX: parseInt(e.target.value) })}
-                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
-                    <input type="range" min="-100" max="100" value={layoutOffsets.bottomY}
-                      onChange={(e) => updateCurrentLayout({ bottomY: parseInt(e.target.value) })}
-                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                  </div>
-                </div>
-              </div>
-
-              <button
-                className="cmd-btn"
-                style={{ width: '100%', marginTop: '12px', fontSize: '7px', padding: '4px', opacity: 0.6 }}
-                onClick={() => {
-                  const defaults = {
-                    'ZAIRE': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                    'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                    'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                    'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
-                  };
-                  updateCurrentLayout(defaults[activeMode]);
-                }}
-              >
-                RESET {activeMode} LAYOUT
-              </button>
-            </div>
-          </div>
-
-          {/* ── COMPONENT CALIBRATION ── */}
-          <div className="panel-section" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-            <div className="section-label">COMPONENT CALIBRATION</div>
-            <div className="calibration-controls" style={{ padding: '4px' }}>
-              <select
-                value={selectedComponent}
-                onChange={(e) => setSelectedComponent(e.target.value)}
-                style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '8px', padding: '4px', marginBottom: '8px' }}
-              >
-                <option value="">SELECT COMPONENT...</option>
-                {(({
-                  'ZAIRE': ['ACTIVE_MODE', 'SYSTEM_VITALS', 'BIOMETRIC_SCAN', 'SCREEN_VISION', 'SYSTEM_METRICS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
-                  'TRADER': ['PORTFOLIO', 'WATCHLIST', 'HALAL_FILTER', 'TOP_OPPORTUNITY', 'MACRO_SIGNALS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
-                  'PROFESSOR': ['CURRICULUM', 'STUDY_METRICS', 'LEARNING_PROGRESS', 'STUDY_GOALS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
-                  'ENGINEER': ['ACTIVE_PROJECT', 'FILE_TREE', 'FORGE_TELEMETRY', 'MANIFESTATION_SYNC', 'SYSTEM_ACTIONS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE']
-                })[activeMode] || []).map(id => (
-                  <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
-                ))}
-              </select>
-
-              {selectedComponent && (
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.4 }}>
-                      <label>X NUDGE</label>
-                      <span>{(componentNudges[selectedComponent]?.x || 0)}px</span>
-                    </div>
-                    <input type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.x || 0}
-                      onChange={(e) => updateComponentNudge(selectedComponent, { x: parseInt(e.target.value) })}
-                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.4 }}>
-                      <label>Y NUDGE</label>
-                      <span>{(componentNudges[selectedComponent]?.y || 0)}px</span>
-                    </div>
-                    <input type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.y || 0}
-                      onChange={(e) => updateComponentNudge(selectedComponent, { y: parseInt(e.target.value) })}
-                      style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                  </div>
-                </div>
-              )}
-
-              <button
-                className="cmd-btn"
-                style={{ width: '100%', marginTop: '10px', fontSize: '7px', padding: '4px', opacity: 0.4 }}
-                onClick={() => {
-                  if (window.confirm('RESET ALL COMPONENT NUDGES?')) setComponentNudges({});
-                }}
-              >
-                RESET ALL COMPONENTS
-              </button>
-            </div>
-          </div>
-        </div>
-
-                {isArchivesPageOpen && (
-          <div className="neural-archives-page">
-            <div className="neural-archives-shell">
-              <div className="archives-page-header">
-                <div>
-                  <div className="archives-kicker">ZAIRE MEMORY CORE</div>
-                  <div className="archives-title">NEURAL ARCHIVES</div>
-                  <div className="archives-subtitle">All saved sessions with export-grade controls.</div>
-                </div>
-                <div className="archives-header-actions">
-                  <button className="archive-head-btn" onClick={() => { handleNewChat(); setIsArchivesPageOpen(false); }}>NEW THREAD</button>
-                  <button className="archive-head-btn" onClick={fetchChatSessions}>REFRESH</button>
-                  <button className="archive-head-btn close" onClick={() => setIsArchivesPageOpen(false)}>CLOSE</button>
-                </div>
-              </div>
-
-              <div className="archives-page-body">
-                <div className="archives-list-pane">
-                  <div className="chat-search-box archives-search">
-                    <input
-                      type="text"
-                      placeholder="SEARCH ARCHIVES..."
-                      value={chatSearch}
-                      onChange={(e) => setChatSearch(e.target.value)}
-                      className="chat-search-input"
-                    />
-                  </div>
-
-                  <div className="archives-list-grid">
-                    {chatSessions.length === 0 && <div className="session-empty">NO THREADS ARCHIVED</div>}
-                    {chatSessions
-                      .filter(s => s.title.toLowerCase().includes(chatSearch.toLowerCase()))
-                      .map(session => (
-                        <div
-                          key={session.id}
-                          className={`archive-card ${selectedArchiveId === session.id ? 'active' : ''}`}
-                          onClick={() => {
-                            setSelectedArchiveId(session.id);
-                            loadArchiveSessionDetail(session.id);
-                          }}
-                        >
-                          <div className="archive-card-title">{session.title}</div>
-                          <div className="archive-card-meta">
-                            <span>{new Date(session.timestamp).toLocaleString()}</span>
-                            <span>{session.messageCount} MSGS</span>
-                          </div>
-                          <div className="archive-card-actions">
-                            <button className="session-action-btn rename" onClick={(e) => { e.stopPropagation(); setEditingSessionId(session.id); setEditingTitle(session.title); }}>RENAME</button>
-                            <button className="session-action-btn" onClick={(e) => { e.stopPropagation(); handleArchiveCopy(session.id); }}>COPY</button>
-                            <button className="session-action-btn" onClick={(e) => { e.stopPropagation(); handleArchiveShare(session.id); }}>SHARE</button>
-                            <button className={`session-action-btn ${archiveReactions[session.id] === 'like' ? 'active-like' : ''}`} onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'like'); }}>LIKE</button>
-                            <button className={`session-action-btn ${archiveReactions[session.id] === 'dislike' ? 'active-dislike' : ''}`} onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'dislike'); }}>DISLIKE</button>
-                            <button className="session-action-btn open" onClick={(e) => { e.stopPropagation(); handleLoadSession(session.id); }}>OPEN</button>
-                            <button className="session-action-btn delete" onClick={(e) => handleDeleteSession(e, session.id)}>DELETE</button>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-
-                <div className="archives-detail-pane">
-                  {selectedArchiveId ? (
-                    <>
-                      <div className="archives-detail-head">
-                        {editingSessionId === selectedArchiveId ? (
-                          <input
-                            autoFocus
-                            className="session-rename-input"
-                            value={editingTitle}
-                            onChange={(e) => setEditingTitle(e.target.value)}
-                            onBlur={() => { handleRenameSession(selectedArchiveId, editingTitle); setEditingSessionId(null); fetchChatSessions(); }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') { handleRenameSession(selectedArchiveId, editingTitle); setEditingSessionId(null); fetchChatSessions(); }
-                              if (e.key === 'Escape') setEditingSessionId(null);
-                            }}
-                          />
-                        ) : (
-                          <div className="archives-detail-title">{(chatSessions.find(s => s.id === selectedArchiveId)?.title) || 'SESSION'}</div>
-                        )}
-                      </div>
-                      <pre className="archives-transcript">
-                        {transcriptFromSession(archiveSessionCache[selectedArchiveId]) || 'Select and load a session to preview full transcript.'}
-                      </pre>
-                    </>
-                  ) : (
-                    <div className="archives-empty-state">Select a chat from the left to inspect, export, and open it.</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
         )}
-{/* ROW 3: BOTTOM PANEL */}
-        <div className="grid-bottom">
-          <div className="bottom-left">
-            {/* ── SECURITY ALERT HUD (IMAGE OVERLAY) ── */}
-            {(isSecurityAlert || biometricData.intruders > 0) && (
-              <div className="security-alert-hud-box">
-                <div className="alert-header">
-                  <span className="alert-icon">⚠️</span>
-                  <span className="alert-title">ALERT: UNKNOWN USER</span>
+
+        <div className="grid-overlay"></div>
+        <div className="vignette"></div>
+        <div className="hex-overlay"></div>
+
+        <div
+          className={`main-grid ${isTransitioning ? 'is-transitioning' : ''}`}
+          data-mode={activeMode}
+          data-state={systemState}
+          style={{
+            '--left-width': `${layoutOffsets.leftWidth}px`,
+            '--right-width': `${layoutOffsets.rightWidth}px`,
+            '--bottom-height': `${layoutOffsets.bottomHeight}px`
+          }}
+        >
+          {/* ROW 1: NAVBAR */}
+          <div className="grid-navbar">
+            <div className="nav-logo">
+              <span className="logo-text">Z.A.I.R.E</span>
+              <span className="logo-sub">ARTIFICIAL INTELLIGENCE · v2.0</span>
+            </div>
+
+            <div className="nav-links">
+              {navItems.map(item => (
+                <div
+                  key={item}
+                  className={`nav-item ${displayedMode === item ? 'active' : ''}`}
+                  onClick={() => activateNavbarMode(item)}
+                >
+                  <span className="nav-arrow">›</span>
+                  {item}
                 </div>
-                <div className="alert-content">
-                  <div className="alert-msg">SCANNING YOUR SYSTEM! SNAPSHOT...</div>
-                  <div className="alert-meta">THREAT_LEVEL: CRITICAL</div>
+              ))}
+            </div>
+
+            <div className="nav-status">
+              <div className="settings-icon" onClick={() => setIsSettingsOpen(!isSettingsOpen)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 1.65 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+                </svg>
+              </div>
+              <div className="mode-indicator">
+                <div className="mode-dot"></div>
+                <span className="mode-text">MODE: {displayedMode}</span>
+              </div>
+              <div className="status-indicator">
+                <div className={`status-dot ${zaireStatus}`}></div>
+                <span className="status-text">{zaireStatus.toUpperCase().replace('_', ' ')}</span>
+              </div>
+              <div className="archive-toggle" onClick={() => { fetchChatSessions(); setIsArchivesPageOpen(true); }} title="Neural Archives">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </div>
+              <div className="upgrade-btn" onClick={handleUpgradePro}>
+                UPGRADE PRO
+              </div>
+              <div className="clerk-user-profile">
+                <UserButton appearance={{
+                  elements: {
+                    avatarBox: "zaire-clerk-avatar"
+                  }
+                }} />
+              </div>
+              <div className="clock-display">{timeStr}</div>
+            </div>
+          </div>
+
+          {/* ROW 2: LEFT PANEL */}
+          <div className="grid-left">
+            {/* ── ZAIRE MODE PANEL ── */}
+            {activeMode === 'ZAIRE' && (
+              <>
+
+                <div className="panel-section" style={getComponentStyle('SYSTEM_VITALS')}>
+                  <div className="section-label">SYSTEM VITALS</div>
+                  <div className="vitals-bars">
+                    <div className="vital-row">
+                      <span className="vital-label">CPU</span>
+                      <div className="vital-bar"><div className="vital-fill" style={{ width: `${liveMetrics.cpu}%` }}></div></div>
+                    </div>
+                    <div className="vital-row">
+                      <span className="vital-label">MEM</span>
+                      <div className="vital-bar"><div className="vital-fill" style={{ width: `${liveMetrics.ram}%` }}></div></div>
+                    </div>
+                    <div className="vital-row">
+                      <span className="vital-label gpu">GPU</span>
+                      <div className="vital-bar gpu"><div className="vital-fill" style={{ width: `${liveMetrics.gpu}%` }}></div></div>
+                    </div>
+                    <div className="vital-row">
+                      <span className="vital-label net">NET</span>
+                      <div className="vital-bar net"><div className="vital-fill" style={{ width: `${liveMetrics.net}%` }}></div></div>
+                    </div>
+                  </div>
                 </div>
-                <div className="alert-footer">
-                  <span className="blink">NEU-STREAM: ACTIVE</span>
+
+                <div className="panel-section" style={getComponentStyle('MODULE_STATUS')}>
+                  <div className="section-label">MODULE STATUS</div>
+                  <div className="module-list">
+                    {[
+                      { name: 'VISION', status: 'READY' },
+                      { name: 'VOICE', status: 'ACTIVE' },
+                      { name: 'WEB', status: 'LIVE' },
+                      { name: 'FILES', status: 'MOUNTED' },
+                    ].map(mod => (
+                      <div key={mod.name} className="module-row">
+                        <span className="module-name">{mod.name}</span>
+                        <span className={`module-status ${mod.status === 'OFFLINE' ? 'offline' : 'online'}`}>{mod.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="panel-section" style={getComponentStyle('VOICE_MONITOR')}>
+                  <div className="section-label">VOICE MONITOR</div>
+                  <canvas ref={voiceWaveformRef} className="voice-waveform"></canvas>
+                </div>
+
+                {/* ── MEMORY CORE ── */}
+                <div className={`panel-section memory-panel ${memoryFlash ? 'memory-flash' : ''}`} style={getComponentStyle('MEMORY_CORE')}>
+                  <div className="section-label memory-label">
+                    <span>MEMORY CORE</span>
+                    <span className="memory-count">{storedMemories.length} STORED</span>
+                  </div>
+                  <div className="memory-list">
+                    {storedMemories.length === 0 && (
+                      <div className="memory-empty">— NO MEMORIES YET —</div>
+                    )}
+                    {storedMemories.map((m, i) => (
+                      <div key={m.id || i} className="memory-item">
+                        <span className="memory-dot">◆</span>
+                        <span className="memory-text">{m.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label">LAST COMMAND</div>
+                  <div className="last-command" style={{ minHeight: '60px' }}>
+                    <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label">LAST COMMAND</div>
+                  <div className="last-command" style={{ minHeight: '60px' }}>
+                    <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ── TRADER MODE PANEL ── */}
+            {activeMode === 'TRADER' && (
+              <>
+                <div className="panel-section">
+                  <div className="section-label" >PORTFOLIO</div>
+                  <div className="metrics-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                    <div className="metric-card" style={{ padding: '8px' }}>
+                      <span className="metric-value" style={{ color: '#00ff88', fontSize: '14px' }}>
+                        ${specialistData?.portfolio_value || '2,847'}
+                      </span>
+                      <span className="metric-label">TOTAL VALUE</span>
+                    </div>
+                    <div className="metric-card" style={{ padding: '8px' }}>
+                      <span className="metric-value" style={{ color: '#00ff88', fontSize: '14px' }}>+4.2%</span>
+                      <span className="metric-label">24H CHANGE</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >HOLDINGS</div>
+                  <div className="holding-list" style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                    {['BTC', 'ETH', 'SOL', 'LINK'].map(asset => (
+                      <div key={asset} className="mini-bar-row">
+                        <span className="mbl">{asset}</span>
+                        <div className="mbt"><div className="mbf" style={{ width: '70%', background: '#00ff88' }}></div></div>
+                        <span className="mbv">82%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >HALAL FILTER</div>
+                  <div style={{ padding: '8px', background: 'rgba(0,255,136,0.04)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '2px' }}>
+                    <div style={{ fontSize: '8px', color: '#00ff88', letterSpacing: '1px' }}>✓ {specialistData?.halal_filter || 'ACTIVE'}</div>
+                    <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>LEVERAGE: BLOCKED</div>
+                    <div style={{ fontSize: '7px', opacity: 0.4 }}>MEME COINS: BLOCKED</div>
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label">TRADING TIMELINE</div>
+                  <div className="manifestation-timeline">
+                    {[
+                      { phase: 'ANALYSIS', label: 'MARKET ANALYSIS', icon: '🔍' },
+                      { phase: 'SIGNAL', label: 'SIGNAL DETECTION', icon: '⚡' },
+                      { phase: 'EXECUTION', label: 'EXECUTION FORGE', icon: '⚔' },
+                      { phase: 'AUDIT', label: 'RISK AUDIT', icon: '🛡' },
+                      { phase: 'HARVEST', label: 'PROFIT HARVEST', icon: '💰' },
+                    ].map((p, i) => (
+                      <div
+                        key={p.phase}
+                        className={`timeline-step ${traderPhase === p.phase ? 'active' : ''} ${i < ['ANALYSIS', 'SIGNAL', 'EXECUTION', 'AUDIT', 'HARVEST'].indexOf(traderPhase) ? 'completed' : ''}`}
+                      >
+                        <div className="step-icon" style={{ borderColor: traderPhase === p.phase ? '#00ff88' : '', color: traderPhase === p.phase ? '#00ff88' : '' }}>{p.icon}</div>
+                        <div className="step-info">
+                          <span className="step-name">{p.label}</span>
+                          <span className="step-status">{traderPhase === p.phase ? 'SCANNING' : (i < ['ANALYSIS', 'SIGNAL', 'EXECUTION', 'AUDIT', 'HARVEST'].indexOf(traderPhase) ? 'SUCCESS' : 'AWAITING')}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >ALGO SYNC</div>
+                  <div className="mini-bar-row">
+                    <span className="mbl" style={{ width: '40px' }}>PRECISION</span>
+                    <div className="mbt"><div className="mbf" style={{ width: `${traderProgress}%`, background: '#00ff88' }}></div></div>
+                    <span className="mbv">{Math.round(traderProgress)}%</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ── PROFESSOR MODE PANEL ── */}
+            {activeMode === 'PROFESSOR' && (
+              <>
+                <div className="panel-section">
+                  <div className="section-label" >CURRICULUM</div>
+                  <div className="curriculum-list">
+                    {['Quantum Physics', 'Neural Networks', 'Linear Algebra'].map(c => (
+                      <div key={c} className="curriculum-item">
+                        <div className="cur-dot" ></div>
+                        <span className="cur-name">{c.toUpperCase()}</span>
+                        <span className="cur-status">ACTIVE</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label">LEARNING TIMELINE</div>
+                  <div className="manifestation-timeline">
+                    {[
+                      { phase: 'ARCHITECTING', label: 'CURRICULUM DESIGN', icon: '✎' },
+                      { phase: 'SYNCING', label: 'KNOWLEDGE SYNC', icon: '❈' },
+                      { phase: 'LECTURE', label: 'LECTURE MANIFEST', icon: '🕮' },
+                      { phase: 'QUIZ', label: 'EVALUATION (QUIZ)', icon: '❓' },
+                      { phase: 'GRADUATION', label: 'CERTIFICATION', icon: '🎓' },
+                    ].map((p, i) => (
+                      <div
+                        key={p.phase}
+                        className={`timeline-step ${professorPhase === p.phase ? 'active' : ''} ${i < ['ARCHITECTING', 'SYNCING', 'LECTURE', 'QUIZ', 'GRADUATION'].indexOf(professorPhase) ? 'completed' : ''}`}
+                      >
+                        <div className="step-icon" style={{ borderColor: professorPhase === p.phase ? '#a78bfa' : '', color: professorPhase === p.phase ? '#a78bfa' : '' }}>{p.icon}</div>
+                        <div className="step-info">
+                          <span className="step-name">{p.label}</span>
+                          <span className="step-status">{professorPhase === p.phase ? 'IN PROGRESS' : (i < ['ARCHITECTING', 'SYNCING', 'LECTURE', 'QUIZ', 'GRADUATION'].indexOf(professorPhase) ? 'COMPLETE' : 'PENDING')}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >CURRICULUM SYNC</div>
+                  <div className="mini-bar-row">
+                    <span className="mbl" style={{ width: '40px' }}>OVERALL</span>
+                    <div className="mbt"><div className="mbf" style={{ width: `${learningProgress}%`, background: '#a78bfa' }}></div></div>
+                    <span className="mbv">{Math.round(learningProgress)}%</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ── ENGINEER MODE PANEL ── */}
+            {activeMode === 'ENGINEER' && (
+              <>
+                <div className="panel-section">
+                  <div className="section-label" >ACTIVE PROJECT</div>
+                  <div style={{ padding: '8px', background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: '2px' }}>
+                    <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '10px', color: '#f97316', letterSpacing: '1.5px' }}>ZAIRE CORE</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.5, marginTop: '4px' }}>
+                      <span>TYPE: NEXT.JS 15</span>
+                      <span>BUILD: STABLE</span>
+                    </div>
+                    <div className="mbt" style={{ marginTop: '6px' }}><div className="mbf" style={{ width: '65%', background: '#f97316' }}></div></div>
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >MANIFESTATION PROGRESS</div>
+                  <div className="build-stats-sidebar">
+                    <div className="stat-row">
+                      <span>SYSTEM_LOAD</span>
+                      <span>{Math.round(forgeProgress)}%</span>
+                    </div>
+                    <div className="mbt"><div className="mbf" style={{ width: `${forgeProgress}%`, background: '#f97316' }}></div></div>
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label">MANIFESTATION TIMELINE</div>
+                  <div className="manifestation-timeline">
+                    {[
+                      { phase: 'BLUEPRINT', label: 'NEURAL ARCHITECT', icon: '◈' },
+                      { phase: 'RESEARCH', label: 'INTELLIGENCE SYNC', icon: '❈' },
+                      { phase: 'FORGE', label: 'ACTIVE MANIFEST', icon: '⚔' },
+                      { phase: 'AUDIT', label: 'VANGUARD AUDIT', icon: '🛡' },
+                      { phase: 'DEPLOY', label: 'CORE DEPLOY', icon: '🚀' },
+                    ].map((p, i) => (
+                      <div
+                        key={p.phase}
+                        className={`timeline-step ${engineerPhase === p.phase ? 'active' : ''} ${i < ['BLUEPRINT', 'RESEARCH', 'FORGE', 'AUDIT', 'DEPLOY'].indexOf(engineerPhase) ? 'completed' : ''}`}
+                      >
+                        <div className="step-icon">{p.icon}</div>
+                        <div className="step-info">
+                          <span className="step-name">{p.label}</span>
+                          <span className="step-status">{engineerPhase === p.phase ? 'PROCESSING' : (i < ['BLUEPRINT', 'RESEARCH', 'FORGE', 'AUDIT', 'DEPLOY'].indexOf(engineerPhase) ? 'COMPLETE' : 'AWAITING')}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >FILE TREE</div>
+                  <div className="file-tree" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                    {['src/App.js', 'src/App.css', 'src/index.js', 'api/core.py'].map(f => (
+                      <div key={f} className="file-tree-item">
+                        <span className="file-icon">📄</span>
+                        <span>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* ROW 2: CENTER (ORB / TACTICAL CONTENT) */}
+          <div className={`grid-center ${activeMode !== 'ZAIRE' ? 'has-content' : ''}`}>
+
+            {/* ── TRADER CENTER: Sovereign Trading Floor ── */}
+            {activeMode === 'TRADER' && (
+              <div className="trader-floor">
+                <div className="hall-nav">
+                  {['CHART', 'STRATEGY', 'ALPHA'].map(m => (
+                    <button key={m} className={`h-nav-btn ${traderSubMode === m ? 'active' : ''}`} onClick={() => setTraderSubMode(m)}>{m}</button>
+                  ))}
+                </div>
+
+                {traderSubMode === 'CHART' && (
+                  <div className="floor-top">
+                    <div className="neural-chart-wrap">
+                      <div className="chart-header">
+                        <div className="pair-info">BTC/USDT <span className="live-dot pulse"></span></div>
+                        <div className="chart-controls">
+                          <span>15M</span>
+                          <span onClick={() => handleSpecialistAction('TRADER', 'WHALE_FORENSICS', { asset: 'BTC' })}>WHALE_SCAN</span>
+                        </div>
+                      </div>
+                      <div className="chart-canvas-area">
+                        <canvas ref={traderChartRef} style={{ width: '100%', height: '100%' }}></canvas>
+                        <div className="neural-overlay-text">NEURAL_SENTIMENT: {specialistData?.sentiment || 'BULLISH (84%)'}</div>
+                      </div>
+                    </div>
+
+                    <div className="execution-side">
+                      <div className="side-label">LIVE EXECUTION</div>
+                      <div className="execution-log">
+                        {specialistData?.live_trades?.length === 0 && <div className="log-empty">SCANNING FOR SIGNALS...</div>}
+                        {(specialistData?.live_trades || liveTrades).map(trade => (
+                          <div key={trade.id} className="trade-entry">
+                            <div className="t-row">
+                              <span className={`t-type ${trade.type.toLowerCase()}`}>{trade.type}</span>
+                              <span className="t-pair">{trade.pair}</span>
+                            </div>
+                            <div className="t-row sub">
+                              <span>{trade.price}</span>
+                              <span className="t-status">{trade.status}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {traderSubMode === 'STRATEGY' && (
+                  <div className="strategy-manifest">
+                    <div className="strategy-header">NEURAL STRATEGY FORGE // {specialistData?.active_strategy?.risk_score || '0'} RISK SCORE</div>
+                    <div className="strategy-grid">
+                      {specialistData?.active_strategy?.steps?.map((s, i) => (
+                        <div key={i} className="strategy-node">
+                          <div className="node-id">STEP 0{i + 1}</div>
+                          <div className="node-content">
+                            <div className="node-title">{s.name}</div>
+                            <div className="node-desc">{s.desc}</div>
+                          </div>
+                        </div>
+                      )) || <div className="strategy-empty">FORGE A STRATEGY TO MANIFEST TACTICAL BLUEPRINTS.</div>}
+                    </div>
+                  </div>
+                )}
+
+                {traderSubMode === 'ALPHA' && (
+                  <div className="alpha-manifest">
+                    <div className="alpha-header">WHALE FORENSICS // LIVE ALPHA FEED</div>
+                    <div className="alpha-list">
+                      {specialistData?.alpha_feed?.map((a, i) => (
+                        <div key={i} className={`alpha-item ${a.sentiment}`}>
+                          <span className="alpha-time">{new Date(a.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="alpha-event">{a.event}</span>
+                          <span className="alpha-sentiment-tag">{a.sentiment}</span>
+                        </div>
+                      )) || <div className="alpha-empty">SCANNING ON-CHAIN PROTOCOLS...</div>}
+                    </div>
+                  </div>
+                )}
+
+                <div className="floor-bottom">
+                  <div className="floor-stats">
+                    <div className="f-stat">
+                      <span className="fs-label">PORTFOLIO</span>
+                      <span className="fs-val positive">${specialistData?.portfolio_value || '2,847.00'}</span>
+                    </div>
+                    <div className="f-stat">
+                      <span className="fs-label">ACTIVE RISK</span>
+                      <span className="fs-val">{specialistData?.risk_level || 'LOW'}</span>
+                    </div>
+                    <div className="f-stat">
+                      <div className="trader-actions">
+                        <button className="t-btn buy" onClick={() => handleSpecialistAction('TRADER', 'EXECUTE_TRADE', { symbol: 'BTCUSDT', side: 'BUY', qty: 0.01 })}>BUY BTC</button>
+                        <button className="t-btn buy" onClick={() => handleSpecialistAction('TRADER', 'STRATEGY_FORGE', { asset: 'BTC' })}>FORGE STRATEGY</button>
+                        <button className="t-btn report" onClick={() => handleSpecialistAction('TRADER', 'WHALE_FORENSICS', { asset: 'BTC' })}>WHALE SCAN</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
 
-            <div className="version-info">
-              <span className="version-row">ZAIRE CORE: v2.0.0</span>
-              <span className="version-row verified">AUTH: MUGHEES [VERIFIED]</span>
-            </div>
-          </div>
-
-          <div className="bottom-center">
-            <div className="single-command-box">
-              <div className="command-header">
-                <span>ZAIRE COMMAND INTERFACE</span>
-                <div className="header-controls">
-                  <button
-                    className={`engine-toggle ${useGroqSpeech ? 'groq' : 'browser'}`}
-                    onClick={() => setUseGroqSpeech(!useGroqSpeech)}
-                    title={useGroqSpeech ? 'Using Groq AI (Whisper)' : 'Using Browser Speech'}
-                  >
-                    {useGroqSpeech ? 'GROQ' : 'BROWSER'}
-                  </button>
-                  <span className="groq-status">{groqStatus}</span>
-                  <div className={`mic-indicator ${isMicrophoneActive ? 'active' : ''}`}>
-                    <span className="mic-dot"></span>
-                    <span>{isMicrophoneActive ? 'LISTENING' : 'VOICE READY'}</span>
-                  </div>
+            {/* ── PROFESSOR CENTER: Sovereign Learning Hall ── */}
+            {activeMode === 'PROFESSOR' && (
+              <div className="professor-learning-hall">
+                <div className="hall-nav">
+                  {['LECTURE', 'ROADMAP', 'LAB'].map(m => (
+                    <button key={m} className={`h-nav-btn ${professorSubMode === m ? 'active' : ''}`} onClick={() => setProfessorSubMode(m)}>{m}</button>
+                  ))}
                 </div>
-              </div>
 
-              {/* ... (Existing Command Box Logic) ... */}
-              <div className="command-row">
-                <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={handleFileUpload} />
-                <button className="uplink-btn" onClick={() => fileInputRef.current.click()} title="Tactical Uplink">
-                  <svg className="uplink-icon" viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-2.48-2.02-4.5-4.5-4.5S7 2.52 7 5v12.5c0 3.59 2.91 6.5 6.5 6.5s6.5-2.91 6.5-6.5V6h-1.5z" /></svg>
-                </button>
-                <div className={`command-input-wrapper ${isMicrophoneActive ? 'voice-mode' : (isTyping ? 'typing-mode' : '')}`}>
-                  <input
-                    type="text"
-                    className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
-                    placeholder={isMicrophoneActive ? 'ZAIRE LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
-                    value={isMicrophoneActive ? (recognizedText || '') : (inputValue || '')}
-                    onChange={(e) => {
-                      if (!isMicrophoneActive) {
-                        setInputValue(e.target.value);
-                        setIsTyping(e.target.value.length > 0);
-                      }
-                    }}
-                    onFocus={() => setIsTyping(true)}
-                    onBlur={() => setIsTyping(false)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && e.target.value.trim()) {
-                        const userText = e.target.value;
-                        setLastUserPrompt(userText);
-                        setInputValue('');
-                        setIsTyping(false);
-                        setZaireResponseStream('');
-                        setLiveCodeStream('');
-                        if (socketRef.current) socketRef.current.emit('user_message', userText, { artifactTokens: [...artifactTokens, ...pendingArtifactTokens] });
-                        if (pendingArtifactTokens.length > 0) { setArtifactTokens(prev => [...prev, ...pendingArtifactTokens]); setPendingArtifactTokens([]); }
-                      }
-                    }}
-                    disabled={isMicrophoneActive}
-                  />
-                </div>
-                <button className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`} onClick={toggleMicrophone} title="Toggle Mic">
-                  <svg className="mic-icon" viewBox="0 0 24 24"><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" /></svg>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="bottom-right">
-            <div className="camera-scan-container">
-              <div className="hud-corner-brackets"></div>
-              <div className="scanline-overlay"></div>
-              <div className="hud-video-container">
-                {cameraStatus === 'authorized' ? (
-                  <div className="hud-video-wrapper">
-                    <img
-                      src=`${API_BASE_URL}/security/video_feed`
-                      alt="Camera Feed"
-                      className="hud-video-feed"
-                    />
-                    <canvas className="face-mesh-canvas" ref={faceMeshCanvasRef}></canvas>
-                    <div className="biometric-tactical-overlay">
-                      <div className="targeting-bracket tl"></div>
-                      <div className="targeting-bracket tr"></div>
-                      <div className="targeting-bracket bl"></div>
-                      <div className="targeting-bracket br"></div>
-                      <div className="bio-readout-hud">
-                        <div className="bio-stat">ID: {biometricData.name || 'SCANNING'}</div>
-                        <div className="bio-stat">CONF: {biometricData.confidence || 0}%</div>
+                {professorSubMode === 'LECTURE' && (
+                  <>
+                    {!specialistData?.active_quiz ? (
+                      <div className="lecture-manifest">
+                        <div className="lecture-header">
+                          <div className="topic-badge">{professorTopic} {'//'} MODULE {specialistData?.module || '04'}</div>
+                          <div className="persona-dna-tag" title="Adaptive Teaching Style">DNA: {specialistData?.persona?.replace('_', ' ') || 'SERIOUS ACADEMIC'}</div>
+                          <div className="slide-counter">{specialistData?.slide_index || '04'} / {specialistData?.total_slides || '12'}</div>
+                        </div>
+                        <div className="manifest-content">
+                          <div className="concept-title">{specialistData?.current_concept?.title || 'Neural Entanglement & Superposition'}</div>
+                          <div className="concept-body">
+                            <p>{specialistData?.current_concept?.body || 'In the quantum realm, information is not binary. It exists in a state of probability, defined by the wave function Ψ. ZAIRE is currently synchronizing this knowledge core with your neural baseline.'}</p>
+                            <ul className="learning-points">
+                              {specialistData?.current_concept?.points?.map((p, i) => (
+                                <li key={i}>✦ {p}</li>
+                              )) || (
+                                  <>
+                                    <li>✦ Superposition: N-dimensional state vectors.</li>
+                                    <li>✦ Interference: Constructive reinforcement of data.</li>
+                                    <li>✦ Decoherence: The primary bottleneck in neural sync.</li>
+                                  </>
+                                )}
+                            </ul>
+                          </div>
+                        </div>
+                        <div className="lecture-footer">
+                          <div className="professor-note">
+                            <span className="note-label">PROFESSOR_INSIGHT:</span>
+                            {specialistData?.current_concept?.insight || 'Focus on the relationship between entropy and information density.'}
+                          </div>
+                          <div className="professor-controls">
+                            <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'GENERATE_QUIZ', { topic: lastUserPrompt || professorTopic })}>GENERATE QUIZ</button>
+                            <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'ARCHITECT_ROADMAP', { topic: lastUserPrompt || professorTopic })}>ARCHITECT ROADMAP</button>
+                            <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'MANIFEST_VISUAL_LAB', { concept: lastUserPrompt || professorTopic })}>INITIALIZE LAB</button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="camera-auth-overlay">
-                    <div className="auth-glitch-text">
-                      {cameraStatus === 'denied' ? 'SIGNAL_BLOCKED' : 'AWAITING_AUTH'}
-                    </div>
-                    <div className="auth-subtext">
-                      {cameraStatus === 'denied' ? 'AUTHORIZATION DENIED BY MASTER' : 'TACTICAL UPLINK PENDING...'}
+                    ) : (
+                      <div className="quiz-manifest">
+                        <div className="quiz-header">
+                          <div className="quiz-title">NEURAL EVALUATION // STAGE 01</div>
+                          <div className="timer">04:52 REMAINING</div>
+                        </div>
+                        <div className="quiz-question">
+                          <div className="q-label">QUESTION 01</div>
+                          <div className="q-text">{specialistData?.active_quiz?.question || 'What is the primary cause of decoherence in a neural-sync environment?'}</div>
+                          <div className="q-options">
+                            {specialistData?.active_quiz?.options?.map((opt, i) => (
+                              <button key={i} className={`q-opt ${opt.correct ? 'correct' : ''}`} onClick={() => handleSpecialistAction('PROFESSOR', 'SUBMIT_QUIZ', { answer: opt.text, is_correct: opt.correct })}>
+                                {String.fromCharCode(65 + i)}) {opt.text}
+                              </button>
+                            )) || (
+                                <>
+                                  <button className="q-opt">A) Atmospheric Pressure</button>
+                                  <button className="q-opt correct">B) Quantum Interference</button>
+                                  <button className="q-opt">C) Clock Speed Mismatch</button>
+                                  <button className="q-opt">D) Thermal Exhaustion</button>
+                                </>
+                              )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {professorSubMode === 'ROADMAP' && (
+                  <div className="roadmap-manifest">
+                    <div className="roadmap-header">SOVEREIGN STUDY ROADMAP // {professorTopic}</div>
+                    <div className="roadmap-grid">
+                      {specialistData?.roadmap?.modules?.map((m, i) => (
+                        <div key={i} className={`roadmap-node ${m.status}`}>
+                          <div className="node-id">0{i + 1}</div>
+                          <div className="node-content">
+                            <div className="node-title">{m.title}</div>
+                            <div className="node-desc">{m.desc}</div>
+                          </div>
+                          <div className="node-status-tag">{m.status || 'LOCKED'}</div>
+                        </div>
+                      )) || <div className="roadmap-empty">AWAITING ARCHITECTURAL COMMAND...</div>}
                     </div>
                   </div>
                 )}
-                <div className="face-target-box">
-                  <div className="reticle reticle-tl"></div>
-                  <div className="reticle reticle-tr"></div>
-                  <div className="reticle reticle-bl"></div>
-                  <div className="reticle reticle-br"></div>
-                  <div className="scanning-bar"></div>
+
+                {professorSubMode === 'LAB' && (
+                  <div className="lab-manifest">
+                    <div className="lab-header">VISUALIZATION LAB // {specialistData?.lab?.title || 'AWAITING NEURAL SYNC'}</div>
+                    <div className="lab-viewport">
+                      {specialistData?.lab ? (
+                        <div className="lab-sim-placeholder">
+                          <div className="sim-pulse"></div>
+                          <span>{specialistData.lab.status}...</span>
+                          <p>Synchronizing with Engineer Forge for {specialistData.lab.engine} manifestation.</p>
+                        </div>
+                      ) : (
+                        <div className="lab-empty">INITIALIZE THE LAB TO MANIFEST INTERACTIVE SIMULATIONS.</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="research-summary">
+                  <div className="summary-label">NEURAL SUMMARY FEED</div>
+                  <div className="summary-items">
+                    {specialistData?.research_feed?.map((f, i) => (
+                      <div key={i} className="s-item">✦ Source: {f.source} {'//'} {f.title}</div>
+                    )) || <div className="s-item opacity-30">PARSING GLOBAL KNOWLEDGE CORES...</div>}
+                  </div>
                 </div>
-                <div className={`biometric-status-flash ${biometricData.detected ? 'confirmed' : (isSecurityAlert ? 'threat' : '')}`}></div>
-                <div className="hud-telemetry-top">
-                  <span className="telemetry-item">REC ●</span>
-                  <span className="telemetry-item blink">SYNC_[88%]</span>
+
+                <div className="learning-hall-sidebar">
+                  <div className="sidebar-section">
+                    <div className="sidebar-label">TEACHING PERSONA</div>
+                    <div className="persona-grid">
+                      {['SERIOUS_ACADEMIC', 'STARK_ENTHUSIAST', 'ZEN_SOCRATIC', 'NEURAL_COACH'].map(p => (
+                        <button
+                          key={p}
+                          className={`persona-btn ${specialistData?.persona === p ? 'active' : ''}`}
+                          onClick={() => handleSpecialistAction('PROFESSOR', 'SET_PERSONA', { persona: p })}
+                          title={p.replace('_', ' ')}
+                        >
+                          {p.split('_')[1][0]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="sidebar-section">
+                    <div className="sidebar-label">NEURAL NOTEBOOK</div>
+                    <div className="notebook-entries">
+                      {specialistData?.notebook?.map((n, i) => (
+                        <div key={i} className="note-entry">
+                          <span className="note-time">{new Date(n.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="note-text">{n.note}</span>
+                        </div>
+                      )) || <div className="note-empty">NO ATOMIC NOTES ARCHIVED.</div>}
+                    </div>
+                    <div className="note-input-wrap">
+                      <input
+                        type="text"
+                        placeholder="Capture atomic note..."
+                        value={professorNoteInput}
+                        onChange={(e) => setProfessorNoteInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && professorNoteInput) {
+                            handleSpecialistAction('PROFESSOR', 'TAKE_NOTE', { note: professorNoteInput });
+                            setProfessorNoteInput('');
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="hud-telemetry-bottom">
-                  <span className="telemetry-item">60 FPS</span>
-                  <span className="telemetry-item">4.2 Mbps</span>
+              </div>
+            )}
+
+            {/* ── ENGINEER CENTER: Forge Build Log ── */}
+            {activeMode === 'ENGINEER' && (
+              <div className="engineer-studio">
+                <div className="studio-top">
+                  <div className="editor-panel">
+                    <div className="editor-header">
+                      <div className="tabs-container">
+                        {manifestedFiles.length > 0 ? manifestedFiles.map((file, i) => (
+                          <div
+                            key={i}
+                            className={`file-tab ${activeTab === i ? 'active' : ''}`}
+                            onClick={() => {
+                              setActiveTab(i);
+                            }}
+                          >
+                            {file.name} <span className="tab-status-dot pulse"></span>
+                          </div>
+                        )) : (
+                          <div className="file-tab active">MANIFEST.js <span className="tab-status-dot pulse"></span></div>
+                        )}
+                      </div>
+                      <div className="editor-metrics">
+                        <span>LINES: {forgeCode.split('\n').length}</span>
+                        <span className="diff-toggle" onClick={() => setShowDiff(!showDiff)}>
+                          DIFF: <span style={{ color: showDiff ? '#f97316' : '#446677' }}>{showDiff ? 'ON' : 'OFF'}</span>
+                        </span>
+                        <span>ALIGN: <span style={{ color: '#00ff88' }}>{specialistData?.manifestation_sync?.alignment || '99%'}</span></span>
+                      </div>
+                    </div>
+                    <div className="editor-content-wrapper">
+                      <div className="line-numbers">
+                        {forgeCode.split('\n').map((_, i) => <div key={i}>{i + 1}</div>)}
+                      </div>
+                      <div className="editor-main">
+                        <pre className="code-block">
+                          <code>
+                            {showDiff && diffData ? (
+                              <div className="diff-viewer">
+                                {diffData.map((line, i) => (
+                                  <div key={i} className={`diff-line ${line.type}`}>
+                                    <span className="line-marker">{line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' '}</span>
+                                    {line.content}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              (manifestedFiles[activeTab]?.code || forgeCode) || '// AWAITING NEURAL FORGE MANIFESTATION...'
+                            )}
+                          </code>
+                        </pre>
+                        <div className="editor-cursor pulse"></div>
+                      </div>
+                      <div className="code-minimap">
+                        <div className="minimap-content" style={{ transform: `scale(0.1)`, transformOrigin: 'top right' }}>
+                          <pre><code>{forgeCode}</code></pre>
+                        </div>
+                        <div className="minimap-viewport"></div>
+                      </div>
+                    </div>
+
+                    {darwinResults && (
+                      <div className="darwin-overlay">
+                        <div className="darwin-header">NEURAL DARWINISM: VARIANT COMPETITION</div>
+                        <div className="darwin-grid">
+                          {Object.entries(darwinResults).map(([variant, score], i) => (
+                            <div key={i} className="darwin-variant">
+                              <div className="variant-label">{variant}</div>
+                              <div className="variant-preview-small"></div>
+                              <div className="variant-score-bar">
+                                <div className="score-fill" style={{ width: `${score}%` }}></div>
+                              </div>
+                              <div className="variant-score-val">{score}%</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="research-panel">
+                    <div className="panel-label">
+                      LIVE PREVIEW
+                      <span className="preview-refresh" style={{ marginLeft: '10px' }} onClick={() => setShowMatrix(!showMatrix)}>
+                        {showMatrix ? 'HIDE MATRIX' : 'SHOW MATRIX'}
+                      </span>
+                      <span className="preview-refresh" onClick={() => {
+                        const current = previewUrl;
+                        setPreviewUrl('');
+                        setTimeout(() => setPreviewUrl(current), 10);
+                      }}>↻</span>
+                    </div>
+                    <div className="preview-container">
+                      {thermalActive && (
+                        <div className="thermal-overlay pulse">
+                          <div className="fracture-marker" style={{ top: '20%', left: '30%', width: '100px', height: '40px' }}>
+                            <span className="fracture-label">ALIGNMENT_FRACTURE: 4px</span>
+                          </div>
+                          <div className="fracture-marker danger" style={{ top: '60%', left: '50%', width: '150px', height: '60px' }}>
+                            <span className="fracture-label">LOW_CONTRAST_DETECTED</span>
+                          </div>
+                        </div>
+                      )}
+                      {showMatrix ? (
+                        <div className="responsive-matrix-grid">
+                          {['mobile', 'tablet', 'laptop', 'desktop'].map(v => (
+                            <div key={v} className="matrix-item">
+                              <span className="matrix-label">{v.toUpperCase()}</span>
+                              <div className="matrix-frame">
+                                {/* Since these are local files in backend/memory/components, we might need a proxy or serve them */}
+                                {/* For now, we simulate with the iframe at different widths */}
+                                <iframe src={previewUrl} style={{ width: v === 'mobile' ? '375px' : v === 'tablet' ? '768px' : '100%', height: '100%', border: 'none', transform: 'scale(0.5)', transformOrigin: 'top left' }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <>
+                          <iframe
+                            src={previewUrl}
+                            className="live-preview-iframe"
+                            title="Engineer Live Preview"
+                            onError={() => console.log("Preview not available yet")}
+                          />
+                          {specialistData?.project_status?.server !== 'RUNNING' && (
+                            <div className="preview-placeholder">
+                              <div className="pulse-ring"></div>
+                              <span>AWAITING SERVER...</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {specialistData?.tech_stack_reasoning && (
+                      <div className="reasoning-box">
+                        <div className="panel-label" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>ARCHITECTURAL REASONING</div>
+                        <div className="reasoning-text">{specialistData.tech_stack_reasoning}</div>
+                      </div>
+                    )}
+
+                    <div className="surveillance-brief">
+                      <div className="panel-label">COMPETITOR SURVEILLANCE</div>
+                      <div className="brief-feed">
+                        <div className="brief-item">✦ ROLEX: NEW TYPOGRAPHY DETECTED (MUSEO → INTER)</div>
+                        <div className="brief-item">✦ AP: ADDED CINEMATIC HERO PARALLAX</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+
+                <div className="studio-bottom">
+                  <div className="studio-console">
+                    <div className="console-header">
+                      <span>
+                        SYSTEM_CONSOLE {'//'} {specialistData?.forge_telemetry?.dna_locked ? `DNA_LOCKED: ${specialistData.forge_telemetry.dna_locked}` : (specialistData?.status || 'STABLE')}
+                        {specialistData?.forge_telemetry?.is_healing && <span className="healing-tag pulse">SELF-HEALING ACTIVE</span>}
+                        <span className="dna-indicator" title="User Design DNA Alignment">DNA: <span style={{ color: '#00ff88' }}>OPTIMIZED</span></span>
+                      </span>
+                      <div className="console-actions">
+                        <button className="c-btn" onClick={() => handleSpecialistAction('ENGINEER', 'MANIFEST_PROJECT', { prompt: lastUserPrompt, project_name: 'zaire-engineered-site' })}>MANIFEST</button>
+                        <button className={`c-btn ${specialistData?.forge_telemetry?.is_healing ? 'healing-active' : ''}`} onClick={() => handleSpecialistAction('ENGINEER', 'VISION_AUDIT')}>
+                          {specialistData?.forge_telemetry?.is_healing ? 'HEALING...' : 'AUDIT'}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="console-output">
+                      {specialistData?.forge_build_log?.length > 0 ? (
+                        specialistData.forge_build_log.map((log, i) => (
+                          <div key={i} className="log-line">
+                            <span className="log-ts">[{log.timestamp}]</span>
+                            <span className={`log-tag ${log.status.toLowerCase()}`}>{log.status}</span>
+                            <span className="log-msg">{log.activity}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <>
+                          <div className="log-line"><span className="log-ts">[17:28:01]</span> <span className="log-tag init">INIT</span> <span className="log-msg">Autonomous Web Studio Manifested.</span></div>
+                          <div className="log-line"><span className="log-ts">[17:28:05]</span> <span className="log-tag ok">OK</span> <span className="log-msg">Neural Link Synchronized.</span></div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── SWARM CENTER: Master Protocol ── */}
+            {activeMode === 'SWARM' && (
+              <div className="swarm-chamber">
+                <div className="chamber-header">
+                  <div className="chamber-title">NEURAL SWARM {'//'} MASTER PROTOCOL</div>
+                  <div className={`swarm-status-badge ${swarmPhase.toLowerCase()}`}>{swarmPhase}</div>
+                </div>
+
+                <div className="swarm-visualizer">
+                  <div className="central-node pulse">MASTER</div>
+                  <div className={`agent-node trader ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>TRADER</div>
+                  <div className={`agent-node professor ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>PROFESSOR</div>
+                  <div className={`agent-node engineer ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>ENGINEER</div>
+                  <div className="swarm-stream">
+                    {swarmMessages.map((m, i) => (
+                      <div key={i} className={`s-msg ${m.from.toLowerCase()}`}>
+                        <span className="s-from">[{m.from}]</span> {m.text}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="swarm-controls">
+                  <button className="swarm-btn" onClick={() => handleSpecialistAction('SWARM', 'INITIATE_TASK', { task: lastUserPrompt })}>INITIATE GLOBAL SYNC</button>
+                </div>
+              </div>
+            )}
+
+            {/* ZAIRE CENTER: Orb fills via fixed canvas */}
+          </div>
+
+          {/* ROW 2: RIGHT PANEL */}
+          <div className="grid-right">
+            {/* ── ZAIRE MODE RIGHT PANEL ── */}
+            {activeMode === 'ZAIRE' && (
+              <>
+                <div className={`panel-section biometric-panel ${biometricData.detected ? 'detected' : ''} ${isSecurityAlert ? 'threat' : ''}`} style={getComponentStyle('BIOMETRIC_SCAN')}>
+                  <div className="section-label">BIOMETRIC SCAN</div>
+                  <div className="biometric-hud">
+                    <div className="bio-status-row">
+                      <span className="bio-label">IDENTITY:</span>
+                      <span className={`bio-value ${biometricData.name === 'Master' ? 'master' : (isSecurityAlert ? 'alert' : '')}`}>
+                        {isSecurityAlert ? 'UNKNOWN_THREAT' : (biometricData.detected ? biometricData.name.toUpperCase() : 'ABSENT')}
+                      </span>
+                    </div>
+                    <div className="bio-status-row">
+                      <span className="bio-label">SCAN LOCK:</span>
+                      <div className="bio-lock-bar">
+                        <div className={`bio-lock-fill ${biometricData.detected ? 'active' : ''} ${isSecurityAlert ? 'threat' : ''}`} style={{ width: biometricData.detected || isSecurityAlert ? '100%' : '0%' }}></div>
+                      </div>
+                    </div>
+                    <div className="bio-status-row">
+                      <span className="bio-label">FACE-LOCK:</span>
+                      <span className={`bio-value ${biometricData.enabled ? 'online' : 'offline'}`}>{biometricData.enabled ? 'ACTIVE' : 'DISABLED'}</span>
+                    </div>
+                    <div className="bio-meta">
+                      <div className="bio-btn-group">
+                        <span className="bio-tag-btn active">SYSTEM READY</span>
+                        <span className="bio-tag-btn">LOCKED</span>
+                        <span className="bio-tag-btn">UNLOCKED</span>
+                      </div>
+                      <div className="bio-timer">30.01</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`panel-section vision-panel ${isVisionScanning ? 'vision-active' : ''}`} style={getComponentStyle('SCREEN_VISION')}>
+                  <div className="section-label vision-label">
+                    <span>SCREEN VISION</span>
+                  </div>
+                  <div className="vision-feed">
+                    {isVisionScanning ? (
+                      <div className="vision-scan-box">
+                        <div className="scan-line-vision"></div>
+                        <div className="vision-meta">OCR: ENABLED | NEURAL: SYNCING</div>
+                      </div>
+                    ) : (
+                      <div className="vision-placeholder">
+                        <div className="vision-off-text">VISION CORE OFFLINE</div>
+                        <div className="vision-hint-text">Say: "What's on my screen?"</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="panel-section" style={getComponentStyle('SLEEP_AWAKE')}>
+                  <div className="section-label">SLEEP / AWAKE</div>
+                  <div className="sleep-hud">
+                    <div className="sleep-main">
+                      <span className="sleep-val">8</span>
+                      <span className="sleep-unit">H</span>
+                      <span className="sleep-state">STANDBY</span>
+                    </div>
+                    <div className="panel-section" style={getComponentStyle('ZAIRE_FEED')}>
+                      <div className="section-label">SYSTEM_LOGS</div>
+                      <div className="log-feed">
+                        {zaireActionFeed.map((log, idx) => (
+                          <div key={idx} className="log-entry">
+                            <span className="log-time">[{log.time}]</span>
+                            <span className="log-msg">{log.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="panel-section" style={getComponentStyle('SYSTEM_METRICS')}>
+                  <div className="section-label">SYSTEM METRICS</div>
+                  <div className="metrics-grid">
+                    <div className="metric-card">
+                      <span className="metric-value">{liveMetrics.latency}ms</span>
+                      <span className="metric-label">LATENCY</span>
+                    </div>
+                    <div className="metric-card">
+                      <span className="metric-value good">{liveMetrics.cpu}%</span>
+                      <span className="metric-label">CPU LOAD</span>
+                    </div>
+                    <div className="metric-card">
+                      <span className="metric-value">{liveMetrics.ram}%</span>
+                      <span className="metric-label">RAM USAGE</span>
+                    </div>
+                    <div className="metric-card">
+                      <span className="metric-value">{(audioFrequency * 100).toFixed(0)}%</span>
+                      <span className="metric-label">VOICE PULSE</span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ── TRADER MODE RIGHT PANEL ── */}
+            {activeMode === 'TRADER' && (
+              <>
+                <div className="panel-section">
+                  <div className="section-label" >NEURAL VERDICT</div>
+                  <div className="verdict-box" style={{ margin: 0 }}>
+                    <div className="v-label">MARKET SIGNAL</div>
+                    <div className="v-val" >STRONG BUY</div>
+                    <div className="v-conf">CONFIDENCE: 94%</div>
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >TOP OPPORTUNITY</div>
+                  <div className="trade-card">
+                    <div className="tc-head">
+                      <span className="tc-asset" >SOL/USDT</span>
+                      <span className="tc-badge">HALAL</span>
+                    </div>
+                    <div style={{ fontSize: '8px', opacity: 0.6, lineHeight: '1.4' }}>Breakout detected at $142.50. Target: $158.00.</div>
+                    <div className="tc-btns">
+                      <div className="tc-btn" style={{ borderColor: '#00ff88', color: '#00ff88' }}>CONFIRM</div>
+                      <div className="tc-btn" style={{ borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)' }}>CANCEL</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >RECENT TRADES</div>
+                  <div className="macro-row"><span className="macro-key">BTC/USDT</span><span className="macro-val" >+$142.50</span></div>
+                  <div className="macro-row"><span className="macro-key">ETH/USDT</span><span className="macro-val" style={{ color: '#ff3366' }}>-$24.12</span></div>
+                </div>
+              </>
+            )}
+
+            {/* ── PROFESSOR MODE RIGHT PANEL ── */}
+            {activeMode === 'PROFESSOR' && (
+              <>
+                <div className="panel-section">
+                  <div className="section-label" >NEURAL LOAD</div>
+                  <div className="neural-gauge" style={{ margin: '10px auto', position: 'relative', width: '80px', height: '80px' }}>
+                    <canvas ref={neuralGaugeRef} width="80" height="80"></canvas>
+                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                      <div style={{ fontSize: '14px', color: '#a78bfa', fontWeight: 'bold' }}>84%</div>
+                      <div style={{ fontSize: '6px', opacity: 0.4 }}>SYNC</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >QUICK ACTIONS</div>
+                  <div className="macro-row"><span className="macro-key">SUMMARIZE</span><span className="macro-val">READY</span></div>
+                  <div className="macro-row"><span className="macro-key">EXPLAIN</span><span className="macro-val">READY</span></div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >SESSION UPTIME</div>
+                  <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '18px', color: '#a78bfa', textAlign: 'center' }}>02:45:12</div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >SPACED REVIEW</div>
+                  <div style={{ padding: '10px', background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.2)' }}>
+                    <div style={{ fontSize: '8px', color: '#a78bfa' }}>Next Review in 4h</div>
+                    <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>Topic: Backpropagation</div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ── ENGINEER MODE RIGHT PANEL ── */}
+            {activeMode === 'ENGINEER' && (
+              <>
+                <div className="panel-section">
+                  <div className="section-label" >BLUEPRINT</div>
+                  <div className="macro-row"><span className="macro-key">NODES</span><span className="macro-val">24</span></div>
+                  <div className="macro-row"><span className="macro-key">EDGES</span><span className="macro-val">56</span></div>
+                  <div className="macro-row"><span className="macro-key">DEPTH</span><span className="macro-val">4</span></div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >VANGUARD AUDIT</div>
+                  <div className="macro-row"><span className="macro-key">SECURITY</span><span className="macro-val" >PASS</span></div>
+                  <div className="macro-row"><span className="macro-key">PERF</span><span className="macro-val" >OPTIMAL</span></div>
+                  <div className="macro-row"><span className="macro-key">LINT</span><span className="macro-val" style={{ color: '#ff3366' }}>2 ERR</span></div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label">DESIGNER PERSONALITY</div>
+                  <div className="persona-grid-engineer">
+                    {[
+                      'STARK_GRADE', 'STEVE_JOBS', 'JONY_IVE', 'MASSIMO_VIGNELLI',
+                      'PAULA_SCHER', 'DAVID_CARSON', 'NERI_OXMAN', 'VIRGIL_ABLOH',
+                      'DIETER_RAMS', 'ZAHA_HADID'
+                    ].map(p => (
+                      <button
+                        key={p}
+                        className={`e-persona-btn ${specialistData?.active_persona === p ? 'active' : ''}`}
+                        onClick={() => handleSpecialistAction('ENGINEER', 'SET_DESIGNER_PERSONA', { persona: p })}
+                        title={p.replace('_', ' ')}
+                      >
+                        {p.split('_')[0][0]}{p.split('_')[1] ? p.split('_')[1][0] : ''}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >DNA PROFILE</div>
+                  <div className="dna-viz-container">
+                    <div className="dna-strand"></div>
+                    <div className="dna-stats">
+                      <span>TYPO: 98%</span>
+                      <span>COLOR: 94%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label">TACTICAL OPS</div>
+                  <div className="ops-grid">
+                    <button className="ops-btn" onClick={() => setThermalActive(!thermalActive)}>
+                      {thermalActive ? 'THERMAL: ON' : 'THERMAL: OFF'}
+                    </button>
+                    <button className="ops-btn" onClick={() => handleSpecialistAction('ENGINEER', 'MIRROR_SANDBOX_SYNC')}>
+                      SYNC MIRROR
+                    </button>
+                    <button className="ops-btn" onClick={() => setShowHallOfFame(!showHallOfFame)}>
+                      HALL OF FAME
+                    </button>
+                  </div>
+                </div>
+
+                <div className="panel-section">
+                  <div className="section-label" >DESIGN BRIEF</div>
+                  <div style={{ fontSize: '7px', opacity: 0.5, lineHeight: '1.4' }}>
+                    "Ensure high-fidelity glassmorphism across all modules."
+                  </div>
+                </div>
+              </>
+            )}
+
+            {activeMode === 'ZAIRE' && (
+              <>
+                {/* ── PERSISTENT LAYOUT CALIBRATION ── */}
+                <div className="panel-section" style={{ marginTop: 'auto', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div className="section-label">{activeMode} LAYOUT CALIBRATION</div>
+                  <div className="calibration-controls" style={{ padding: '4px' }}>
+                    <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                        <label>LEFT WIDTH</label>
+                        <span>{layoutOffsets.leftWidth}px</span>
+                      </div>
+                      <input type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200}
+                        onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })}
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
+                    </div>
+                    <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                        <label>RIGHT WIDTH</label>
+                        <span>{layoutOffsets.rightWidth}px</span>
+                      </div>
+                      <input type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200}
+                        onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })}
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
+                    </div>
+                    <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                        <label>CMD HEIGHT</label>
+                        <span>{layoutOffsets.bottomHeight}px</span>
+                      </div>
+                      <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150}
+                        onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })}
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
+                    </div>
+
+                    <div style={{ margin: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                      <div className="cal-col">
+                        <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
+                        <div style={{ marginBottom: '6px' }}>
+                          <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
+                          <input type="range" min="-100" max="100" value={layoutOffsets.leftX}
+                            onChange={(e) => updateCurrentLayout({ leftX: parseInt(e.target.value) })}
+                            style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
+                          <input type="range" min="-100" max="100" value={layoutOffsets.leftY}
+                            onChange={(e) => updateCurrentLayout({ leftY: parseInt(e.target.value) })}
+                            style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                        </div>
+                      </div>
+
+                      <div className="cal-col">
+                        <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
+                        <div style={{ marginBottom: '6px' }}>
+                          <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
+                          <input type="range" min="-100" max="100" value={layoutOffsets.rightX}
+                            onChange={(e) => updateCurrentLayout({ rightX: parseInt(e.target.value) })}
+                            style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
+                          <input type="range" min="-100" max="100" value={layoutOffsets.rightY}
+                            onChange={(e) => updateCurrentLayout({ rightY: parseInt(e.target.value) })}
+                            style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                        </div>
+                      </div>
+
+                      <div className="cal-col">
+                        <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
+                        <div style={{ marginBottom: '6px' }}>
+                          <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
+                          <input type="range" min="-100" max="100" value={layoutOffsets.bottomX}
+                            onChange={(e) => updateCurrentLayout({ bottomX: parseInt(e.target.value) })}
+                            style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
+                          <input type="range" min="-100" max="100" value={layoutOffsets.bottomY}
+                            onChange={(e) => updateCurrentLayout({ bottomY: parseInt(e.target.value) })}
+                            style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      className="cmd-btn"
+                      style={{ width: '100%', marginTop: '12px', fontSize: '7px', padding: '4px', opacity: 0.6 }}
+                      onClick={() => {
+                        const defaults = {
+                          'ZAIRE': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                          'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                          'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                          'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
+                        };
+                        updateCurrentLayout(defaults[activeMode]);
+                      }}
+                    >
+                      RESET {activeMode} LAYOUT
+                    </button>
+                  </div>
+                </div>
+
+                {/* ── COMPONENT CALIBRATION ── */}
+                <div className="panel-section" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+                  <div className="section-label">COMPONENT CALIBRATION</div>
+                  <div className="calibration-controls" style={{ padding: '4px' }}>
+                    <select
+                      value={selectedComponent}
+                      onChange={(e) => setSelectedComponent(e.target.value)}
+                      style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '8px', padding: '4px', marginBottom: '8px' }}
+                    >
+                      <option value="">SELECT COMPONENT...</option>
+                      {(({
+                        'ZAIRE': ['ACTIVE_MODE', 'SYSTEM_VITALS', 'BIOMETRIC_SCAN', 'SCREEN_VISION', 'SYSTEM_METRICS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
+                        'TRADER': ['PORTFOLIO', 'WATCHLIST', 'HALAL_FILTER', 'TOP_OPPORTUNITY', 'MACRO_SIGNALS'],
+                        'PROFESSOR': ['CURRICULUM', 'STUDY_METRICS', 'LEARNING_PROGRESS', 'STUDY_GOALS'],
+                        'ENGINEER': ['ACTIVE_PROJECT', 'FILE_TREE', 'FORGE_TELEMETRY', 'MANIFESTATION_SYNC', 'SYSTEM_ACTIONS']
+                      })[activeMode] || []).map(id => (
+                        <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ── PERSISTENT LAYOUT CALIBRATION ── */}
+            <div className="panel-section" style={{ marginTop: 'auto', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="section-label">{activeMode} LAYOUT CALIBRATION</div>
+              <div className="calibration-controls" style={{ padding: '4px' }}>
+                <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                    <label>LEFT WIDTH</label>
+                    <span>{layoutOffsets.leftWidth}px</span>
+                  </div>
+                  <input type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200}
+                    onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })}
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
+                </div>
+                <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                    <label>RIGHT WIDTH</label>
+                    <span>{layoutOffsets.rightWidth}px</span>
+                  </div>
+                  <input type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200}
+                    onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })}
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
+                </div>
+                <div className="calibration-item" style={{ marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
+                    <label>CMD HEIGHT</label>
+                    <span>{layoutOffsets.bottomHeight}px</span>
+                  </div>
+                  <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150}
+                    onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })}
+                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
+                </div>
+
+                <div style={{ margin: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  <div className="cal-col">
+                    <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
+                    <div style={{ marginBottom: '6px' }}>
+                      <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
+                      <input type="range" min="-100" max="100" value={layoutOffsets.leftX}
+                        onChange={(e) => updateCurrentLayout({ leftX: parseInt(e.target.value) })}
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
+                      <input type="range" min="-100" max="100" value={layoutOffsets.leftY}
+                        onChange={(e) => updateCurrentLayout({ leftY: parseInt(e.target.value) })}
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                    </div>
+                  </div>
+
+                  <div className="cal-col">
+                    <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
+                    <div style={{ marginBottom: '6px' }}>
+                      <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
+                      <input type="range" min="-100" max="100" value={layoutOffsets.rightX}
+                        onChange={(e) => updateCurrentLayout({ rightX: parseInt(e.target.value) })}
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
+                      <input type="range" min="-100" max="100" value={layoutOffsets.rightY}
+                        onChange={(e) => updateCurrentLayout({ rightY: parseInt(e.target.value) })}
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                    </div>
+                  </div>
+
+                  <div className="cal-col">
+                    <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
+                    <div style={{ marginBottom: '6px' }}>
+                      <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
+                      <input type="range" min="-100" max="100" value={layoutOffsets.bottomX}
+                        onChange={(e) => updateCurrentLayout({ bottomX: parseInt(e.target.value) })}
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
+                      <input type="range" min="-100" max="100" value={layoutOffsets.bottomY}
+                        onChange={(e) => updateCurrentLayout({ bottomY: parseInt(e.target.value) })}
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  className="cmd-btn"
+                  style={{ width: '100%', marginTop: '12px', fontSize: '7px', padding: '4px', opacity: 0.6 }}
+                  onClick={() => {
+                    const defaults = {
+                      'ZAIRE': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                      'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                      'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+                      'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
+                    };
+                    updateCurrentLayout(defaults[activeMode]);
+                  }}
+                >
+                  RESET {activeMode} LAYOUT
+                </button>
+              </div>
+            </div>
+
+            {/* ── COMPONENT CALIBRATION ── */}
+            <div className="panel-section" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+              <div className="section-label">COMPONENT CALIBRATION</div>
+              <div className="calibration-controls" style={{ padding: '4px' }}>
+                <select
+                  value={selectedComponent}
+                  onChange={(e) => setSelectedComponent(e.target.value)}
+                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '8px', padding: '4px', marginBottom: '8px' }}
+                >
+                  <option value="">SELECT COMPONENT...</option>
+                  {(({
+                    'ZAIRE': ['ACTIVE_MODE', 'SYSTEM_VITALS', 'BIOMETRIC_SCAN', 'SCREEN_VISION', 'SYSTEM_METRICS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
+                    'TRADER': ['PORTFOLIO', 'WATCHLIST', 'HALAL_FILTER', 'TOP_OPPORTUNITY', 'MACRO_SIGNALS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
+                    'PROFESSOR': ['CURRICULUM', 'STUDY_METRICS', 'LEARNING_PROGRESS', 'STUDY_GOALS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
+                    'ENGINEER': ['ACTIVE_PROJECT', 'FILE_TREE', 'FORGE_TELEMETRY', 'MANIFESTATION_SYNC', 'SYSTEM_ACTIONS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE']
+                  })[activeMode] || []).map(id => (
+                    <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
+                  ))}
+                </select>
+
+                {selectedComponent && (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.4 }}>
+                        <label>X NUDGE</label>
+                        <span>{(componentNudges[selectedComponent]?.x || 0)}px</span>
+                      </div>
+                      <input type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.x || 0}
+                        onChange={(e) => updateComponentNudge(selectedComponent, { x: parseInt(e.target.value) })}
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.4 }}>
+                        <label>Y NUDGE</label>
+                        <span>{(componentNudges[selectedComponent]?.y || 0)}px</span>
+                      </div>
+                      <input type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.y || 0}
+                        onChange={(e) => updateComponentNudge(selectedComponent, { y: parseInt(e.target.value) })}
+                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  className="cmd-btn"
+                  style={{ width: '100%', marginTop: '10px', fontSize: '7px', padding: '4px', opacity: 0.4 }}
+                  onClick={() => {
+                    if (window.confirm('RESET ALL COMPONENT NUDGES?')) setComponentNudges({});
+                  }}
+                >
+                  RESET ALL COMPONENTS
+                </button>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* ── FLOATING RESPONSE STREAM (FUTURISTIC SUBTITLES) ── */}
-        <div className={`floating-subtitles ${showResponsePanel && zaireResponseStream ? 'visible' : ''}`}>
-          <div className="subtitles-content">
-            <span className="subtitles-prefix">ZAIRE // </span>
-            {zaireResponseStream}
-          </div>
-        </div>
-      </div>
+          {isArchivesPageOpen && (
+            <div className="neural-archives-page">
+              <div className="neural-archives-shell">
+                <div className="archives-page-header">
+                  <div>
+                    <div className="archives-kicker">ZAIRE MEMORY CORE</div>
+                    <div className="archives-title">NEURAL ARCHIVES</div>
+                    <div className="archives-subtitle">All saved sessions with export-grade controls.</div>
+                  </div>
+                  <div className="archives-header-actions">
+                    <button className="archive-head-btn" onClick={() => { handleNewChat(); setIsArchivesPageOpen(false); }}>NEW THREAD</button>
+                    <button className="archive-head-btn" onClick={fetchChatSessions}>REFRESH</button>
+                    <button className="archive-head-btn close" onClick={() => setIsArchivesPageOpen(false)}>CLOSE</button>
+                  </div>
+                </div>
 
-      {/* ── SECURITY ALERT OVERLAY ── */}
-      {showSecurityOverlay && activeIntruder && (
-        <div className="security-alert-overlay">
-          <div className="glitch-background"></div>
-          <div className="threat-container">
-            <div className="threat-header">🚨 SECURITY BREACH DETECTED 🚨</div>
-            <div className="intruder-card">
-              {activeIntruder.snapshot_b64 ? (
-                <img
-                  src={`data:image/jpeg;base64,${activeIntruder.snapshot_b64}`}
-                  alt="Intruder"
-                  className="intruder-face"
-                />
-              ) : (
-                <div className="intruder-placeholder">IMAGE_LOST</div>
+                <div className="archives-page-body">
+                  <div className="archives-list-pane">
+                    <div className="chat-search-box archives-search">
+                      <input
+                        type="text"
+                        placeholder="SEARCH ARCHIVES..."
+                        value={chatSearch}
+                        onChange={(e) => setChatSearch(e.target.value)}
+                        className="chat-search-input"
+                      />
+                    </div>
+
+                    <div className="archives-list-grid">
+                      {chatSessions.length === 0 && <div className="session-empty">NO THREADS ARCHIVED</div>}
+                      {chatSessions
+                        .filter(s => s.title.toLowerCase().includes(chatSearch.toLowerCase()))
+                        .map(session => (
+                          <div
+                            key={session.id}
+                            className={`archive-card ${selectedArchiveId === session.id ? 'active' : ''}`}
+                            onClick={() => {
+                              setSelectedArchiveId(session.id);
+                              loadArchiveSessionDetail(session.id);
+                            }}
+                          >
+                            <div className="archive-card-title">{session.title}</div>
+                            <div className="archive-card-meta">
+                              <span>{new Date(session.timestamp).toLocaleString()}</span>
+                              <span>{session.messageCount} MSGS</span>
+                            </div>
+                            <div className="archive-card-actions">
+                              <button className="session-action-btn rename" onClick={(e) => { e.stopPropagation(); setEditingSessionId(session.id); setEditingTitle(session.title); }}>RENAME</button>
+                              <button className="session-action-btn" onClick={(e) => { e.stopPropagation(); handleArchiveCopy(session.id); }}>COPY</button>
+                              <button className="session-action-btn" onClick={(e) => { e.stopPropagation(); handleArchiveShare(session.id); }}>SHARE</button>
+                              <button className={`session-action-btn ${archiveReactions[session.id] === 'like' ? 'active-like' : ''}`} onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'like'); }}>LIKE</button>
+                              <button className={`session-action-btn ${archiveReactions[session.id] === 'dislike' ? 'active-dislike' : ''}`} onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'dislike'); }}>DISLIKE</button>
+                              <button className="session-action-btn open" onClick={(e) => { e.stopPropagation(); handleLoadSession(session.id); }}>OPEN</button>
+                              <button className="session-action-btn delete" onClick={(e) => handleDeleteSession(e, session.id)}>DELETE</button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+
+                  <div className="archives-detail-pane">
+                    {selectedArchiveId ? (
+                      <>
+                        <div className="archives-detail-head">
+                          {editingSessionId === selectedArchiveId ? (
+                            <input
+                              autoFocus
+                              className="session-rename-input"
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              onBlur={() => { handleRenameSession(selectedArchiveId, editingTitle); setEditingSessionId(null); fetchChatSessions(); }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') { handleRenameSession(selectedArchiveId, editingTitle); setEditingSessionId(null); fetchChatSessions(); }
+                                if (e.key === 'Escape') setEditingSessionId(null);
+                              }}
+                            />
+                          ) : (
+                            <div className="archives-detail-title">{(chatSessions.find(s => s.id === selectedArchiveId)?.title) || 'SESSION'}</div>
+                          )}
+                        </div>
+                        <pre className="archives-transcript">
+                          {transcriptFromSession(archiveSessionCache[selectedArchiveId]) || 'Select and load a session to preview full transcript.'}
+                        </pre>
+                      </>
+                    ) : (
+                      <div className="archives-empty-state">Select a chat from the left to inspect, export, and open it.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* ROW 3: BOTTOM PANEL */}
+          <div className="grid-bottom">
+            <div className="bottom-left">
+              {/* ── SECURITY ALERT HUD (IMAGE OVERLAY) ── */}
+              {(isSecurityAlert || biometricData.intruders > 0) && (
+                <div className="security-alert-hud-box">
+                  <div className="alert-header">
+                    <span className="alert-icon">⚠️</span>
+                    <span className="alert-title">ALERT: UNKNOWN USER</span>
+                  </div>
+                  <div className="alert-content">
+                    <div className="alert-msg">SCANNING YOUR SYSTEM! SNAPSHOT...</div>
+                    <div className="alert-meta">THREAT_LEVEL: CRITICAL</div>
+                  </div>
+                  <div className="alert-footer">
+                    <span className="blink">NEU-STREAM: ACTIVE</span>
+                  </div>
+                </div>
               )}
-              <div className="intruder-meta">
-                <div className="meta-row"><span className="L">TIMESTAMP:</span> <span className="V">{activeIntruder.timestamp}</span></div>
-                <div className="meta-row"><span className="L">THREAT_LVL:</span> <span className="V red">CRITICAL</span></div>
-                <div className="meta-row"><span className="L">ACTION:</span> <span className="V">PUSH_SENT</span></div>
+
+              <div className="version-info">
+                <span className="version-row">ZAIRE CORE: v2.0.0</span>
+                <span className="version-row verified">AUTH: MUGHEES [VERIFIED]</span>
               </div>
             </div>
-            <button className="threat-dismiss" onClick={() => setShowSecurityOverlay(false)}>ACKNOWLEDGE RISK</button>
-          </div>
-        </div>
-      )}
 
-      <ShadowAssistant socket={socketRef.current} />
+            <div className="bottom-center">
+              <div className="single-command-box">
+                <div className="command-header">
+                  <span>ZAIRE COMMAND INTERFACE</span>
+                  <div className="header-controls">
+                    <button
+                      className={`engine-toggle ${useGroqSpeech ? 'groq' : 'browser'}`}
+                      onClick={() => setUseGroqSpeech(!useGroqSpeech)}
+                      title={useGroqSpeech ? 'Using Groq AI (Whisper)' : 'Using Browser Speech'}
+                    >
+                      {useGroqSpeech ? 'GROQ' : 'BROWSER'}
+                    </button>
+                    <span className="groq-status">{groqStatus}</span>
+                    <div className={`mic-indicator ${isMicrophoneActive ? 'active' : ''}`}>
+                      <span className="mic-dot"></span>
+                      <span>{isMicrophoneActive ? 'LISTENING' : 'VOICE READY'}</span>
+                    </div>
+                  </div>
+                </div>
 
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        activeMode={activeMode}
-        customModes={customModes}
-        onCustomModesChange={(nextModes) => {
-          setCustomModes(nextModes);
-          if (activeCustomMode && !nextModes.some((m) => m.enabled && m.name === activeCustomMode)) {
-            setActiveCustomMode(null);
-          }
-        }}
-        biometricData={biometricData}
-        blobColor={blobColor}
-        setBlobColor={setBlobColor}
-        blobSize={blobSize}
-        setBlobSize={setBlobSize}
-        hudOpacity={hudOpacity}
-        setHudOpacity={setHudOpacity}
-        neuralGlowEnabled={neuralGlowEnabled}
-        setNeuralGlowEnabled={setNeuralGlowEnabled}
-        holographicTiltEnabled={holographicTiltEnabled}
-        setHolographicTiltEnabled={setHolographicTiltEnabled}
-        halalFilterEnabled={halalFilterEnabled}
-        setHalalFilterEnabled={setHalalFilterEnabled}
-        autoLintEnabled={autoLintEnabled}
-        setAutoLintEnabled={setAutoLintEnabled}
-        onEnterDragMode={() => {
-          setIsSettingsOpen(false);
-          setIsDragging(true);
-          dragStateRef.current.isPointerDown = false;
-        }}
-      />
+                {/* ... (Existing Command Box Logic) ... */}
+                <div className="command-row">
+                  <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={handleFileUpload} />
+                  <button className="uplink-btn" onClick={() => fileInputRef.current.click()} title="Tactical Uplink">
+                    <svg className="uplink-icon" viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-2.48-2.02-4.5-4.5-4.5S7 2.52 7 5v12.5c0 3.59 2.91 6.5 6.5 6.5s6.5-2.91 6.5-6.5V6h-1.5z" /></svg>
+                  </button>
+                  <div className={`command-input-wrapper ${isMicrophoneActive ? 'voice-mode' : (isTyping ? 'typing-mode' : '')}`}>
+                    <input
+                      type="text"
+                      className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
+                      placeholder={isMicrophoneActive ? 'ZAIRE LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
+                      value={isMicrophoneActive ? (recognizedText || '') : (inputValue || '')}
+                      onChange={(e) => {
+                        if (!isMicrophoneActive) {
+                          setInputValue(e.target.value);
+                          setIsTyping(e.target.value.length > 0);
+                        }
+                      }}
+                      onFocus={() => setIsTyping(true)}
+                      onBlur={() => setIsTyping(false)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.target.value.trim()) {
+                          const userText = e.target.value;
+                          setLastUserPrompt(userText);
+                          setInputValue('');
+                          setIsTyping(false);
+                          setZaireResponseStream('');
+                          setLiveCodeStream('');
+                          if (socketRef.current) socketRef.current.emit('user_message', userText, { artifactTokens: [...artifactTokens, ...pendingArtifactTokens] });
+                          if (pendingArtifactTokens.length > 0) { setArtifactTokens(prev => [...prev, ...pendingArtifactTokens]); setPendingArtifactTokens([]); }
+                        }
+                      }}
+                      disabled={isMicrophoneActive}
+                    />
+                  </div>
+                  <button className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`} onClick={toggleMicrophone} title="Toggle Mic">
+                    <svg className="mic-icon" viewBox="0 0 24 24"><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" /></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
 
-      {isDragging && (
-        <div
-          className="drag-overlay"
-          onPointerDown={handleDragPointerDown}
-          onPointerMove={handleDragPointerMove}
-          onPointerUp={handleDragPointerUp}
-          onPointerCancel={handleDragPointerUp}
-          onPointerLeave={handleDragPointerUp}
-        >
-          <div className="drag-helper-text">
-            <span>DRAG ANYWHERE TO REPOSITION</span>
-            <button
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                setBlobPosition(dragStateRef.current.tempPosition);
-                dragStateRef.current.isPointerDown = false;
-                setIsDragging(false);
-              }}
-            >
-              SAVE POSITION
-            </button>
-          </div>
-        </div>
-      )}
-      {/* Engagement Overlay (Audio Context Fix) */}
-      {/* ── NEURAL VIDEO OVERLAY ── */}
-      {isVideoPlaying && neuralVideoData && (
-        <div className="neural-video-overlay">
-          <div className="video-header">
-            <span className="video-title">{neuralVideoData.title}</span>
-            <button className="video-close" onClick={() => setIsVideoPlaying(false)}>✕</button>
-            <div className="zaire-response-text">
-              {zaireResponseStream || 'AWAITING NEURAL UPLINK...'}
+            <div className="bottom-right">
+              <div className="camera-scan-container">
+                <div className="hud-corner-brackets"></div>
+                <div className="scanline-overlay"></div>
+                <div className="hud-video-container">
+                  {cameraStatus === 'authorized' ? (
+                    <div className="hud-video-wrapper">
+                      <img
+                        src={API_BASE_URL + '/security/video_feed'}
+                        alt="Camera Feed"
+                        className="hud-video-feed"
+                      />
+                      <canvas className="face-mesh-canvas" ref={faceMeshCanvasRef}></canvas>
+                      <div className="biometric-tactical-overlay">
+                        <div className="targeting-bracket tl"></div>
+                        <div className="targeting-bracket tr"></div>
+                        <div className="targeting-bracket bl"></div>
+                        <div className="targeting-bracket br"></div>
+                        <div className="bio-readout-hud">
+                          <div className="bio-stat">ID: {biometricData.name || 'SCANNING'}</div>
+                          <div className="bio-stat">CONF: {biometricData.confidence || 0}%</div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="camera-auth-overlay">
+                      <div className="auth-glitch-text">
+                        {cameraStatus === 'denied' ? 'SIGNAL_BLOCKED' : 'AWAITING_AUTH'}
+                      </div>
+                      <div className="auth-subtext">
+                        {cameraStatus === 'denied' ? 'AUTHORIZATION DENIED BY MASTER' : 'TACTICAL UPLINK PENDING...'}
+                      </div>
+                    </div>
+                  )}
+                  <div className="face-target-box">
+                    <div className="reticle reticle-tl"></div>
+                    <div className="reticle reticle-tr"></div>
+                    <div className="reticle reticle-bl"></div>
+                    <div className="reticle reticle-br"></div>
+                    <div className="scanning-bar"></div>
+                  </div>
+                  <div className={`biometric-status-flash ${biometricData.detected ? 'confirmed' : (isSecurityAlert ? 'threat' : '')}`}></div>
+                  <div className="hud-telemetry-top">
+                    <span className="telemetry-item">REC ●</span>
+                    <span className="telemetry-item blink">SYNC_[88%]</span>
+                  </div>
+                  <div className="hud-telemetry-bottom">
+                    <span className="telemetry-item">60 FPS</span>
+                    <span className="telemetry-item">4.2 Mbps</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="video-stage">
-            <div className="three-manifest-layer">
-              {/* Real 3D content would be rendered into a Three.js sub-canvas here */}
-              <div className="manifestation-label">3D_MANIFEST: ACTIVE</div>
-            </div>
-            <div className="subtitles-layer">
+
+          {/* ── FLOATING RESPONSE STREAM (FUTURISTIC SUBTITLES) ── */}
+          <div className={`floating-subtitles ${showResponsePanel && zaireResponseStream ? 'visible' : ''}`}>
+            <div className="subtitles-content">
+              <span className="subtitles-prefix">ZAIRE // </span>
               {zaireResponseStream}
             </div>
           </div>
-          <div className="video-timeline">
-            <div className="timeline-progress" style={{ width: '45%' }}></div>
-          </div>
         </div>
-      )}
 
-      {/* ── KNOWLEDGE PARTICLES ── */}
-      {particles.map(p => (
-        <div
-          key={p.id}
-          className="knowledge-particle"
-          style={{
-            left: p.x,
-            top: p.y,
-            '--target-x': `${p.tx}px`,
-            '--target-y': `${p.ty}px`
+        {/* ── SECURITY ALERT OVERLAY ── */}
+        {showSecurityOverlay && activeIntruder && (
+          <div className="security-alert-overlay">
+            <div className="glitch-background"></div>
+            <div className="threat-container">
+              <div className="threat-header">🚨 SECURITY BREACH DETECTED 🚨</div>
+              <div className="intruder-card">
+                {activeIntruder.snapshot_b64 ? (
+                  <img
+                    src={`data:image/jpeg;base64,${activeIntruder.snapshot_b64}`}
+                    alt="Intruder"
+                    className="intruder-face"
+                  />
+                ) : (
+                  <div className="intruder-placeholder">IMAGE_LOST</div>
+                )}
+                <div className="intruder-meta">
+                  <div className="meta-row"><span className="L">TIMESTAMP:</span> <span className="V">{activeIntruder.timestamp}</span></div>
+                  <div className="meta-row"><span className="L">THREAT_LVL:</span> <span className="V red">CRITICAL</span></div>
+                  <div className="meta-row"><span className="L">ACTION:</span> <span className="V">PUSH_SENT</span></div>
+                </div>
+              </div>
+              <button className="threat-dismiss" onClick={() => setShowSecurityOverlay(false)}>ACKNOWLEDGE RISK</button>
+            </div>
+          </div>
+        )}
+
+        <ShadowAssistant socket={socketRef.current} />
+
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          activeMode={activeMode}
+          customModes={customModes}
+          onCustomModesChange={(nextModes) => {
+            setCustomModes(nextModes);
+            if (activeCustomMode && !nextModes.some((m) => m.enabled && m.name === activeCustomMode)) {
+              setActiveCustomMode(null);
+            }
+          }}
+          biometricData={biometricData}
+          blobColor={blobColor}
+          setBlobColor={setBlobColor}
+          blobSize={blobSize}
+          setBlobSize={setBlobSize}
+          hudOpacity={hudOpacity}
+          setHudOpacity={setHudOpacity}
+          neuralGlowEnabled={neuralGlowEnabled}
+          setNeuralGlowEnabled={setNeuralGlowEnabled}
+          holographicTiltEnabled={holographicTiltEnabled}
+          setHolographicTiltEnabled={setHolographicTiltEnabled}
+          halalFilterEnabled={halalFilterEnabled}
+          setHalalFilterEnabled={setHalalFilterEnabled}
+          autoLintEnabled={autoLintEnabled}
+          setAutoLintEnabled={setAutoLintEnabled}
+          onEnterDragMode={() => {
+            setIsSettingsOpen(false);
+            setIsDragging(true);
+            dragStateRef.current.isPointerDown = false;
           }}
         />
-      ))}
 
-      {/* ── OMNI-BOX SEARCH ── */}
-      {isOmniBoxOpen && (
-        <div className="omni-box-overlay" onClick={() => setIsOmniBoxOpen(false)}>
-          <div className="omni-box-container" onClick={e => e.stopPropagation()}>
-            <div className="omni-header">OMNI_SEARCH_V2 // SYSTEM_QUERY</div>
-            <input
-              autoFocus
-              className="omni-input"
-              placeholder="ASK ZAIRE... (Prefix 'Deep think' for 70B cores)"
-              value={omniInput || ''}
-              onChange={e => setOmniInput(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && omniInput.trim()) {
-                  if (socketRef.current) socketRef.current.emit('user_message', omniInput);
-                  setOmniInput('');
-                  setIsOmniBoxOpen(false);
-                }
-              }}
-            />
-            <div className="omni-footer">PRESS ESC TO DISMISS</div>
+        {isDragging && (
+          <div
+            className="drag-overlay"
+            onPointerDown={handleDragPointerDown}
+            onPointerMove={handleDragPointerMove}
+            onPointerUp={handleDragPointerUp}
+            onPointerCancel={handleDragPointerUp}
+            onPointerLeave={handleDragPointerUp}
+          >
+            <div className="drag-helper-text">
+              <span>DRAG ANYWHERE TO REPOSITION</span>
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setBlobPosition(dragStateRef.current.tempPosition);
+                  dragStateRef.current.isPointerDown = false;
+                  setIsDragging(false);
+                }}
+              >
+                SAVE POSITION
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+        {/* Engagement Overlay (Audio Context Fix) */}
+        {/* ── NEURAL VIDEO OVERLAY ── */}
+        {isVideoPlaying && neuralVideoData && (
+          <div className="neural-video-overlay">
+            <div className="video-header">
+              <span className="video-title">{neuralVideoData.title}</span>
+              <button className="video-close" onClick={() => setIsVideoPlaying(false)}>✕</button>
+              <div className="zaire-response-text">
+                {zaireResponseStream || 'AWAITING NEURAL UPLINK...'}
+              </div>
+            </div>
+            <div className="video-stage">
+              <div className="three-manifest-layer">
+                {/* Real 3D content would be rendered into a Three.js sub-canvas here */}
+                <div className="manifestation-label">3D_MANIFEST: ACTIVE</div>
+              </div>
+              <div className="subtitles-layer">
+                {zaireResponseStream}
+              </div>
+            </div>
+            <div className="video-timeline">
+              <div className="timeline-progress" style={{ width: '45%' }}></div>
+            </div>
+          </div>
+        )}
 
-      {!isSystemEngaged && (
-        <div className="engagement-overlay" onClick={() => setIsSystemEngaged(true)}>
-          <div className="engagement-content">
-            <div className="power-icon">⚡</div>
-            <h2>INITIALIZE ZAIRE NEURAL LINK</h2>
-            <p>Click to synchronize sensory arrays and audio core.</p>
-            <div className="scan-line"></div>
+        {/* ── KNOWLEDGE PARTICLES ── */}
+        {particles.map(p => (
+          <div
+            key={p.id}
+            className="knowledge-particle"
+            style={{
+              left: p.x,
+              top: p.y,
+              '--target-x': `${p.tx}px`,
+              '--target-y': `${p.ty}px`
+            }}
+          />
+        ))}
+
+        {/* ── OMNI-BOX SEARCH ── */}
+        {isOmniBoxOpen && (
+          <div className="omni-box-overlay" onClick={() => setIsOmniBoxOpen(false)}>
+            <div className="omni-box-container" onClick={e => e.stopPropagation()}>
+              <div className="omni-header">OMNI_SEARCH_V2 // SYSTEM_QUERY</div>
+              <input
+                autoFocus
+                className="omni-input"
+                placeholder="ASK ZAIRE... (Prefix 'Deep think' for 70B cores)"
+                value={omniInput || ''}
+                onChange={e => setOmniInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && omniInput.trim()) {
+                    if (socketRef.current) socketRef.current.emit('user_message', omniInput);
+                    setOmniInput('');
+                    setIsOmniBoxOpen(false);
+                  }
+                }}
+              />
+              <div className="omni-footer">PRESS ESC TO DISMISS</div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {!isSystemEngaged && (
+          <div className="engagement-overlay" onClick={() => setIsSystemEngaged(true)}>
+            <div className="engagement-content">
+              <div className="power-icon">⚡</div>
+              <h2>INITIALIZE ZAIRE NEURAL LINK</h2>
+              <p>Click to synchronize sensory arrays and audio core.</p>
+              <div className="scan-line"></div>
+            </div>
+          </div>
         )}
       </>
 
       {false && (
-      <SignedOut>
-        <div className="zaire-auth-container-glass">
-          <div className="auth-box-wrapper">
-            <h1 className="auth-brand-title">ZAIRE OS</h1>
-            {authView === 'signin' ? (
-              <SignIn routing="hash" signUpUrl="#sign-up" forceRedirectUrl="/" />
-            ) : (
-              <SignUp routing="hash" signInUrl="#sign-in" forceRedirectUrl="/" />
-            )}
+        <SignedOut>
+          <div className="zaire-auth-container-glass">
+            <div className="auth-box-wrapper">
+              <h1 className="auth-brand-title">ZAIRE OS</h1>
+              {authView === 'signin' ? (
+                <SignIn routing="hash" signUpUrl="#sign-up" forceRedirectUrl="/" />
+              ) : (
+                <SignUp routing="hash" signInUrl="#sign-in" forceRedirectUrl="/" />
+              )}
+            </div>
           </div>
-        </div>
-      </SignedOut>
+        </SignedOut>
       )}
     </div>
   );
