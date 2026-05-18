@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-const API_BASE_URL = process.env.REACT_APP_API_URL || `${API_BASE_URL}`;
-
 import './SettingsModal.css';
+
+const API_URL = process.env.REACT_APP_API_URL;
+
 
 const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
 
@@ -441,7 +442,7 @@ function SettingsModal({
           setAiSlots(normalized);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => { isActive = false; };
   }, [isOpen]);
 
@@ -955,13 +956,13 @@ function SettingsModal({
                 </SettingRow>
                 <div style={{ margin: '15px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
                 <SettingRow name="FULLY DISABLE SECURITY" desc="Turn off all biometric scanning and locking">
-                  <Toggle 
-                    checked={biometricData?.disabled || false} 
+                  <Toggle
+                    checked={biometricData?.disabled || false}
                     onChange={(val) => {
                       if (window.toggleSecuritySystem) {
                         window.toggleSecuritySystem(val);
                       }
-                    }} 
+                    }}
                   />
                 </SettingRow>
               </Section>
