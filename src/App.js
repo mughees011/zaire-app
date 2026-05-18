@@ -1183,7 +1183,7 @@ function App() {
     const pollBiometrics = async () => {
       try {
         // Updated to port 3001 proxy for the new Tier 5 daemon
-        const res = await fetch(`${API_BASE_URL}/security/status`);
+        const res = await fetch(`${API_BASE_URL}/api/security/status`);
         const data = await res.json();
         if (data.success) {
           setBiometricData({
@@ -1209,7 +1209,7 @@ function App() {
 
     const toggleSecuritySystem = async (disabled) => {
       try {
-        const res = await fetch(`${API_BASE_URL}/security/toggle_system`, {
+        const res = await fetch(`${API_BASE_URL}/api/security/toggle_system`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ disabled })
@@ -3929,7 +3929,7 @@ function App() {
                   {cameraStatus === 'authorized' ? (
                     <div className="hud-video-wrapper">
                       <img
-                        src={API_BASE_URL + '/security/video_feed'}
+                        src={API_BASE_URL + '/api/security/video_feed'}
                         alt="Camera Feed"
                         className="hud-video-feed"
                       />
