@@ -329,7 +329,7 @@ function SettingsModal({
       const storedLicense = localStorage.getItem('zaire_license_key') || '';
       if (storedLicense) {
         setLicenseKeyInput(storedLicense);
-        const response = await fetch(`${API_BASE_URL}/api/license/validate`, {
+        const response = await fetch(`${API_URL}/api/license/validate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -364,7 +364,7 @@ function SettingsModal({
     setLicensingLoading(true);
     setLicensingError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/license/validate`, {
+      const response = await fetch(`${API_URL}/api/license/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -394,7 +394,7 @@ function SettingsModal({
     if (!licensingInfo?.license_key) return;
     setLicensingLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/license/deactivate`, {
+      const response = await fetch(`${API_URL}/api/license/deactivate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -424,7 +424,7 @@ function SettingsModal({
   useEffect(() => {
     if (!isOpen) return;
     let isActive = true;
-    fetch(`${API_BASE_URL}/llm/providers`)
+    fetch(`${API_URL}/llm/providers`)
       .then((r) => r.json())
       .then((data) => {
         if (!isActive) return;
