@@ -9,7 +9,7 @@ import ShadowAssistant from './components/ShadowAssistant';
 import { SignedIn, SignedOut, SignIn, SignUp, UserButton, useUser } from '@clerk/clerk-react';
 
 const DEFAULT_BLOB_COLOR = '#00b4ff';
-const API_BASE_URL = 'http://localhost:3001';
+const API_BASE_URL = process.env.REACT_APP_API_URL || `${API_BASE_URL}`;
 const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
 const CORE_MODES = ['ZAIRE', 'TRADER', 'PROFESSOR', 'ENGINEER', 'SWARM'];
 
@@ -668,7 +668,7 @@ function App() {
   // Function to fetch TTS audio via HTTP
   const fetchTTSAudio = React.useCallback(async (text) => {
     try {
-      const response = await fetch('http://127.0.0.1:3001/tts', {
+      const response = await fetch(`${API_BASE_URL}/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, pitch: '+0Hz', rate: '+5%' })
@@ -784,7 +784,7 @@ function App() {
 
   const fetchChatSessions = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:3001/chats');
+      const res = await fetch(`${API_BASE_URL}/chats`);
       const data = await res.json();
       if (data.success) {
         setChatSessions(data.sessions);
@@ -811,7 +811,7 @@ function App() {
   const loadArchiveSessionDetail = React.useCallback(async (sessionId) => {
     if (!sessionId || archiveSessionCache[sessionId]) return archiveSessionCache[sessionId];
     try {
-      const res = await fetch(`http://127.0.0.1:3001/chats/${sessionId}`);
+      const res = await fetch(`${API_BASE_URL}/chats/${sessionId}`);
       const data = await res.json();
       if (data.success && data.session) {
         setArchiveSessionCache(prev => ({ ...prev, [sessionId]: data.session }));
@@ -879,7 +879,7 @@ function App() {
     e.stopPropagation();
     if (window.confirm('Erase this neural thread from memory?')) {
       try {
-        await fetch(`http://127.0.0.1:3001/chats/${sessionId}`, { method: 'DELETE' });
+        await fetch(`${API_BASE_URL}/chats/${sessionId}`, { method: 'DELETE' });
         fetchChatSessions();
         if (currentSessionId === sessionId) {
           handleNewChat();
@@ -898,14 +898,14 @@ function App() {
 
   // Load memories and system config from backend on startup
   useEffect(() => {
-    fetch('http://127.0.0.1:3001/memories')
+    fetch(`${API_BASE_URL}/memories`)
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) setStoredMemories(data.slice(0, 5));
       })
       .catch(() => { });
 
-    fetch('http://127.0.0.1:3001/config')
+    fetch(`${API_BASE_URL}/config`)
       .then(r => r.json())
       .then(res => {
         if (res.success && res.data) {
@@ -919,7 +919,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    socketRef.current = io('http://127.0.0.1:3001', {
+    socketRef.current = io(`${API_BASE_URL}`, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 10,
@@ -1183,7 +1183,7 @@ function App() {
     const pollBiometrics = async () => {
       try {
         // Updated to port 3001 proxy for the new Tier 5 daemon
-        const res = await fetch('http://127.0.0.1:3001/security/status');
+        const res = await fetch(`${API_BASE_URL}/security/status`);
         const data = await res.json();
         if (data.success) {
           setBiometricData({
@@ -1209,7 +1209,7 @@ function App() {
 
     const toggleSecuritySystem = async (disabled) => {
       try {
-        const res = await fetch('http://127.0.0.1:3001/security/toggle_system', {
+        const res = await fetch(`${API_BASE_URL}/security/toggle_system`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ disabled })
@@ -1565,7 +1565,7 @@ function App() {
     files.forEach(file => formData.append('artifacts', file));
 
     try {
-      const response = await fetch('http://localhost:3001/upload', {
+      const response = await fetch(`${API_BASE_URL}/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -3929,7 +3929,7 @@ function App() {
                 {cameraStatus === 'authorized' ? (
                   <div className="hud-video-wrapper">
                     <img
-                      src="http://127.0.0.1:3001/security/video_feed"
+                      src=`${API_BASE_URL}/security/video_feed`
                       alt="Camera Feed"
                       className="hud-video-feed"
                     />

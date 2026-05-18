@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+const API_BASE_URL = process.env.REACT_APP_API_URL || `${API_BASE_URL}`;
+
 import './SettingsModal.css';
 
 const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
@@ -326,7 +328,7 @@ function SettingsModal({
       const storedLicense = localStorage.getItem('zaire_license_key') || '';
       if (storedLicense) {
         setLicenseKeyInput(storedLicense);
-        const response = await fetch('http://127.0.0.1:3001/api/license/validate', {
+        const response = await fetch(`${API_BASE_URL}/api/license/validate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -361,7 +363,7 @@ function SettingsModal({
     setLicensingLoading(true);
     setLicensingError(null);
     try {
-      const response = await fetch('http://127.0.0.1:3001/api/license/validate', {
+      const response = await fetch(`${API_BASE_URL}/api/license/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -391,7 +393,7 @@ function SettingsModal({
     if (!licensingInfo?.license_key) return;
     setLicensingLoading(true);
     try {
-      const response = await fetch('http://127.0.0.1:3001/api/license/deactivate', {
+      const response = await fetch(`${API_BASE_URL}/api/license/deactivate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -421,7 +423,7 @@ function SettingsModal({
   useEffect(() => {
     if (!isOpen) return;
     let isActive = true;
-    fetch('http://127.0.0.1:3001/llm/providers')
+    fetch(`${API_BASE_URL}/llm/providers`)
       .then((r) => r.json())
       .then((data) => {
         if (!isActive) return;
