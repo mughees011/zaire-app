@@ -9,7 +9,7 @@ import ShadowAssistant from './components/ShadowAssistant';
 import { SignedIn, SignedOut, SignIn, SignUp, UserButton, useUser } from '@clerk/clerk-react';
 
 const DEFAULT_BLOB_COLOR = '#00b4ff';
-const API_BASE_URL = process.env.REACT_APP_API_URL || `${API_BASE_URL}`;
+const API_BASE_URL = process.env.REACT_APP_API_URL || `https://zaire-backend.onrender.com`;
 const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
 const CORE_MODES = ['ZAIRE', 'TRADER', 'PROFESSOR', 'ENGINEER', 'SWARM'];
 
