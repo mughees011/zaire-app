@@ -2,39 +2,61 @@ import React, { useState, useEffect, useRef } from 'react';
 import './GhostTranscript.css';
 
 function GhostTranscript({ isListening, interimText, finalText, onTranscriptComplete }) {
-  const [isAnimatingIn, setIsAnimatingIn] = useState(false);
-  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
-  const [displayText, setDisplayText] = useState('');
+  const [transcriptState, setTranscriptState] = useState({
+    isAnimatingIn: false,
+    isAnimatingOut: false,
+    displayText: ''
+  });
   const prevFinalRef = useRef('');
+  const fadeTimerRef = useRef(null);
+  const clearTimerRef = useRef(null);
 
   useEffect(() => {
     if (interimText && !finalText) {
-      setDisplayText(interimText);
+      setTranscriptState((prev) => ({
+        ...prev,
+        displayText: interimText
+      }));
     }
   }, [interimText, finalText]);
 
   useEffect(() => {
     if (finalText && finalText !== prevFinalRef.current) {
       prevFinalRef.current = finalText;
-      setIsAnimatingIn(true);
-      setDisplayText(finalText);
+      setTranscriptState({
+        isAnimatingIn: true,
+        isAnimatingOut: false,
+        displayText: finalText
+      });
       
       if (onTranscriptComplete) {
         onTranscriptComplete(finalText);
       }
       
-      setTimeout(() => {
-        setIsAnimatingIn(false);
-        setIsAnimatingOut(true);
+      fadeTimerRef.current = setTimeout(() => {
+        setTranscriptState((prev) => ({
+          ...prev,
+          isAnimatingIn: false,
+          isAnimatingOut: true
+        }));
         
-        setTimeout(() => {
-          setIsAnimatingOut(false);
-          setDisplayText('');
+        clearTimerRef.current = setTimeout(() => {
+          setTranscriptState({
+            isAnimatingIn: false,
+            isAnimatingOut: false,
+            displayText: ''
+          });
         }, 300);
       }, 1500);
     }
+
+    return () => {
+      if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+    };
   }, [finalText, onTranscriptComplete]);
 
+  const { isAnimatingIn, isAnimatingOut, displayText } = transcriptState;
   const isStreaming = interimText && !finalText;
   const hasFinal = finalText && !isAnimatingOut;
 
@@ -55,7 +77,7 @@ function GhostTranscript({ isListening, interimText, finalText, onTranscriptComp
         
         <div className={`main-input-display ${hasFinal ? 'filled' : ''}`}>
           <span className="input-placeholder">
-            {isListening ? 'LISTENING...' : 'SPEAK OR TYPE COMMAND'}
+            {isListening ? 'LISTENING…' : 'SPEAK OR TYPE COMMAND'}
           </span>
           {hasFinal && <span className="final-text">{finalText}</span>}
         </div>

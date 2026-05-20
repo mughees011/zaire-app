@@ -151,6 +151,14 @@ function Navbar() {
                     key={item.id}
                     className={`nav-item ${activeItem === item.id ? 'active' : ''}`}
                     onClick={() => setActiveItem(item.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setActiveItem(item.id);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
                     style={item.badge ? { position: 'relative' } : {}}
                   >
                     {item.icon}

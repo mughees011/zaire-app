@@ -1,10 +1,205 @@
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '@clerk/clerk-react';
+import { ZaireComponentRegistry } from './engine/ComponentRegistry';
 import './SettingsModal.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
-
-
 const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
+const COMPONENT_LIBRARY = ZaireComponentRegistry;
+const CUSTOM_MODE_LOCKED_ZONES = ['Bottom Console'];
+
+const sanitizeModeComponents = (components = []) =>
+  components.filter((component) => !CUSTOM_MODE_LOCKED_ZONES.includes(component.zone));
+
+const sanitizeModeRecord = (mode) => ({
+  ...mode,
+  components: sanitizeModeComponents(mode.components || [])
+});
+
+const formatLicenseTimestamp = (value, fallback) => {
+  if (!value) return fallback;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? fallback : date.toLocaleString();
+};
+
+const renderMiniPreview = (type, color = '#00d4ff') => {
+  const accentStyle = { color: color };
+  const fillStyle = { background: color };
+  const borderStyle = { borderColor: color };
+
+  switch (type) {
+    case 'Chat Panel':
+      return (
+        <div className="mini-chat-mock" style={borderStyle}>
+          <div className="mini-bubble user" style={{ background: 'rgba(255,255,255,0.07)' }} />
+          <div className="mini-bubble ai" style={{ background: `${color}15`, border: `1px solid ${color}33` }} />
+          <div className="mini-chat-input-line" style={{ borderTop: `1px solid ${color}22` }} />
+        </div>
+      );
+    case 'Task Queue':
+      return (
+        <div className="mini-queue-mock">
+          <div className="mini-progress-row">
+            <span className="dot" style={fillStyle} />
+            <div className="bar"><div className="fill" style={{ width: '70%', background: color }} /></div>
+          </div>
+          <div className="mini-progress-row">
+            <span className="dot" style={{ background: 'rgba(255,255,255,0.2)' }} />
+            <div className="bar"><div className="fill" style={{ width: '35%', background: color }} /></div>
+          </div>
+        </div>
+      );
+    case 'File Browser':
+      return (
+        <div className="mini-files-mock">
+          <div className="row" style={accentStyle}>📁 src</div>
+          <div className="row indent">📄 App.js</div>
+          <div className="row indent">📄 index.js</div>
+        </div>
+      );
+    case 'Live Preview':
+      return (
+        <div className="mini-preview-mock" style={borderStyle}>
+          <div className="mini-browser-bar" style={{ background: `${color}15`, borderBottom: `1px solid ${color}33` }}>
+            <span className="dot" style={fillStyle} /><span className="dot" />
+          </div>
+          <div className="mini-browser-body" />
+        </div>
+      );
+    case 'Notes Panel':
+      return (
+        <div className="mini-notes-mock" style={borderStyle}>
+          <div className="scribble" />
+          <div className="scribble" style={{ width: '70%' }} />
+          <div className="scribble" style={{ width: '40%' }} />
+        </div>
+      );
+    case 'Memory Panel':
+      return (
+        <div className="mini-memory-mock">
+          <div className="vector-node" style={{ border: `1px solid ${color}` }}>VECTOR LINK</div>
+          <div className="vector-bars">
+            <div className="v-bar" style={fillStyle} />
+            <div className="v-bar" style={fillStyle} />
+            <div className="v-bar" style={{ background: 'rgba(255,255,255,0.1)' }} />
+          </div>
+        </div>
+      );
+    case 'Calendar Panel':
+      return (
+        <div className="mini-calendar-mock">
+          <div className="cal-grid">
+            {[...Array(12)].map((_, i) => (
+              <div key={i} className={`cal-cell ${i === 4 ? 'active' : ''}`} style={i === 4 ? fillStyle : undefined} />
+            ))}
+          </div>
+        </div>
+      );
+    case 'Chart Panel':
+      return (
+        <div className="mini-chart-mock">
+          <div className="bar" style={{ height: '40%', background: color }} />
+          <div className="bar" style={{ height: '75%', background: color }} />
+          <div className="bar" style={{ height: '50%', background: color }} />
+          <div className="bar" style={{ height: '90%', background: color }} />
+        </div>
+      );
+    case 'Camera Feed':
+      return (
+        <div className="mini-camera-mock" style={borderStyle}>
+          <div className="reticle" style={{ border: `1px dashed ${color}` }} />
+          <span className="rec" style={accentStyle}>● REC</span>
+        </div>
+      );
+    case 'Voice Panel':
+      return (
+        <div className="mini-voice-mock">
+          <div className="wave" style={{ height: '6px', background: color }} />
+          <div className="wave" style={{ height: '14px', background: color }} />
+          <div className="wave" style={{ height: '9px', background: color }} />
+          <div className="wave" style={{ height: '18px', background: color }} />
+          <div className="wave" style={{ height: '5px', background: color }} />
+        </div>
+      );
+    case 'Terminal':
+      return (
+        <div className="mini-terminal-mock" style={{ background: 'rgba(0,0,0,0.8)', border: `1px solid ${color}44` }}>
+          <span className="prompt" style={accentStyle}>$&gt;</span>
+          <span className="cursor blink" style={fillStyle} />
+        </div>
+      );
+    case 'Code Editor':
+      return (
+        <div className="mini-code-mock">
+          <div className="line" style={{ width: '90%', background: color, opacity: 0.8 }} />
+          <div className="line" style={{ width: '60%', background: color, opacity: 0.8 }} />
+          <div className="line" style={{ width: '75%', background: color, opacity: 0.8 }} />
+        </div>
+      );
+    case 'Kanban Board':
+      return (
+        <div className="mini-kanban-mock">
+          <div className="lane" style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="card" style={{ borderLeft: `2px solid ${color}` }} />
+          </div>
+          <div className="lane">
+            <div className="card" style={{ borderLeft: `2px solid ${color}` }} />
+          </div>
+        </div>
+      );
+    case 'Timeline':
+      return (
+        <div className="mini-timeline-mock">
+          <span className="node" style={fillStyle} />
+          <div className="connector" style={{ background: color }} />
+          <span className="node" style={{ border: `1px solid ${color}` }} />
+        </div>
+      );
+    case 'Research Panel':
+      return (
+        <div className="mini-research-mock">
+          <div className="ticker-line" style={{ background: `${color}15`, color: color }}>NEWS // GLOBAL SCAN</div>
+          <div className="ticker-bar" />
+        </div>
+      );
+    case 'Health Tracker':
+      return (
+        <div className="mini-health-mock">
+          <span className="pulse-heart" style={accentStyle}>♥</span>
+          <span className="status-val" style={accentStyle}>99.2%</span>
+        </div>
+      );
+    case 'Finance Panel':
+      return (
+        <div className="mini-finance-mock">
+          <div className="val" style={accentStyle}>$48K</div>
+          <div className="sub-val" style={{ color: 'var(--accent-red)' }}>-$0.24</div>
+        </div>
+      );
+    case 'Document Viewer':
+      return (
+        <div className="mini-doc-mock" style={borderStyle}>
+          <div className="doc-header" style={{ background: `${color}22` }}>PDF</div>
+          <div className="doc-body" />
+        </div>
+      );
+    case 'System Logs':
+      return (
+        <div className="mini-logs-mock" style={{ fontFamily: 'monospace', color: color }}>
+          <div>[09:12] OK</div>
+          <div>[09:13] VAULT</div>
+        </div>
+      );
+    case 'Agent Status':
+      return (
+        <div className="mini-status-mock">
+          <div className="badge" style={{ background: `${color}15`, border: `1px solid ${color}`, color: color }}>🤖 ON</div>
+        </div>
+      );
+    default:
+      return null;
+  }
+};
 
 const modeTemplates = [
   {
@@ -98,12 +293,24 @@ const blankCreatorDraft = {
   name: '',
   desc: '',
   color: '#00d4ff',
-  capabilities: ['WEB SEARCH', 'FILE SYSTEM', 'SCREEN VISION', 'COMPUTER USE'],
+  capabilities: ['WEB SEARCH', 'FILE SYSTEM'],
   persona: '',
   goals: '',
+  neverDo: '',
   preferredOutput: 'Action Plan',
-  components: ['TOPBAR', 'LEFT_PANEL', 'CENTER_STAGE'],
   routingPriority: 'Balanced',
+  components: [
+    { type: 'Chat Panel', zone: 'Main Workspace', index: 0 },
+    { type: 'Task Queue', zone: 'Left Sidebar', index: 0 }
+  ],
+  permissions: {
+    fileSystem: false,
+    shellExecution: false,
+    internetAccess: true,
+    costWarnings: true,
+    screenCapture: false,
+    hardwareMedia: false
+  }
 };
 
 const navGroups = [
@@ -417,7 +624,7 @@ function SettingsModal({
 
   useEffect(() => {
     if (Array.isArray(customModes) && customModes.length > 0) {
-      setLocalModes(customModes);
+      setLocalModes(customModes.map(sanitizeModeRecord));
     }
   }, [customModes]);
 
@@ -446,6 +653,35 @@ function SettingsModal({
     return () => { isActive = false; };
   }, [isOpen]);
 
+  const { getToken } = useAuth();
+  const [creatorStep, setCreatorStep] = useState(1);
+
+  const fetchCustomModes = async () => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/api/custom_modes`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success && Array.isArray(data.modes)) {
+        const sanitizedModes = data.modes.map(sanitizeModeRecord);
+        setLocalModes(sanitizedModes);
+        localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(sanitizedModes));
+        if (onCustomModesChange) onCustomModesChange(sanitizedModes);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch custom modes from backend, fallback to local storage:', err.message);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchCustomModes();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const hudOpacityPercent = Math.round(hudOpacity * 100);
@@ -453,13 +689,85 @@ function SettingsModal({
   const selectedTemplate = modeTemplates.find((template) => template.id === selectedTemplateId) || modeTemplates[0];
   const modeCount = localModes.length;
 
+  const saveCustomMode = async (mode) => {
+    try {
+      const token = await getToken();
+      await fetch(`${API_URL}/api/custom_modes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(mode)
+      });
+    } catch (err) {
+      console.warn('Failed to save custom mode to backend:', err.message);
+    }
+  };
+
+  const duplicateCustomMode = async (modeId) => {
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/api/custom_modes/${modeId}/duplicate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        fetchCustomModes();
+      }
+    } catch (err) {
+      console.warn('Failed to duplicate custom mode on backend:', err.message);
+      // Fallback local duplication
+      const original = localModes.find(m => m.id === modeId);
+      if (original) {
+        const copy = {
+          ...original,
+          id: `${original.id.replace(/-[0-9]+$/, '')}-copy-${Date.now()}`,
+          name: `${original.name} COPY`,
+          createdAt: new Date().toISOString()
+        };
+        const next = [copy, ...localModes];
+        persistCustomModes(next);
+      }
+    }
+  };
+
+  const deleteCustomMode = async (modeId) => {
+    if (!window.confirm('Wipe this custom mode from database permanently?')) return;
+    try {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/api/custom_modes/${modeId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        fetchCustomModes();
+      }
+    } catch (err) {
+      console.warn('Failed to delete custom mode from backend, executing local wipe:', err.message);
+      const next = localModes.filter(m => m.id !== modeId);
+      persistCustomModes(next);
+    }
+  };
+
   const persistCustomModes = (nextModes) => {
-    setLocalModes(nextModes);
-    localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(nextModes));
-    if (onCustomModesChange) onCustomModesChange(nextModes);
+    const sanitizedModes = nextModes.map(sanitizeModeRecord);
+    setLocalModes(sanitizedModes);
+    localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(sanitizedModes));
+    if (onCustomModesChange) onCustomModesChange(sanitizedModes);
   };
 
   const applyTemplateToDraft = (template) => {
+    const defaultComps = [
+      { type: 'Chat Panel', zone: 'Main Workspace', index: 0 },
+      { type: 'Task Queue', zone: 'Left Sidebar', index: 0 }
+    ];
     setCreatorDraft({
       name: template.name,
       desc: template.desc,
@@ -467,11 +775,21 @@ function SettingsModal({
       capabilities: template.capabilities,
       persona: template.persona,
       goals: '',
+      neverDo: '',
       preferredOutput: 'Action Plan',
-      components: ['TOPBAR', 'LEFT_PANEL', 'CENTER_STAGE'],
       routingPriority: 'Balanced',
+      components: defaultComps,
+      permissions: {
+        fileSystem: template.capabilities.includes('FILE SYSTEM'),
+        shellExecution: false,
+        internetAccess: template.capabilities.includes('WEB SEARCH'),
+        costWarnings: true,
+        screenCapture: template.capabilities.includes('SCREEN VISION'),
+        hardwareMedia: false
+      }
     });
     setSelectedTemplateId(template.id);
+    setCreatorStep(1);
     setActivePage('creator');
   };
 
@@ -487,11 +805,33 @@ function SettingsModal({
     });
   };
 
-  const manifestMode = () => {
+  const handleAddComponentToZone = (compType, zone) => {
+    if (CUSTOM_MODE_LOCKED_ZONES.includes(zone)) return;
+    setCreatorDraft(draft => {
+      const clean = draft.components.filter(c => c.type !== compType);
+      const index = clean.filter(c => c.zone === zone).length;
+      return {
+        ...draft,
+        components: [...clean, { type: compType, zone, index }]
+      };
+    });
+  };
+
+  const handleRemoveComponent = (compType) => {
+    setCreatorDraft(draft => ({
+      ...draft,
+      components: draft.components.filter(c => c.type !== compType)
+    }));
+  };
+
+  const manifestMode = async () => {
     const name = creatorDraft.name.trim();
     const desc = creatorDraft.desc.trim();
 
-    if (!name || !desc) return;
+    if (!name || !desc) {
+      alert('Please specify a Mode Name and Description.');
+      return;
+    }
 
     const nextMode = {
       id: `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
@@ -501,28 +841,50 @@ function SettingsModal({
       capabilities: creatorDraft.capabilities,
       persona: creatorDraft.persona.trim() || 'Custom ZAIRE specialist',
       goals: creatorDraft.goals.trim(),
+      neverDo: creatorDraft.neverDo.trim(),
       preferredOutput: creatorDraft.preferredOutput,
-      components: creatorDraft.components,
+      components: sanitizeModeComponents(creatorDraft.components),
       routingPriority: creatorDraft.routingPriority,
+      permissions: creatorDraft.permissions,
       enabled: true,
       source: selectedTemplateId ? `template:${selectedTemplateId}` : 'custom',
       createdAt: new Date().toISOString(),
     };
 
-    persistCustomModes([nextMode, ...localModes]);
+    const nextModes = [nextMode, ...localModes];
+    persistCustomModes(nextModes);
+    await saveCustomMode(nextMode);
+
     setCreatorDraft(blankCreatorDraft);
+    setCreatorStep(1);
     setActivePage('mymodes');
   };
 
-  const toggleModeEnabled = (modeId) => {
-    persistCustomModes(localModes.map((mode) => (
+  const toggleModeEnabled = async (modeId) => {
+    const nextModes = localModes.map((mode) => (
       mode.id === modeId ? { ...mode, enabled: !mode.enabled } : mode
-    )));
+    ));
+    persistCustomModes(nextModes);
+
+    try {
+      const mode = nextModes.find(m => m.id === modeId);
+      const token = await getToken();
+      await fetch(`${API_URL}/api/custom_modes/${modeId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ enabled: mode.enabled })
+      });
+    } catch (err) {
+      console.warn('Failed to update mode status on backend:', err.message);
+    }
   };
 
   return (
     <>
-      <div className="hud-settings-overlay" onClick={onClose} />
+      <button type="button" className="hud-settings-overlay" onClick={onClose} aria-label="Close settings overlay" />
       <div className="settings-wrap" role="dialog" aria-modal="true" aria-label="ZAIRE system control">
         <aside className="sidebar">
           <div className="sidebar-header">
@@ -742,148 +1104,406 @@ function SettingsModal({
 
           {activePage === 'creator' && (
             <div className="page active">
-              <div className="page-title">CUSTOM MODE CREATOR</div>
-              <div className="page-sub">Start from a template, customize the specialist, and launch fast</div>
-              <Section title="MODE TEMPLATES LIBRARY">
-                <div className="template-grid">
-                  {modeTemplates.map((template) => (
+              <div className="page-title">ZAIRE MODE STUDIO</div>
+              <div className="page-sub">Step-by-step modular specialist creation workspace</div>
+
+              {/* Wizard Steps Header */}
+              <div className="wizard-step-header" style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', gap: 15 }}>
+                  {['1. IDENTITY', '2. INTELLIGENCE', '3. INTERFACE', '4. PERMISSIONS'].map((lbl, idx) => (
                     <button
                       type="button"
-                      className={`template-card ${selectedTemplateId === template.id ? 'selected' : ''}`}
-                      key={template.id}
-                      onClick={() => applyTemplateToDraft(template)}
+                      key={lbl}
+                      className="wizard-step-tab"
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 'bold',
+                        letterSpacing: 1.5,
+                        color: creatorStep === idx + 1 ? '#00d4ff' : creatorStep > idx + 1 ? '#00ff88' : 'rgba(255,255,255,0.2)',
+                        borderBottom: creatorStep === idx + 1 ? '2px solid #00d4ff' : 'none',
+                        paddingBottom: 4,
+                        cursor: 'pointer',
+                        background: 'transparent',
+                        borderLeft: 'none',
+                        borderRight: 'none',
+                        borderTop: 'none'
+                      }}
+                      onClick={() => setCreatorStep(idx + 1)}
                     >
-                      <span className="template-color" style={{ background: template.color, boxShadow: `0 0 8px ${template.color}` }} />
-                      <span className="template-name">{template.name}</span>
-                      <span className="template-desc">{template.desc}</span>
-                      <span className="template-meta">{template.capabilities.join(' / ')}</span>
+                      {lbl}
                     </button>
                   ))}
                 </div>
-              </Section>
-              <div className="mode-wizard">
-                <div className="wizard-step active">
-                  <div className="wizard-step-header">
-                    <span className="step-label">TEMPLATE: {selectedTemplate.name}</span>
-                    <div className="step-indicator"><span className="step-dot done" /><span className="step-dot current" /><span className="step-dot" /></div>
-                  </div>
-                  <div className="wizard-field">
-                    <label className="wf-label">MODE NAME</label>
-                    <input
-                      className="wf-input"
-                      placeholder="e.g. BRAND MODE, HEALTH SENTINEL, LAWYER"
-                      value={creatorDraft.name}
-                      onChange={(event) => setCreatorDraft({ ...creatorDraft, name: event.target.value })}
+                <div className="step-indicator">
+                  {[1, 2, 3, 4].map(s => (
+                    <span
+                      key={s}
+                      className={`step-dot ${creatorStep > s ? 'done' : creatorStep === s ? 'current' : ''}`}
                     />
-                  </div>
-                  <div className="wizard-field">
-                    <label className="wf-label">ONE LINE DESCRIPTION</label>
-                    <input
-                      className="wf-input"
-                      placeholder="What should this mode manage?"
-                      value={creatorDraft.desc}
-                      onChange={(event) => setCreatorDraft({ ...creatorDraft, desc: event.target.value })}
-                    />
-                  </div>
-                  <div className="wizard-field">
-                    <label className="wf-label">PERSONALITY DIRECTIVE</label>
-                    <textarea
-                      className="wf-textarea"
-                      placeholder="How should this mode think, speak, and prioritize?"
-                      value={creatorDraft.persona}
-                      onChange={(event) => setCreatorDraft({ ...creatorDraft, persona: event.target.value })}
-                    />
-                  </div>
-                  <div className="wizard-field">
-                    <label className="wf-label">MISSION GOALS (ASK MORE)</label>
-                    <textarea
-                      className="wf-textarea"
-                      placeholder="What outcomes should this mode optimize for every session?"
-                      value={creatorDraft.goals}
-                      onChange={(event) => setCreatorDraft({ ...creatorDraft, goals: event.target.value })}
-                    />
-                  </div>
-                  <div className="wizard-field">
-                    <label className="wf-label">PREFERRED OUTPUT STYLE</label>
-                    <select
-                      className="hud-select"
-                      value={creatorDraft.preferredOutput}
-                      onChange={(event) => setCreatorDraft({ ...creatorDraft, preferredOutput: event.target.value })}
-                    >
-                      <option>Action Plan</option>
-                      <option>Deep Analysis</option>
-                      <option>Checklist</option>
-                      <option>Executive Summary</option>
-                      <option>Teach Me</option>
-                    </select>
-                  </div>
-                  <div className="wizard-field">
-                    <label className="wf-label">ROUTING PRIORITY</label>
-                    <Segment
-                      value={creatorDraft.routingPriority}
-                      options={['Speed', 'Balanced', 'Reasoning']}
-                      onChange={(value) => setCreatorDraft({ ...creatorDraft, routingPriority: value })}
-                    />
-                  </div>
-                  <div className="wizard-field">
-                    <label className="wf-label">SIGNAL COLOR</label>
-                    <div className="color-row">
-                      {['#00d4ff', '#00ff88', '#a78bfa', '#fbbf24', '#f97316', '#ec4899', '#60a5fa', '#34d399'].map((color) => (
-                        <button
-                          type="button"
-                          className={`color-opt ${creatorDraft.color === color ? 'selected' : ''}`}
-                          style={{ background: color }}
-                          key={color}
-                          onClick={() => setCreatorDraft({ ...creatorDraft, color })}
-                          aria-label={`Select ${color}`}
-                        />
-                      ))}
+                  ))}
+                </div>
+              </div>
+
+              {/* STEP 1: IDENTITY */}
+              {creatorStep === 1 && (
+                <div style={{ animation: 'fadeIn 0.3s' }}>
+                  <Section title="MODE IDENTITY PROFILE">
+                    <div className="wizard-field">
+                      <label className="wf-label" htmlFor="creator-mode-name">MODE NAME</label>
+                      <input
+                        id="creator-mode-name"
+                        className="wf-input"
+                        placeholder="e.g. BRAND MODE, HEALTH SENTINEL, LAWYER"
+                        value={creatorDraft.name}
+                        onChange={(e) => setCreatorDraft((prev) => ({ ...prev, name: e.target.value }))}
+                      />
                     </div>
-                  </div>
-                  <div className="wizard-field">
-                    <label className="wf-label">CAPABILITIES</label>
-                    <div className="component-grid">
-                      {['WEB SEARCH', 'FILE SYSTEM', 'SCREEN VISION', 'COMPUTER USE', 'CHARTS', 'IMAGE GEN'].map((item) => (
+                    <div className="wizard-field">
+                      <label className="wf-label" htmlFor="creator-mode-desc">ONE LINE DESCRIPTION</label>
+                      <input
+                        id="creator-mode-desc"
+                        className="wf-input"
+                        placeholder="What should this mode manage?"
+                        value={creatorDraft.desc}
+                        onChange={(e) => setCreatorDraft((prev) => ({ ...prev, desc: e.target.value }))}
+                      />
+                    </div>
+                    <div className="wizard-field">
+                      <label className="wf-label">CHROMA COLOR (AESTHETICS)</label>
+                      <div className="color-row">
+                        {['#00d4ff', '#00ff88', '#a78bfa', '#fbbf24', '#f97316', '#ec4899', '#60a5fa', '#34d399'].map((color) => (
+                          <button
+                            type="button"
+                            className={`color-opt ${creatorDraft.color === color ? 'selected' : ''}`}
+                            style={{ background: color, boxShadow: `0 0 5px ${color}` }}
+                            key={color}
+                            onClick={() => setCreatorDraft((prev) => ({ ...prev, color }))}
+                            aria-label={`Select color ${color}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </Section>
+                  
+                  <Section title="POPULATE FROM TEMPLATE CORE">
+                    <div className="template-grid">
+                      {modeTemplates.map((template) => (
                         <button
                           type="button"
-                          className={`comp-opt ${creatorDraft.capabilities.includes(item) ? 'selected' : ''}`}
-                          key={item}
-                          onClick={() => toggleDraftCapability(item)}
+                          className={`template-card ${selectedTemplateId === template.id ? 'selected' : ''}`}
+                          key={template.id}
+                          onClick={() => applyTemplateToDraft(template)}
                         >
-                          {item}
+                          <span className="template-color" style={{ background: template.color, boxShadow: `0 0 8px ${template.color}` }} />
+                          <span className="template-name">{template.name}</span>
+                          <span className="template-desc">{template.desc}</span>
+                          <span className="template-meta">{template.capabilities.join(' / ')}</span>
                         </button>
                       ))}
                     </div>
-                  </div>
-                  <div className="wizard-field">
-                    <label className="wf-label">HUD COMPONENTS</label>
-                    <div className="component-grid">
-                      {['TOPBAR', 'LEFT_PANEL', 'CENTER_STAGE', 'RIGHT_PANEL', 'BOTTOM_COMMAND', 'ARCHIVE_ACCESS'].map((item) => (
-                        <button
-                          type="button"
-                          className={`comp-opt ${creatorDraft.components.includes(item) ? 'selected' : ''}`}
-                          key={item}
-                          onClick={() => {
-                            const has = creatorDraft.components.includes(item);
-                            setCreatorDraft({
-                              ...creatorDraft,
-                              components: has
-                                ? creatorDraft.components.filter((x) => x !== item)
-                                : [...creatorDraft.components, item]
-                            });
-                          }}
-                        >
-                          {item}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  </Section>
+
                   <div className="wizard-nav">
-                    <button type="button" className="wiz-btn wiz-btn-back" onClick={() => setCreatorDraft(blankCreatorDraft)}>CLEAR</button>
+                    <button type="button" className="wiz-btn wiz-btn-back" onClick={() => setCreatorDraft(blankCreatorDraft)}>WIPE DRAFT</button>
+                    <button type="button" className="wiz-btn wiz-btn-next" onClick={() => setCreatorStep(2)}>NEXT: INTELLIGENCE</button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: INTELLIGENCE */}
+              {creatorStep === 2 && (
+                <div style={{ animation: 'fadeIn 0.3s' }}>
+                  <Section title="SPECIALIST INSTRUCTIONS">
+                    <div className="wizard-field">
+                      <label className="wf-label" htmlFor="creator-mode-persona">PERSONALITY DIRECTIVE</label>
+                      <textarea
+                        id="creator-mode-persona"
+                        className="wf-textarea"
+                        placeholder="How should ZAIRE think, speak, and prioritize inside this mode? (e.g. Calm, medical safety-first, direct and motivating)"
+                        value={creatorDraft.persona}
+                        onChange={(e) => setCreatorDraft((prev) => ({ ...prev, persona: e.target.value }))}
+                      />
+                    </div>
+                    <div className="wizard-field">
+                      <label className="wf-label" htmlFor="creator-mode-goals">MISSION OBJECTIVES (What should it help with?)</label>
+                      <textarea
+                        id="creator-mode-goals"
+                        className="wf-textarea"
+                        placeholder="List specific goals or tasks ZAIRE should optimize for in this workspace."
+                        value={creatorDraft.goals}
+                        onChange={(e) => setCreatorDraft((prev) => ({ ...prev, goals: e.target.value }))}
+                      />
+                    </div>
+                    <div className="wizard-field">
+                      <label className="wf-label" htmlFor="creator-mode-neverdo">NEGATIVE CONSTRAINTS (What should it never do?)</label>
+                      <textarea
+                        id="creator-mode-neverdo"
+                        className="wf-textarea"
+                        placeholder="Specify forbidden actions or bounds (e.g., never execute destructive shell commands)."
+                        value={creatorDraft.neverDo || ''}
+                        onChange={(e) => setCreatorDraft((prev) => ({ ...prev, neverDo: e.target.value }))}
+                      />
+                    </div>
+                  </Section>
+
+                  <Section title="TASK ROUTING & CAPABILITIES">
+                    <div className="wizard-field">
+                      <label className="wf-label" htmlFor="creator-mode-output">PREFERRED OUTPUT STYLE</label>
+                      <select
+                        id="creator-mode-output"
+                        className="hud-select"
+                        value={creatorDraft.preferredOutput}
+                        onChange={(e) => setCreatorDraft((prev) => ({ ...prev, preferredOutput: e.target.value }))}
+                      >
+                        <option>Action Plan</option>
+                        <option>Deep Analysis</option>
+                        <option>Checklist</option>
+                        <option>Executive Summary</option>
+                        <option>Teach Me</option>
+                      </select>
+                    </div>
+                    <div className="wizard-field">
+                      <label className="wf-label">ROUTING PRIORITY</label>
+                      <Segment
+                        value={creatorDraft.routingPriority}
+                        options={['Speed', 'Balanced', 'Reasoning']}
+                        onChange={(value) => setCreatorDraft((prev) => ({ ...prev, routingPriority: value }))}
+                      />
+                    </div>
+                    <div className="wizard-field">
+                      <label className="wf-label">ACTIVE SYSTEM CAPABILITIES</label>
+                      <div className="component-grid">
+                        {['WEB SEARCH', 'FILE SYSTEM', 'SCREEN VISION', 'COMPUTER USE', 'CHARTS', 'IMAGE GEN'].map((item) => (
+                          <button
+                            type="button"
+                            className={`comp-opt ${creatorDraft.capabilities.includes(item) ? 'selected' : ''}`}
+                            key={item}
+                            onClick={() => toggleDraftCapability(item)}
+                          >
+                            {item}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </Section>
+
+                  <div className="wizard-nav">
+                    <button type="button" className="wiz-btn wiz-btn-back" onClick={() => setCreatorStep(1)}>BACK</button>
+                    <button type="button" className="wiz-btn wiz-btn-next" onClick={() => setCreatorStep(3)}>NEXT: INTERFACE BUILDER</button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: INTERFACE */}
+              {creatorStep === 3 && (
+                <div style={{ animation: 'fadeIn 0.3s' }}>
+                  <Section title="MODE INTERFACE BUILDER">
+                    <div style={{ fontSize: 9, color: 'rgba(0, 212, 255, 0.4)', marginBottom: 10 }}>
+                      Drag components from the library or click the green "+" button to assign them to layout zones.
+                    </div>
+
+                    <div className="layout-builder-container">
+                      {/* Component Library Column */}
+                      <div className="layout-library">
+                        <div className="library-title">COMPONENT LIBRARY</div>
+                        <div className="library-scroll">
+                          {COMPONENT_LIBRARY.map((comp) => {
+                            const alreadyPlaced = creatorDraft.components.some(c => c.type === comp.type);
+                            return (
+                              <div
+                                key={comp.type}
+                                className="library-item"
+                                draggable={!alreadyPlaced}
+                                onDragStart={(e) => {
+                                  e.dataTransfer.setData('text/plain', comp.type);
+                                }}
+                                style={alreadyPlaced ? { opacity: 0.35, cursor: 'not-allowed' } : { borderColor: `${creatorDraft.color}22` }}
+                              >
+                                <div className="lib-item-info">
+                                  <span className="lib-item-icon">{comp.icon}</span>
+                                  <div className="lib-item-text">
+                                    <div className="lib-item-name">{comp.type}</div>
+                                    <div className="lib-item-desc">{comp.desc}</div>
+                                  </div>
+                                </div>
+                                {!alreadyPlaced && (
+                                  <select
+                                    className="library-item-add-btn"
+                                    value=""
+                                    onChange={(e) => {
+                                      if (e.target.value) {
+                                        handleAddComponentToZone(comp.type, e.target.value);
+                                        e.target.value = '';
+                                      }
+                                    }}
+                                    style={{ color: creatorDraft.color }}
+                                  >
+                                    <option value="" disabled>+</option>
+                                    <option value="Top Status Bar">Top</option>
+                                    <option value="Left Sidebar">Left</option>
+                                    <option value="Main Workspace">Center</option>
+                                    <option value="Right Inspector">Right</option>
+                                  </select>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Dashboard Mockup grid */}
+                      <div>
+                        <div className="library-title" style={{ textAlign: 'center' }}>WORKSPACE SCHEMATIC</div>
+                        <div className="layout-dashboard-mock">
+                          {/* Zones */}
+                          {['Top Status Bar', 'Left Sidebar', 'Main Workspace', 'Right Inspector'].map((zone) => {
+                            const zoneClass =
+                              zone === 'Top Status Bar' ? 'zone-top' :
+                              zone === 'Left Sidebar' ? 'zone-left' :
+                              zone === 'Main Workspace' ? 'zone-center' :
+                              zone === 'Right Inspector' ? 'zone-right' : 'zone-bottom';
+
+                            const zoneComponents = creatorDraft.components
+                              .filter(c => c.zone === zone)
+                              .sort((a, b) => a.index - b.index);
+
+                            return (
+                              <div
+                                key={zone}
+                                className={`zone ${zoneClass}`}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  const compType = e.dataTransfer.getData('text/plain');
+                                  if (compType) {
+                                    handleAddComponentToZone(compType, zone);
+                                  }
+                                }}
+                                style={{
+                                  borderColor: `${creatorDraft.color}22`,
+                                  background: `${creatorDraft.color}03`
+                                }}
+                              >
+                                <div className="zone-label">{zone}</div>
+                                <div className="zone-components-list">
+                                  {zoneComponents.map((c) => {
+                                    const matchedLib = COMPONENT_LIBRARY.find(l => l.type === c.type);
+                                    return (
+                                      <div 
+                                        key={c.type} 
+                                        className="zone-component-card-visual" 
+                                        style={{ border: `1px solid ${creatorDraft.color}22`, background: `rgba(0, 0, 0, 0.4)` }}
+                                      >
+                                        <div className="visual-card-header" style={{ borderBottom: `1px solid ${creatorDraft.color}11` }}>
+                                          <span className="visual-card-title"><span style={{ marginRight: 4 }}>{matchedLib?.icon}</span>{c.type.toUpperCase()}</span>
+                                          <button
+                                            type="button"
+                                            className="zone-component-remove"
+                                            onClick={() => handleRemoveComponent(c.type)}
+                                            title="Remove component"
+                                            aria-label={`Remove ${c.type} component`}
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                          
+                                        <div className="visual-card-preview-area">
+                                          {renderMiniPreview(c.type, creatorDraft.color)}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </Section>
+
+                  <div className="wizard-nav">
+                    <button type="button" className="wiz-btn wiz-btn-back" onClick={() => setCreatorStep(2)}>BACK</button>
+                    <button type="button" className="wiz-btn wiz-btn-next" onClick={() => setCreatorStep(4)}>NEXT: PERMISSIONS</button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 4: PERMISSIONS */}
+              {creatorStep === 4 && (
+                <div style={{ animation: 'fadeIn 0.3s' }}>
+                  <Section title="MODE PERMISSIONS POLICY">
+                    <div style={{ fontSize: 9, color: 'rgba(0, 212, 255, 0.4)', marginBottom: 15 }}>
+                      Establish cryptographic permission boundaries and security policies for this specialist mode.
+                    </div>
+
+                    <SettingRow name="FILE SYSTEM READ/WRITE" desc="Allows the agent to write files and modify code directories">
+                      <Toggle
+                        checked={creatorDraft.permissions.fileSystem}
+                        onChange={(val) => setCreatorDraft((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, fileSystem: val }
+                        }))}
+                      />
+                    </SettingRow>
+
+                    <SettingRow name="SHELL / TERMINAL EXECUTION" desc="Allows executing host operating system shell commands">
+                      <Toggle
+                        checked={creatorDraft.permissions.shellExecution}
+                        onChange={(val) => setCreatorDraft((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, shellExecution: val }
+                        }))}
+                      />
+                    </SettingRow>
+
+                    <SettingRow name="UNRESTRICTED INTERNET ACCESS" desc="Allows outbound networking, API connections and Web Search">
+                      <Toggle
+                        checked={creatorDraft.permissions.internetAccess}
+                        onChange={(val) => setCreatorDraft((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, internetAccess: val }
+                        }))}
+                      />
+                    </SettingRow>
+
+                    <SettingRow name="TOKEN COST RUNTIME WARNINGS" desc="Prompt for confirmation before executing high-token reasoning calls">
+                      <Toggle
+                        checked={creatorDraft.permissions.costWarnings}
+                        onChange={(val) => setCreatorDraft((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, costWarnings: val }
+                        }))}
+                      />
+                    </SettingRow>
+
+                    <SettingRow name="SCREEN VISION CAPTURE" desc="Allows periodic desktop screen visual grabs and OCR analysis">
+                      <Toggle
+                        checked={creatorDraft.permissions.screenCapture}
+                        onChange={(val) => setCreatorDraft((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, screenCapture: val }
+                        }))}
+                      />
+                    </SettingRow>
+
+                    <SettingRow name="HARDWARE SENSORY ACCESS" desc="Allows direct access to user microphone and camera feeds">
+                      <Toggle
+                        checked={creatorDraft.permissions.hardwareMedia}
+                        onChange={(val) => setCreatorDraft((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, hardwareMedia: val }
+                        }))}
+                      />
+                    </SettingRow>
+                  </Section>
+
+                  <div className="wizard-nav">
+                    <button type="button" className="wiz-btn wiz-btn-back" onClick={() => setCreatorStep(3)}>BACK</button>
                     <button type="button" className="wiz-btn wiz-btn-create" onClick={manifestMode}>MANIFEST MODE</button>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -901,9 +1521,27 @@ function SettingsModal({
                       <div className="mode-card-meta">{mode.capabilities.join(' / ')}</div>
                     </div>
                     <div className="mode-card-actions">
-                      <button type="button" className="mode-action-btn">EDIT</button>
-                      <button type="button" className="mode-action-btn" onClick={() => toggleModeEnabled(mode.id)}>
-                        {mode.enabled ? 'ENABLED' : 'ENABLE'}
+                      <button
+                        type="button"
+                        className="mode-action-btn"
+                        onClick={() => toggleModeEnabled(mode.id)}
+                      >
+                        {mode.enabled ? 'DISABLE' : 'ENABLE'}
+                      </button>
+                      <button
+                        type="button"
+                        className="mode-action-btn"
+                        onClick={() => duplicateCustomMode(mode.id)}
+                      >
+                        DUPLICATE
+                      </button>
+                      <button
+                        type="button"
+                        className="mode-action-btn"
+                        onClick={() => deleteCustomMode(mode.id)}
+                        style={{ color: '#ff3366', borderColor: 'rgba(255,51,102,0.2)' }}
+                      >
+                        DELETE
                       </button>
                     </div>
                   </div>
@@ -1008,7 +1646,7 @@ function SettingsModal({
                 )}
                 {licensingLoading && (
                   <div style={{ color: '#00f2ff', fontSize: 11, fontFamily: 'Courier New', marginBottom: 15 }}>
-                    ESTABLISHING SECURE PORTAL DEPLOYMENT...
+                    ESTABLISHING SECURE PORTAL DEPLOYMENT…
                   </div>
                 )}
               </Section>
@@ -1024,7 +1662,7 @@ function SettingsModal({
                     </SettingRow>
                     <SettingRow name="EXPIRY SCHEDULE" desc="Subscription expiration deadline">
                       <span style={{ color: '#fbbf24', fontFamily: 'Courier New', fontSize: 12 }}>
-                        {licensingInfo.expiry ? new Date(licensingInfo.expiry).toLocaleString() : 'PERPETUAL CORES'}
+                        {formatLicenseTimestamp(licensingInfo.expiry, 'PERPETUAL CORES')}
                       </span>
                     </SettingRow>
                   </Section>
@@ -1042,7 +1680,7 @@ function SettingsModal({
                                 OS: {m.os_version} | ID: {m.machine_id?.substring(0, 12)}...
                               </div>
                               <div style={{ color: '#666', fontSize: 9, fontFamily: 'Courier New' }}>
-                                LAST ACTIVE: {m.last_seen ? new Date(m.last_seen).toLocaleString() : 'Never'}
+                                LAST ACTIVE: {formatLicenseTimestamp(m.last_seen, 'Never')}
                               </div>
                             </div>
                             <button

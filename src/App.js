@@ -6,12 +6,89 @@ import GroqSpeechService from './groqSpeechService';
 import { io } from 'socket.io-client';
 import './App.css';
 import ShadowAssistant from './components/ShadowAssistant';
-import { SignedIn, SignedOut, SignIn, SignUp, UserButton, useUser } from '@clerk/clerk-react';
-
+import { SignedIn, SignedOut, SignIn, SignUp, UserButton, useUser, useAuth } from '@clerk/clerk-react';
+import { ZaireComponentRegistry } from './engine/ComponentRegistry';
+import * as EliteComponents from './engine/EliteComponents';
 const DEFAULT_BLOB_COLOR = '#00b4ff';
 const API_BASE_URL = process.env.REACT_APP_API_URL || `https://zaire-backend.onrender.com`;
 const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
+const BLOB_COLOR_STORAGE_KEY = 'blobColor:v1';
+const BLOB_SIZE_STORAGE_KEY = 'blobSize:v1';
+const BLOB_POSITION_STORAGE_KEY = 'blobPosition:v1';
 const CORE_MODES = ['ZAIRE', 'TRADER', 'PROFESSOR', 'ENGINEER', 'SWARM'];
+const CUSTOM_MODE_LOCKED_ZONES = ['Bottom Console'];
+
+const sanitizeCustomModeComponents = (components = []) =>
+  components.filter((component) => !CUSTOM_MODE_LOCKED_ZONES.includes(component.zone));
+
+const sanitizeCustomModeRecord = (mode) => ({
+  ...mode,
+  components: sanitizeCustomModeComponents(mode.components || [])
+});
+
+const handleAccessibleActivate = (event, action) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    action();
+  }
+};
+
+function FileTreeNode({ node, depth = 0, onOpenFile }) {
+  const [isOpen, setIsOpen] = React.useState(depth === 0);
+  const isDir = node.type === 'directory';
+  const nodePath = node.path || node.name;
+
+  const handleNodeClick = () => {
+    if (isDir) {
+      setIsOpen((prev) => !prev);
+      return;
+    }
+    if (onOpenFile) onOpenFile(node);
+  };
+
+  return (
+    <div className="file-tree-node" style={{ marginLeft: `${depth * 10}px` }}>
+      <button
+        type="button"
+        className={`node-label ${isDir ? 'directory' : 'file'} clickable`}
+        onClick={handleNodeClick}
+      >
+        <span className="node-icon">{isDir ? (isOpen ? '📂' : '📁') : '📄'}</span>
+        <span className="node-name">{node.name}</span>
+        {node.size && <span className="node-size">({(node.size / 1024).toFixed(1)}kb)</span>}
+      </button>
+      {isDir && isOpen && node.children && (
+        <div className="node-children">
+          {node.children.map((child) => {
+            const childPath = child.path || `${nodePath}/${child.name}`;
+            return (
+              <FileTreeNode
+                key={childPath}
+                node={{ ...child, path: childPath }}
+                depth={depth + 1}
+                onOpenFile={onOpenFile}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const buildCustomModeActivationLine = (modeDef) => {
+  if (!modeDef) return 'Custom workspace loaded. Specialist parameters synchronized.';
+
+  const cleanName = String(modeDef.name || 'CUSTOM MODE').trim();
+  const desc = String(modeDef.desc || '').trim();
+  const persona = String(modeDef.persona || '').trim();
+  const focusSource = persona || desc;
+  const focusLine = focusSource
+    ? focusSource.replace(/\s+/g, ' ').replace(/[.!?]+$/, '')
+    : 'Custom specialist directives synchronized';
+
+  return `${cleanName} engaged. ${focusLine}. Ready for execution, sir.`;
+};
 
 function normalizeHexColor(value) {
   if (!value || typeof value !== 'string') return DEFAULT_BLOB_COLOR;
@@ -21,6 +98,7 @@ function normalizeHexColor(value) {
 
 function App() {
   const { user } = useUser();
+  const { getToken } = useAuth();
   const threeCanvasRef = useRef(null);
   const gridCanvasRef = useRef(null);
   const cameraRef = useRef(null);
@@ -52,6 +130,7 @@ function App() {
   const [showResponsePanel, setShowResponsePanel] = useState(false);
   const [isNeuralInterruptActive, setIsNeuralInterruptActive] = useState(false);
   const responseTimeoutRef = useRef(null);
+  const pendingActivationLineRef = useRef(null);
 
   const [zaireActionFeed, setZaireActionFeed] = useState([
     { time: '15:47', message: 'System boot complete' },
@@ -64,9 +143,10 @@ function App() {
   // Biometric State
   const [biometricData, setBiometricData] = useState({ detected: false, name: 'ABSENT', confidence: 0 });
   const [isSecurityAlert, setIsSecurityAlert] = useState(false);
-  const [intruderSnapshots, setIntruderSnapshots] = useState([]);
+  const intruderSnapshotsRef = useRef([]);
   const [showSecurityOverlay, setShowSecurityOverlay] = useState(false);
   const [activeIntruder, setActiveIntruder] = useState(null);
+  const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
 
   const [liveMetrics, setLiveMetrics] = useState({ cpu: 0, ram: 0, gpu: 0, latency: 4 });
   const [isOmniBoxOpen, setIsOmniBoxOpen] = useState(false);
@@ -78,14 +158,38 @@ function App() {
   const [activeMode, setActiveMode] = useState('ZAIRE');
   const [customModes, setCustomModes] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem(MODE_STORAGE_KEY) || '[]');
+      const storedModes = JSON.parse(localStorage.getItem(MODE_STORAGE_KEY) || '[]');
+      return Array.isArray(storedModes) ? storedModes.map(sanitizeCustomModeRecord) : [];
     } catch {
       return [];
     }
   });
   const [activeCustomMode, setActiveCustomMode] = useState(null);
+  const [customTasks, setCustomTasks] = useState([
+    { id: 1, title: 'Diagnostic System Sync', status: 'completed', progress: 100 },
+    { id: 2, title: 'Neural Pathway Calibration', status: 'in_progress', progress: 45 },
+    { id: 3, title: 'Security Protocol Audit', status: 'pending', progress: 0 }
+  ]);
+  const [customNotes, setCustomNotes] = useState([
+    { id: 1, time: '14:20', text: 'ZAIRE Mode Studio fully initialized with 4-layer schema.' }
+  ]);
+  const [customChatInput, setCustomChatInput] = useState('');
+  const [customTerminalInput, setCustomTerminalInput] = useState('');
+  const [customTerminalLines, setCustomTerminalLines] = useState([
+    'ZAIRE Terminal Core [Version 2.0.0]',
+    '(c) 2026 ZAIRE Sovereign Intelligence. All rights reserved.',
+    '',
+    'Type "help" for a list of available commands.',
+    'Ready.'
+  ]);
+  const [customEditorText, setCustomEditorText] = useState('// ZAIRE Code Engine v2.0\nfunction initWorkspace() {\n  console.log("Workspace initialized successfully.");\n}');
+  const [customKanbanCards, setCustomKanbanCards] = useState([
+    { id: 1, title: 'Draft Spec Sheet', status: 'todo' },
+    { id: 2, title: 'Model Gating Logic', status: 'doing' },
+    { id: 3, title: 'Database Migration', status: 'done' }
+  ]);
   const [zaireStatus, setZaireStatus] = useState('online');
-  const [isDeepThinking, setIsDeepThinking] = useState(false);
+  const isDeepThinkingRef = useRef(false);
   const [timeStr, setTimeStr] = useState('00:00:00');
   const [navItem, setNavItem] = useState('HOME');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -98,15 +202,42 @@ function App() {
     isMicrophoneActiveRef.current = isMicrophoneActive;
   }, [isMicrophoneActive]);
 
+  // Fetch custom modes from PostgreSQL backend on user login
+  const fetchCustomModes = React.useCallback(async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const response = await fetch(`${API_BASE_URL}/api/custom_modes`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success && Array.isArray(data.modes)) {
+        const sanitizedModes = data.modes.map(sanitizeCustomModeRecord);
+        setCustomModes(sanitizedModes);
+        localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(sanitizedModes));
+      }
+    } catch (err) {
+      console.warn('Failed to fetch custom modes from backend:', err.message);
+    }
+  }, [getToken]);
+
+  useEffect(() => {
+    if (user) {
+      fetchCustomModes();
+    }
+  }, [user, fetchCustomModes]);
+
   const [audioFrequency, setAudioFrequency] = useState(0);
   const plasmaMatRef = useRef(null);
   const pMatRef = useRef(null);
   const frequencyBandsRef = useRef([0, 0, 0, 0, 0]);
 
-  const [blobColor, setBlobColor] = useState(() => normalizeHexColor(localStorage.getItem('blobColor') || DEFAULT_BLOB_COLOR));
-  const [blobSize, setBlobSize] = useState(() => parseFloat(localStorage.getItem('blobSize')) || 1.0);
+  const [blobColor, setBlobColor] = useState(() => normalizeHexColor(localStorage.getItem(BLOB_COLOR_STORAGE_KEY) || DEFAULT_BLOB_COLOR));
+  const [blobSize, setBlobSize] = useState(() => parseFloat(localStorage.getItem(BLOB_SIZE_STORAGE_KEY)) || 1.0);
   const [blobPosition, setBlobPosition] = useState(() => {
-    const saved = localStorage.getItem('blobPosition');
+    const saved = localStorage.getItem(BLOB_POSITION_STORAGE_KEY);
     return saved ? JSON.parse(saved) : { x: 0, y: 0 };
   });
 
@@ -277,6 +408,8 @@ function App() {
   const [darwinResults, setDarwinResults] = useState(null); // {v1: score, v2: score, v3: score}
   const [thermalActive, setThermalActive] = useState(false);
   const [showHallOfFame, setShowHallOfFame] = useState(false);
+  const darwinResetTimeoutRef = useRef(null);
+  const customIdRef = useRef(1);
 
   const fetchDiff = async (filename) => {
     try {
@@ -297,7 +430,8 @@ function App() {
       setDarwinResults(specialistData.forge_telemetry.darwin_results);
       // Automatically hide after 5 seconds of 'OK' status
       if (specialistData.status === 'OK') {
-        setTimeout(() => setDarwinResults(null), 5000);
+        if (darwinResetTimeoutRef.current) clearTimeout(darwinResetTimeoutRef.current);
+        darwinResetTimeoutRef.current = setTimeout(() => setDarwinResults(null), 5000);
       }
     }
 
@@ -310,6 +444,10 @@ function App() {
         setManifestedFiles(newFiles);
       }
     }
+
+    return () => {
+      if (darwinResetTimeoutRef.current) clearTimeout(darwinResetTimeoutRef.current);
+    };
   }, [specialistData, activeMode, forgeCode]);
 
   const [liveCodeStream, setLiveCodeStream] = useState('');
@@ -423,33 +561,6 @@ function App() {
     };
   };
 
-  // --- RECURSIVE FILE TREE COMPONENT ---
-  const FileTreeNode = ({ node, depth = 0 }) => {
-    const [isOpen, setIsOpen] = useState(depth === 0); // Open root by default
-    const isDir = node.type === 'directory';
-
-    return (
-      <div className="file-tree-node" style={{ marginLeft: `${depth * 10}px` }}>
-        <div
-          className={`node-label ${isDir ? 'directory' : 'file'} clickable`}
-          onClick={() => isDir ? setIsOpen(!isOpen) : socketRef.current.emit('SPECIALIST_ACTION', { mode: 'ENGINEER', action: 'OPEN_FILE', payload: { filename: node.name } })}
-        >
-          <span className="node-icon">{isDir ? (isOpen ? '📂' : '📁') : '📄'}</span>
-          <span className="node-name">{node.name}</span>
-          {node.size && <span className="node-size">({(node.size / 1024).toFixed(1)}kb)</span>}
-        </div>
-        {isDir && isOpen && node.children && (
-          <div className="node-children">
-            {node.children.map((child, i) => (
-              <FileTreeNode key={`${child.name}-${i}`} node={child} depth={depth + 1} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-
   const [artifactTokens, setArtifactTokens] = useState([]);
   const [pendingArtifactTokens, setPendingArtifactTokens] = useState([]);
   const [isMinigameActive, setIsMinigameActive] = useState(false);
@@ -470,6 +581,47 @@ function App() {
   const isPlayingAudioRef = useRef(false);
   const [cameraStatus, setCameraStatus] = useState('pending'); // 'pending', 'authorized', 'denied'
   const nextExpectedIndexRef = useRef(0);
+
+  const getNextCustomId = React.useCallback(() => {
+    const nextId = customIdRef.current;
+    customIdRef.current += 1;
+    return nextId;
+  }, []);
+
+  const handleOpenEngineerFile = React.useCallback((node) => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('SPECIALIST_ACTION', {
+      mode: 'ENGINEER',
+      action: 'OPEN_FILE',
+      payload: { filename: node.name }
+    });
+  }, []);
+
+  const addCustomTask = React.useCallback(() => {
+    const title = prompt("Enter task objective:");
+    if (!title) return;
+
+    setCustomTasks((prev) => [...prev, {
+      id: `task-${getNextCustomId()}`,
+      title,
+      status: 'pending',
+      progress: 0
+    }]);
+  }, [getNextCustomId]);
+
+  const addCustomNote = React.useCallback((text) => {
+    const cleanText = text.trim();
+    if (!cleanText) return;
+
+    setCustomNotes((prev) => [
+      {
+        id: `note-${getNextCustomId()}`,
+        time: new Date().toLocaleTimeString().slice(0, 5),
+        text: cleanText
+      },
+      ...prev
+    ]);
+  }, [getNextCustomId]);
 
   const playSpatialSound = React.useCallback((type, side = 'center') => {
     // Spatial mapping: -1.0 (left), 0.0 (center), 1.0 (right)
@@ -496,7 +648,8 @@ function App() {
     }
   }, []);
 
-  const handleModeChange = React.useCallback((newMode) => {
+  const handleModeChange = React.useCallback((newMode, options = {}) => {
+    const { emitSocket = true } = options;
     if (newMode === activeMode) return;
 
     // Digital Dissolve Trigger
@@ -504,7 +657,7 @@ function App() {
     setTimeout(() => setIsTransitioning(false), 800);
 
     setActiveMode(newMode);
-    if (socketRef.current) {
+    if (emitSocket && socketRef.current) {
       socketRef.current.emit('MODE_CHANGE', { mode: newMode });
     }
 
@@ -538,8 +691,28 @@ function App() {
     const modeDef = customModes.find((m) => m.name === modeName && m.enabled);
     if (!modeDef) return;
     setActiveCustomMode(modeDef.name);
+    const activationLine = buildCustomModeActivationLine(modeDef);
+    pendingActivationLineRef.current = activationLine;
+    setZaireResponseStream(activationLine);
+    setShowResponsePanel(true);
+    if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+    responseTimeoutRef.current = setTimeout(() => {
+      setShowResponsePanel(false);
+      setZaireResponseStream('');
+    }, 12000);
     // Custom modes run on ZAIRE base layout for full HUD compatibility.
-    if (activeMode !== 'ZAIRE') handleModeChange('ZAIRE');
+    if (activeMode !== 'ZAIRE') {
+      handleModeChange('ZAIRE', { emitSocket: false });
+    }
+    // Also emit custom mode details to backend with permissions!
+    if (socketRef.current) {
+      socketRef.current.emit('MODE_CHANGE', {
+        mode: modeDef.name,
+        isCustom: true,
+        permissions: modeDef.permissions,
+        activationLine
+      });
+    }
   }, [activeMode, customModes, handleModeChange]);
 
   const handleModeSync = React.useCallback((newMode) => {
@@ -629,9 +802,9 @@ function App() {
 
   // Sync to LOCALSTORAGE for persistence on change
   useEffect(() => {
-    localStorage.setItem('blobColor', blobColor);
-    localStorage.setItem('blobSize', blobSize);
-    localStorage.setItem('blobPosition', JSON.stringify(blobPosition));
+    localStorage.setItem(BLOB_COLOR_STORAGE_KEY, blobColor);
+    localStorage.setItem(BLOB_SIZE_STORAGE_KEY, blobSize);
+    localStorage.setItem(BLOB_POSITION_STORAGE_KEY, JSON.stringify(blobPosition));
   }, [blobColor, blobSize, blobPosition]);
 
   // ── PHASE 3: NEURAL THEME SYNC ─────────────────────
@@ -666,7 +839,7 @@ function App() {
   }, [liveMetrics, timeStr]);
 
   // Function to fetch TTS audio via HTTP
-  const fetchTTSAudio = React.useCallback(async (text) => {
+  const fetchTTSAudio = React.useEffectEvent(async (text) => {
     try {
       const response = await fetch(`${API_BASE_URL}/tts`, {
         method: 'POST',
@@ -684,9 +857,9 @@ function App() {
       console.error('[TTS HTTP] Failed:', err);
       return null;
     }
-  }, []);
+  });
 
-  const playNextAudioChunk = React.useCallback(async () => {
+  const playNextAudioChunk = React.useEffectEvent(async () => {
     if (isPlayingAudioRef.current) return;
 
     const nextIndex = nextExpectedIndexRef.current;
@@ -768,7 +941,7 @@ function App() {
       nextExpectedIndexRef.current++;
       playNextAudioChunk();
     }
-  }, [fetchTTSAudio]);
+  });
 
   useEffect(() => {
     fetchChatSessions();
@@ -896,8 +1069,7 @@ function App() {
     }
   };
 
-  // Load memories and system config from backend on startup
-  useEffect(() => {
+  const loadInitialSystemData = React.useCallback(() => {
     fetch(`${API_BASE_URL}/memories`)
       .then(r => r.json())
       .then(data => {
@@ -917,6 +1089,11 @@ function App() {
       })
       .catch(() => { });
   }, []);
+
+  // Load memories and system config from backend on startup
+  useEffect(() => {
+    loadInitialSystemData();
+  }, [loadInitialSystemData]);
 
   useEffect(() => {
     socketRef.current = io(`${API_BASE_URL}`, {
@@ -975,6 +1152,11 @@ function App() {
 
     socketRef.current.on('ai_text_delta', (delta) => {
       setZaireResponseStream(prev => {
+        if (pendingActivationLineRef.current && delta === pendingActivationLineRef.current) {
+          const currentActivationLine = pendingActivationLineRef.current;
+          pendingActivationLineRef.current = null;
+          return prev === currentActivationLine ? prev : (prev || delta);
+        }
         const next = prev + delta;
         // Check for Neural Video Payload
         if (next.includes('[NEURAL_VIDEO_PAYLOAD]')) {
@@ -1072,7 +1254,7 @@ function App() {
 
     // Deep thinking status
     socketRef.current.on('deep_thinking', (isThinking) => {
-      setIsDeepThinking(isThinking);
+      isDeepThinkingRef.current = isThinking;
     });
 
     // Memory stored event
@@ -1148,7 +1330,7 @@ function App() {
     });
 
     socketRef.current.on('intruder_snapshots', (data) => {
-      if (data.snapshots) setIntruderSnapshots(data.snapshots);
+      if (data.snapshots) intruderSnapshotsRef.current = data.snapshots;
     });
 
     // Tier 7: HUD Live Telemetry
@@ -1170,7 +1352,7 @@ function App() {
         socketRef.current.off();
       }
     };
-  }, [playNextAudioChunk, handleModeSync, fetchTTSAudio]);
+  }, [handleModeSync]);
 
   // NOTE: Direct browser camera access is disabled to prevent hardware contention 
   // with the Tier 5 Face Security Daemon (Python). Only one process can hold the camera lock.
@@ -1230,11 +1412,14 @@ function App() {
 
     const handlePersist = (event) => {
       const incoming = event?.detail || {};
+      const storedBlobColor = localStorage.getItem(BLOB_COLOR_STORAGE_KEY);
+      const storedBlobSize = localStorage.getItem(BLOB_SIZE_STORAGE_KEY);
+      const storedBlobPosition = localStorage.getItem(BLOB_POSITION_STORAGE_KEY);
       if (socketRef.current) {
         socketRef.current.emit('SAVE_CONFIG', {
-          blobColor: normalizeHexColor(localStorage.getItem('blobColor')),
-          blobSize: parseFloat(localStorage.getItem('blobSize') || '1.0'),
-          blobPosition: JSON.parse(localStorage.getItem('blobPosition') || '{"x":0,"y":0}'),
+          blobColor: normalizeHexColor(storedBlobColor),
+          blobSize: parseFloat(storedBlobSize || '1.0'),
+          blobPosition: JSON.parse(storedBlobPosition || '{"x":0,"y":0}'),
           ...incoming
         });
       }
@@ -1277,9 +1462,9 @@ function App() {
     blobColorRef.current = blobColor;
     blobPositionRef.current = blobPosition;
 
-    localStorage.setItem('blobColor', blobColor);
-    localStorage.setItem('blobSize', blobSize.toString());
-    localStorage.setItem('blobPosition', JSON.stringify(blobPosition));
+    localStorage.setItem(BLOB_COLOR_STORAGE_KEY, blobColor);
+    localStorage.setItem(BLOB_SIZE_STORAGE_KEY, blobSize.toString());
+    localStorage.setItem(BLOB_POSITION_STORAGE_KEY, JSON.stringify(blobPosition));
 
     // Push position update immediately (not dependent on animation loop)
     if (mainGroupRef.current) {
@@ -2287,15 +2472,24 @@ function App() {
     return () => cancelAnimationFrame(animationId);
   }, [biometricData?.detected]);
 
-  const enabledCustomNavModes = customModes
-    .filter((m) => m.enabled && m.name)
-    .map((m) => m.name.toUpperCase());
+  const enabledCustomNavModes = customModes.reduce((modes, mode) => {
+    if (mode.enabled && mode.name) {
+      modes.push(mode.name.toUpperCase());
+    }
+    return modes;
+  }, []);
   const navItems = [...CORE_MODES, ...enabledCustomNavModes.filter((m) => !CORE_MODES.includes(m))];
   const displayedMode = activeCustomMode || activeMode;
 
   const handleUpgradePro = async () => {
-    if (!user) return;
+    if (!user || isUpgradeLoading) return;
+    const checkoutWindow = window.open('', '_blank');
+
     try {
+      setIsUpgradeLoading(true);
+      setZaireResponseStream('Initializing PRO checkout...');
+      setShowResponsePanel(true);
+
       const res = await fetch(`${API_BASE_URL}/billing/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2304,12 +2498,34 @@ function App() {
           userEmail: user.primaryEmailAddress?.emailAddress
         })
       });
-      const data = await res.json();
-      if (data.checkoutUrl) {
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to initialize checkout.');
+      }
+
+      if (!data.checkoutUrl) {
+        throw new Error('Checkout URL was not returned by the billing service.');
+      }
+
+      if (checkoutWindow) {
+        checkoutWindow.location.href = data.checkoutUrl;
+      } else {
         window.open(data.checkoutUrl, '_blank');
       }
+
+      setZaireResponseStream('PRO checkout ready. Redirecting now...');
     } catch (e) {
+      if (checkoutWindow) checkoutWindow.close();
       console.error("Upgrade checkout failed:", e);
+      setZaireResponseStream(`PRO checkout failed: ${e.message}`);
+      setZaireActionFeed(prev => [{
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        message: `Billing checkout failed: ${e.message}`
+      }, ...prev].slice(0, 5));
+    } finally {
+      setIsUpgradeLoading(false);
     }
   };
 
@@ -2326,6 +2542,348 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  const activeModeObj = customModes.find((m) => m.name === activeCustomMode && m.enabled);
+
+  const getZoneComponents = (zoneName) => {
+    if (!activeModeObj || !activeModeObj.components) return [];
+    return sanitizeCustomModeComponents(activeModeObj.components)
+      .filter(c => c.zone === zoneName)
+      .sort((a, b) => (a.index || 0) - (b.index || 0));
+  };
+
+  const wrapPremiumWorkspaceCard = (compType, key, content, statusText = "SECURE LINK", icon = "⚡") => {
+    const cardColor = activeModeObj?.color || 'var(--primary)';
+    return (
+      <div 
+        key={key}
+        className="premium-workspace-card"
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          e.currentTarget.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+          e.currentTarget.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+        }}
+        style={{
+          '--card-theme': cardColor,
+          borderColor: `${cardColor}25`,
+        }}
+      >
+        {/* HUD Corners */}
+        <div className="card-hud-bracket top-left" style={{ borderColor: `${cardColor}66` }}></div>
+        <div className="card-hud-bracket top-right" style={{ borderColor: `${cardColor}66` }}></div>
+        <div className="card-hud-bracket bottom-left" style={{ borderColor: `${cardColor}66` }}></div>
+        <div className="card-hud-bracket bottom-right" style={{ borderColor: `${cardColor}66` }}></div>
+        
+        {/* Scanline overlay */}
+        <div className="card-scanline"></div>
+
+        {/* Header Tab */}
+        <div className="premium-card-header" style={{ borderBottom: `1px solid ${cardColor}18` }}>
+          <div className="header-title-wrap">
+            <span className="header-status-dot pulse" style={{ background: cardColor, boxShadow: `0 0 6px ${cardColor}` }}></span>
+            <span className="header-icon" style={{ marginRight: '4px' }}>{icon}</span>
+            <span className="header-title">{compType.toUpperCase()}</span>
+          </div>
+          <div className="header-status-text" style={{ color: `${cardColor}b3` }}>
+            {statusText}
+          </div>
+        </div>
+
+        {/* Inner Content Area */}
+        <div className="premium-card-body">
+          {content}
+        </div>
+      </div>
+    );
+  };
+
+  const renderCustomComponent = (comp) => {
+    const key = `${comp.type}-${comp.index}`;
+    let innerJSX = null;
+    let icon = "⚡";
+    let statusText = "SECURE LINK";
+
+    switch (comp.type) {
+      case 'Chat Panel': {
+        const activeSession = chatSessions.find(s => s.id === currentSessionId);
+        const currentMessages = activeSession ? activeSession.messages : [];
+        const isAIActive = ['thinking', 'speaking', 'deep_thinking', 'agent_thinking'].includes(zaireStatus);
+        icon = "💬";
+        statusText = "UPLINK: ACTIVE";
+
+        innerJSX = (
+          <div className="chat-panel-custom" style={{ height: '100%' }}>
+            <div className="custom-chat-messages">
+              {currentMessages.length === 0 && !zaireResponseStream && (
+                <div className="chat-empty-state">
+                  <span className="empty-pulse">⚡</span>
+                  AWAITING UPLINK
+                </div>
+              )}
+              {currentMessages.map((msg, idx) => (
+                <div key={idx} className={`custom-chat-bubble ${msg.role}`}>
+                  <span className="bubble-role">{msg.role === 'user' ? 'USER' : 'ZAIRE'}</span>
+                  <div>{msg.content}</div>
+                </div>
+              ))}
+              {isAIActive && zaireResponseStream && (
+                <div className="custom-chat-bubble assistant">
+                  <span className="bubble-role">ZAIRE [STREAMING]</span>
+                  <div>{zaireResponseStream}</div>
+                </div>
+              )}
+            </div>
+            <div className="custom-chat-input-wrap">
+              <input
+                type="text"
+                className="custom-chat-input"
+                placeholder="Message ZAIRE..."
+                value={customChatInput}
+                onChange={(e) => setCustomChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && customChatInput.trim()) {
+                    const txt = customChatInput.trim();
+                    setLastUserPrompt(txt);
+                    setCustomChatInput('');
+                    setZaireResponseStream('');
+                    setLiveCodeStream('');
+                    if (socketRef.current) {
+                      socketRef.current.emit('user_message', txt, { artifactTokens: [...artifactTokens, ...pendingArtifactTokens] });
+                    }
+                  }
+                }}
+              />
+              <button
+                className="custom-chat-send-btn"
+                onClick={() => {
+                  if (customChatInput.trim()) {
+                    const txt = customChatInput.trim();
+                    setLastUserPrompt(txt);
+                    setCustomChatInput('');
+                    setZaireResponseStream('');
+                    setLiveCodeStream('');
+                    if (socketRef.current) {
+                      socketRef.current.emit('user_message', txt, { artifactTokens: [...artifactTokens, ...pendingArtifactTokens] });
+                    }
+                  }
+                }}
+              >
+                SEND
+              </button>
+            </div>
+          </div>
+        );
+        break;
+      }
+      case 'Task Queue': {
+        icon = "📊";
+        const doneCount = customTasks.filter(t => t.status === 'completed').length;
+        statusText = `${doneCount}/${customTasks.length} DONE`;
+
+        innerJSX = (
+          <div className="task-queue-custom">
+            <div className="custom-task-list">
+              {customTasks.map(t => (
+                <div key={t.id} className={`custom-task-card ${t.status}`}>
+                  <div className="task-header">
+                    <span className="task-title">{t.title.toUpperCase()}</span>
+                    <span className="task-status">{t.status.toUpperCase()}</span>
+                  </div>
+                  <div className="task-bar-bg">
+                    <div className="task-bar-fill" style={{ width: `${t.progress}%` }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              className="custom-task-add-btn"
+              onClick={addCustomTask}
+            >
+              + ADD SYSTEM OBJECTIVE
+            </button>
+          </div>
+        );
+        break;
+      }
+      case 'Notes Panel': {
+        icon = "📝";
+        statusText = "MEMO BUFFER";
+
+        innerJSX = (
+          <div className="notes-panel-custom">
+            <textarea
+              className="custom-notes-area"
+              placeholder="Capture intelligence thoughts..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (e.target.value.trim()) {
+                    addCustomNote(e.target.value);
+                    e.target.value = '';
+                  }
+                }
+              }}
+            />
+            <div className="custom-notes-list">
+              {customNotes.map(n => (
+                <div key={n.id} className="custom-note-item">
+                  <span className="note-time">[{n.time}]</span>
+                  <div className="note-text">{n.text}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+        break;
+      }
+      case 'Memory Panel': {
+        icon = "🧠";
+        statusText = `${storedMemories.length} VECTORS`;
+
+        innerJSX = (
+          <div>
+            <div style={{ fontSize: '12px', marginBottom: '8px', color: 'var(--primary)', fontFamily: 'var(--font-orbitron)', letterSpacing: '0.5px' }}>
+              STORED VECTORS: {storedMemories.length}
+            </div>
+            <div className="custom-task-list">
+              {storedMemories.length === 0 ? (
+                <div style={{ fontSize: '12px', opacity: 0.5, textAlign: 'center', padding: '10px' }}>NO MEMORY VECTOR RECORDED</div>
+              ) : (
+                storedMemories.map(m => (
+                  <div key={m.id} className="custom-task-card" style={{ fontSize: '12px', padding: '8px' }}>
+                    <div style={{ opacity: 0.4, fontSize: '10px', marginBottom: '4px' }}>{m.timestamp}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.9)' }}>{m.text}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+        break;
+      }
+      case 'Terminal': {
+        icon = "💻";
+        statusText = "SHELL: READY";
+
+        innerJSX = (
+          <div className="terminal-custom">
+            <div className="custom-terminal-body" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+              {customTerminalLines.map((line, idx) => (
+                <div key={idx} className="terminal-line">{line}</div>
+              ))}
+            </div>
+            <div className="custom-terminal-prompt">
+              <span className="prompt-arrow">&gt;</span>
+              <input
+                type="text"
+                className="terminal-input"
+                value={customTerminalInput}
+                onChange={(e) => setCustomTerminalInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const val = customTerminalInput.trim();
+                    if (val) {
+                      setCustomTerminalLines(prev => [...prev, `> ${val}`, `Executing command '${val}'...`, 'Command succeeded.']);
+                      setCustomTerminalInput('');
+                    }
+                  }
+                }}
+              />
+            </div>
+          </div>
+        );
+        break;
+      }
+      case 'Code Editor': {
+        icon = "✍️";
+        statusText = "NEURAL FORGE";
+
+        innerJSX = (
+          <div className="editor-container-inner" style={{ flex: 1, minHeight: '140px' }}>
+            <div className="editor-gutter">
+              {[1, 2, 3, 4, 5].map(n => <span key={n} className="gutter-num">{n}</span>)}
+            </div>
+            <textarea
+              className="editor-text-area"
+              value={customEditorText}
+              onChange={(e) => setCustomEditorText(e.target.value)}
+            />
+          </div>
+        );
+        break;
+      }
+      case 'Kanban Board': {
+        const lanes = ['todo', 'doing', 'done'];
+        icon = "📋";
+        statusText = "SPRINT TARGET";
+
+        innerJSX = (
+          <div className="kanban-grid-cols">
+            {lanes.map(lane => (
+              <div key={lane} className="kanban-col">
+                <div className="col-label">{lane.toUpperCase()}</div>
+                <div className="col-cards">
+                  {customKanbanCards.filter(c => c.status === lane).map(card => (
+                    <button
+                      type="button"
+                      key={card.id}
+                      className="kanban-card"
+                      onClick={() => {
+                        const nextStatus = lane === 'todo' ? 'doing' : (lane === 'doing' ? 'done' : 'todo');
+                        setCustomKanbanCards(prev => prev.map(c => c.id === card.id ? { ...c, status: nextStatus } : c));
+                      }}
+                    >
+                      {card.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+        break;
+      }
+      case 'System Logs': {
+        icon = "📃";
+        statusText = "SYS_EVENT";
+
+        innerJSX = (
+          <div className="system-logs-body" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+            {zaireActionFeed.map((log, i) => (
+              <div key={i} className="log-row">
+                <span className="log-time">[{log.time}]</span>
+                <span className="log-msg">{log.message}</span>
+              </div>
+            ))}
+          </div>
+        );
+        break;
+      }
+      default: {
+        const componentName = comp.type.replace(/\s+/g, '');
+        const EliteComp = EliteComponents[componentName];
+        const matchedRegistry = ZaireComponentRegistry.find(c => c.type === comp.type);
+        if (matchedRegistry) {
+          icon = matchedRegistry.icon;
+          statusText = matchedRegistry.desc.toUpperCase();
+        }
+        
+        if (EliteComp) {
+          innerJSX = <EliteComp color={activeModeObj?.color || 'var(--primary)'} />;
+        } else {
+          innerJSX = (
+            <div className="custom-module-placeholder">
+              <span className="pulse" style={{ marginRight: '6px' }}>⚡</span>
+              AWAITING MODULE: {comp.type.toUpperCase()}
+            </div>
+          );
+        }
+        break;
+      }
+    }
+
+    return wrapPremiumWorkspaceCard(comp.type, key, innerJSX, statusText, icon);
+  };
 
   return (
     <div
@@ -2361,8 +2919,9 @@ function App() {
         {isMinigameActive && (
           <div className="neural-pulse-arena">
             <div className="arena-score">SYNC: {minigameScore}</div>
-            {gameNodes.map(node => (
-              <div
+              {gameNodes.map(node => (
+              <button
+                type="button"
                 key={node.id}
                 className="neural-node"
                 style={{
@@ -2373,10 +2932,11 @@ function App() {
                   animationDelay: node.delay
                 }}
                 onClick={() => handleNodeClick(node.id)}
+                aria-label={`Sync node ${node.id}`}
               >
                 <div className="node-core"></div>
                 <div className="node-ring"></div>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -2390,9 +2950,14 @@ function App() {
           data-mode={activeMode}
           data-state={systemState}
           style={{
-            '--left-width': `${layoutOffsets.leftWidth}px`,
-            '--right-width': `${layoutOffsets.rightWidth}px`,
-            '--bottom-height': `${layoutOffsets.bottomHeight}px`
+            '--left-width': activeCustomMode 
+              ? (getZoneComponents('Left Sidebar').length > 0 ? `${layoutOffsets.leftWidth || 250}px` : '0px')
+              : `${layoutOffsets.leftWidth}px`,
+            '--right-width': activeCustomMode
+              ? (getZoneComponents('Right Inspector').length > 0 ? `${layoutOffsets.rightWidth || 250}px` : '0px')
+              : `${layoutOffsets.rightWidth}px`,
+            '--bottom-height': `${layoutOffsets.bottomHeight}px`,
+            '--primary': activeModeObj?.color || undefined
           }}
         >
           {/* ROW 1: NAVBAR */}
@@ -2408,6 +2973,9 @@ function App() {
                   key={item}
                   className={`nav-item ${displayedMode === item ? 'active' : ''}`}
                   onClick={() => activateNavbarMode(item)}
+                  onKeyDown={(event) => handleAccessibleActivate(event, () => activateNavbarMode(item))}
+                  role="button"
+                  tabIndex={0}
                 >
                   <span className="nav-arrow">›</span>
                   {item}
@@ -2415,8 +2983,26 @@ function App() {
               ))}
             </div>
 
+            {activeCustomMode && (
+              <div className="custom-top-status-bar">
+                {getZoneComponents('Top Status Bar').map(comp => (
+                  <div key={`${comp.type}-${comp.index}`} className="custom-top-status-item">
+                    <span className="hud-tag-btn active custom-top-status-chip">
+                      {comp.type.toUpperCase()}: ACTIVE
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="nav-status">
-              <div className="settings-icon" onClick={() => setIsSettingsOpen(!isSettingsOpen)}>
+              <div
+                className="settings-icon"
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                onKeyDown={(event) => handleAccessibleActivate(event, () => setIsSettingsOpen(!isSettingsOpen))}
+                role="button"
+                tabIndex={0}
+              >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                   <circle cx="12" cy="12" r="3" />
                   <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 1.65 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
@@ -2430,16 +3016,28 @@ function App() {
                 <div className={`status-dot ${zaireStatus}`}></div>
                 <span className="status-text">{zaireStatus.toUpperCase().replace('_', ' ')}</span>
               </div>
-              <div className="archive-toggle" onClick={() => { fetchChatSessions(); setIsArchivesPageOpen(true); }} title="Neural Archives">
+              <div
+                className="archive-toggle"
+                onClick={() => { fetchChatSessions(); setIsArchivesPageOpen(true); }}
+                onKeyDown={(event) => handleAccessibleActivate(event, () => { fetchChatSessions(); setIsArchivesPageOpen(true); })}
+                title="Neural Archives"
+                role="button"
+                tabIndex={0}
+              >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
               </div>
-              <div className="upgrade-btn" onClick={handleUpgradePro}>
-                UPGRADE PRO
-              </div>
+              <button
+                type="button"
+                className="upgrade-btn"
+                onClick={handleUpgradePro}
+                disabled={isUpgradeLoading}
+              >
+                {isUpgradeLoading ? 'OPENING...' : 'UPGRADE PRO'}
+              </button>
               <div className="clerk-user-profile">
                 <UserButton appearance={{
                   elements: {
@@ -2453,11 +3051,14 @@ function App() {
 
           {/* ROW 2: LEFT PANEL */}
           <div className="grid-left">
-            {/* ── ZAIRE MODE PANEL ── */}
-            {activeMode === 'ZAIRE' && (
+            {activeCustomMode ? (
+              getZoneComponents('Left Sidebar').map(renderCustomComponent)
+            ) : (
               <>
-
-                <div className="panel-section" style={getComponentStyle('SYSTEM_VITALS')}>
+                {/* ── ZAIRE MODE PANEL ── */}
+                {activeMode === 'ZAIRE' && (
+                  <>
+                    <div className="panel-section" style={getComponentStyle('SYSTEM_VITALS')}>
                   <div className="section-label">SYSTEM VITALS</div>
                   <div className="vitals-bars">
                     <div className="vital-row">
@@ -2726,10 +3327,17 @@ function App() {
                 </div>
               </>
             )}
-          </div>
+          </>
+        )}
+      </div>
 
           {/* ROW 2: CENTER (ORB / TACTICAL CONTENT) */}
-          <div className={`grid-center ${activeMode !== 'ZAIRE' ? 'has-content' : ''}`}>
+          <div className={`grid-center ${activeMode !== 'ZAIRE' || activeCustomMode ? 'has-content' : ''}`}>
+            {activeCustomMode && (
+              <div className="custom-main-workspace-wrapper" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '15px', height: '100%', padding: '15px', overflowY: 'auto', pointerEvents: 'auto' }}>
+                {getZoneComponents('Main Workspace').map(renderCustomComponent)}
+              </div>
+            )}
 
             {/* ── TRADER CENTER: Sovereign Trading Floor ── */}
             {activeMode === 'TRADER' && (
@@ -2747,7 +3355,14 @@ function App() {
                         <div className="pair-info">BTC/USDT <span className="live-dot pulse"></span></div>
                         <div className="chart-controls">
                           <span>15M</span>
-                          <span onClick={() => handleSpecialistAction('TRADER', 'WHALE_FORENSICS', { asset: 'BTC' })}>WHALE_SCAN</span>
+                          <span
+                            onClick={() => handleSpecialistAction('TRADER', 'WHALE_FORENSICS', { asset: 'BTC' })}
+                            onKeyDown={(event) => handleAccessibleActivate(event, () => handleSpecialistAction('TRADER', 'WHALE_FORENSICS', { asset: 'BTC' }))}
+                            role="button"
+                            tabIndex={0}
+                          >
+                            WHALE_SCAN
+                          </span>
                         </div>
                       </div>
                       <div className="chart-canvas-area">
@@ -2759,7 +3374,7 @@ function App() {
                     <div className="execution-side">
                       <div className="side-label">LIVE EXECUTION</div>
                       <div className="execution-log">
-                        {specialistData?.live_trades?.length === 0 && <div className="log-empty">SCANNING FOR SIGNALS...</div>}
+                        {specialistData?.live_trades?.length === 0 && <div className="log-empty">SCANNING FOR SIGNALS…</div>}
                         {(specialistData?.live_trades || liveTrades).map(trade => (
                           <div key={trade.id} className="trade-entry">
                             <div className="t-row">
@@ -2804,7 +3419,7 @@ function App() {
                           <span className="alpha-event">{a.event}</span>
                           <span className="alpha-sentiment-tag">{a.sentiment}</span>
                         </div>
-                      )) || <div className="alpha-empty">SCANNING ON-CHAIN PROTOCOLS...</div>}
+                      )) || <div className="alpha-empty">SCANNING ON-CHAIN PROTOCOLS…</div>}
                     </div>
                   </div>
                 )}
@@ -2932,7 +3547,7 @@ function App() {
                       {specialistData?.lab ? (
                         <div className="lab-sim-placeholder">
                           <div className="sim-pulse"></div>
-                          <span>{specialistData.lab.status}...</span>
+                          <span>{specialistData.lab.status}…</span>
                           <p>Synchronizing with Engineer Forge for {specialistData.lab.engine} manifestation.</p>
                         </div>
                       ) : (
@@ -2947,7 +3562,7 @@ function App() {
                   <div className="summary-items">
                     {specialistData?.research_feed?.map((f, i) => (
                       <div key={i} className="s-item">✦ Source: {f.source} {'//'} {f.title}</div>
-                    )) || <div className="s-item opacity-30">PARSING GLOBAL KNOWLEDGE CORES...</div>}
+                    )) || <div className="s-item opacity-30">PARSING GLOBAL KNOWLEDGE CORES…</div>}
                   </div>
                 </div>
 
@@ -3011,6 +3626,11 @@ function App() {
                             onClick={() => {
                               setActiveTab(i);
                             }}
+                            onKeyDown={(event) => handleAccessibleActivate(event, () => {
+                              setActiveTab(i);
+                            })}
+                            role="button"
+                            tabIndex={0}
                           >
                             {file.name} <span className="tab-status-dot pulse"></span>
                           </div>
@@ -3020,7 +3640,13 @@ function App() {
                       </div>
                       <div className="editor-metrics">
                         <span>LINES: {forgeCode.split('\n').length}</span>
-                        <span className="diff-toggle" onClick={() => setShowDiff(!showDiff)}>
+                        <span
+                          className="diff-toggle"
+                          onClick={() => setShowDiff(!showDiff)}
+                          onKeyDown={(event) => handleAccessibleActivate(event, () => setShowDiff(!showDiff))}
+                          role="button"
+                          tabIndex={0}
+                        >
                           DIFF: <span style={{ color: showDiff ? '#f97316' : '#446677' }}>{showDiff ? 'ON' : 'OFF'}</span>
                         </span>
                         <span>ALIGN: <span style={{ color: '#00ff88' }}>{specialistData?.manifestation_sync?.alignment || '99%'}</span></span>
@@ -3043,7 +3669,7 @@ function App() {
                                 ))}
                               </div>
                             ) : (
-                              (manifestedFiles[activeTab]?.code || forgeCode) || '// AWAITING NEURAL FORGE MANIFESTATION...'
+                              (manifestedFiles[activeTab]?.code || forgeCode) || '// AWAITING NEURAL FORGE MANIFESTATION…'
                             )}
                           </code>
                         </pre>
@@ -3079,14 +3705,31 @@ function App() {
                   <div className="research-panel">
                     <div className="panel-label">
                       LIVE PREVIEW
-                      <span className="preview-refresh" style={{ marginLeft: '10px' }} onClick={() => setShowMatrix(!showMatrix)}>
+                      <span
+                        className="preview-refresh"
+                        style={{ marginLeft: '10px' }}
+                        onClick={() => setShowMatrix(!showMatrix)}
+                        onKeyDown={(event) => handleAccessibleActivate(event, () => setShowMatrix(!showMatrix))}
+                        role="button"
+                        tabIndex={0}
+                      >
                         {showMatrix ? 'HIDE MATRIX' : 'SHOW MATRIX'}
                       </span>
-                      <span className="preview-refresh" onClick={() => {
-                        const current = previewUrl;
-                        setPreviewUrl('');
-                        setTimeout(() => setPreviewUrl(current), 10);
-                      }}>↻</span>
+                      <span
+                        className="preview-refresh"
+                        onClick={() => {
+                          const current = previewUrl;
+                          setPreviewUrl('');
+                          setTimeout(() => setPreviewUrl(current), 10);
+                        }}
+                        onKeyDown={(event) => handleAccessibleActivate(event, () => {
+                          const current = previewUrl;
+                          setPreviewUrl('');
+                          setTimeout(() => setPreviewUrl(current), 10);
+                        })}
+                        role="button"
+                        tabIndex={0}
+                      >{'\u21bb'}</span>
                     </div>
                     <div className="preview-container">
                       {thermalActive && (
@@ -3107,7 +3750,7 @@ function App() {
                               <div className="matrix-frame">
                                 {/* Since these are local files in backend/memory/components, we might need a proxy or serve them */}
                                 {/* For now, we simulate with the iframe at different widths */}
-                                <iframe src={previewUrl} style={{ width: v === 'mobile' ? '375px' : v === 'tablet' ? '768px' : '100%', height: '100%', border: 'none', transform: 'scale(0.5)', transformOrigin: 'top left' }} />
+                                <iframe title={`Engineer Live Preview ${v}`} src={previewUrl} style={{ width: v === 'mobile' ? '375px' : v === 'tablet' ? '768px' : '100%', height: '100%', border: 'none', transform: 'scale(0.5)', transformOrigin: 'top left' }} />
                               </div>
                             </div>
                           ))}
@@ -3123,7 +3766,7 @@ function App() {
                           {specialistData?.project_status?.server !== 'RUNNING' && (
                             <div className="preview-placeholder">
                               <div className="pulse-ring"></div>
-                              <span>AWAITING SERVER...</span>
+                              <span>AWAITING SERVER…</span>
                             </div>
                           )}
                         </>
@@ -3157,7 +3800,7 @@ function App() {
                       <div className="console-actions">
                         <button className="c-btn" onClick={() => handleSpecialistAction('ENGINEER', 'MANIFEST_PROJECT', { prompt: lastUserPrompt, project_name: 'zaire-engineered-site' })}>MANIFEST</button>
                         <button className={`c-btn ${specialistData?.forge_telemetry?.is_healing ? 'healing-active' : ''}`} onClick={() => handleSpecialistAction('ENGINEER', 'VISION_AUDIT')}>
-                          {specialistData?.forge_telemetry?.is_healing ? 'HEALING...' : 'AUDIT'}
+                          {specialistData?.forge_telemetry?.is_healing ? 'HEALING…' : 'AUDIT'}
                         </button>
                       </div>
                     </div>
@@ -3215,8 +3858,12 @@ function App() {
 
           {/* ROW 2: RIGHT PANEL */}
           <div className="grid-right">
-            {/* ── ZAIRE MODE RIGHT PANEL ── */}
-            {activeMode === 'ZAIRE' && (
+            {activeCustomMode ? (
+              getZoneComponents('Right Inspector').map(renderCustomComponent)
+            ) : (
+              <>
+                {/* ── ZAIRE MODE RIGHT PANEL ── */}
+                {activeMode === 'ZAIRE' && (
               <>
                 <div className={`panel-section biometric-panel ${biometricData.detected ? 'detected' : ''} ${isSecurityAlert ? 'threat' : ''}`} style={getComponentStyle('BIOMETRIC_SCAN')}>
                   <div className="section-label">BIOMETRIC SCAN</div>
@@ -3739,7 +4386,9 @@ function App() {
                 </button>
               </div>
             </div>
-          </div>
+          </>
+        )}
+      </div>
 
           {isArchivesPageOpen && (
             <div className="neural-archives-page">
@@ -3781,6 +4430,12 @@ function App() {
                               setSelectedArchiveId(session.id);
                               loadArchiveSessionDetail(session.id);
                             }}
+                            onKeyDown={(event) => handleAccessibleActivate(event, () => {
+                              setSelectedArchiveId(session.id);
+                              loadArchiveSessionDetail(session.id);
+                            })}
+                            role="button"
+                            tabIndex={0}
                           >
                             <div className="archive-card-title">{session.title}</div>
                             <div className="archive-card-meta">
@@ -3844,7 +4499,7 @@ function App() {
                     <span className="alert-title">ALERT: UNKNOWN USER</span>
                   </div>
                   <div className="alert-content">
-                    <div className="alert-msg">SCANNING YOUR SYSTEM! SNAPSHOT...</div>
+                    <div className="alert-msg">SCANNING YOUR SYSTEM! SNAPSHOT…</div>
                     <div className="alert-meta">THREAT_LEVEL: CRITICAL</div>
                   </div>
                   <div className="alert-footer">
@@ -3951,7 +4606,7 @@ function App() {
                         {cameraStatus === 'denied' ? 'SIGNAL_BLOCKED' : 'AWAITING_AUTH'}
                       </div>
                       <div className="auth-subtext">
-                        {cameraStatus === 'denied' ? 'AUTHORIZATION DENIED BY MASTER' : 'TACTICAL UPLINK PENDING...'}
+                        {cameraStatus === 'denied' ? 'AUTHORIZATION DENIED BY MASTER' : 'TACTICAL UPLINK PENDING…'}
                       </div>
                     </div>
                   )}
@@ -3974,7 +4629,7 @@ function App() {
                 </div>
               </div>
             </div>
-          </div>
+      </div>
 
           {/* ── FLOATING RESPONSE STREAM (FUTURISTIC SUBTITLES) ── */}
           <div className={`floating-subtitles ${showResponsePanel && zaireResponseStream ? 'visible' : ''}`}>
@@ -4020,7 +4675,8 @@ function App() {
           activeMode={activeMode}
           customModes={customModes}
           onCustomModesChange={(nextModes) => {
-            setCustomModes(nextModes);
+            const sanitizedModes = nextModes.map(sanitizeCustomModeRecord);
+            setCustomModes(sanitizedModes);
             if (activeCustomMode && !nextModes.some((m) => m.enabled && m.name === activeCustomMode)) {
               setActiveCustomMode(null);
             }
@@ -4080,7 +4736,7 @@ function App() {
               <span className="video-title">{neuralVideoData.title}</span>
               <button className="video-close" onClick={() => setIsVideoPlaying(false)}>✕</button>
               <div className="zaire-response-text">
-                {zaireResponseStream || 'AWAITING NEURAL UPLINK...'}
+                {zaireResponseStream || 'AWAITING NEURAL UPLINK…'}
               </div>
             </div>
             <div className="video-stage">
@@ -4114,11 +4770,16 @@ function App() {
 
         {/* ── OMNI-BOX SEARCH ── */}
         {isOmniBoxOpen && (
-          <div className="omni-box-overlay" onClick={() => setIsOmniBoxOpen(false)}>
-            <div className="omni-box-container" onClick={e => e.stopPropagation()}>
+          <div
+            className="omni-box-overlay"
+            onClick={() => setIsOmniBoxOpen(false)}
+            onKeyDown={(event) => handleAccessibleActivate(event, () => setIsOmniBoxOpen(false))}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="omni-box-container" onClick={e => e.stopPropagation()} role="presentation">
               <div className="omni-header">OMNI_SEARCH_V2 // SYSTEM_QUERY</div>
               <input
-                autoFocus
                 className="omni-input"
                 placeholder="ASK ZAIRE... (Prefix 'Deep think' for 70B cores)"
                 value={omniInput || ''}
@@ -4137,7 +4798,13 @@ function App() {
         )}
 
         {!isSystemEngaged && (
-          <div className="engagement-overlay" onClick={() => setIsSystemEngaged(true)}>
+          <div
+            className="engagement-overlay"
+            onClick={() => setIsSystemEngaged(true)}
+            onKeyDown={(event) => handleAccessibleActivate(event, () => setIsSystemEngaged(true))}
+            role="button"
+            tabIndex={0}
+          >
             <div className="engagement-content">
               <div className="power-icon">⚡</div>
               <h2>INITIALIZE ZAIRE NEURAL LINK</h2>
@@ -4167,5 +4834,6 @@ function App() {
 }
 
 export default App;
+
 
 
