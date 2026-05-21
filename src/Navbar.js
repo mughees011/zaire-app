@@ -6,8 +6,7 @@ function Navbar() {
   const logoCanvasRef = useRef(null);
   const [activeItem, setActiveItem] = useState('HOME');
   const [activeMode, setActiveMode] = useState('VOICE');
-  const [timeStr, setTimeStr] = useState('00:00:00');
-  const [dateStr, setDateStr] = useState('THU 00:00');
+  const [clock, setClock] = useState({ timeStr: '00:00:00', dateStr: 'THU 00:00' });
 
   useEffect(() => {
     // Clock tick
@@ -17,8 +16,10 @@ function Navbar() {
         .map(n => String(n).padStart(2, '0'))
         .join(':');
       const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-      setTimeStr(hms);
-      setDateStr(days[now.getDay()] + ' ' + hms.slice(0, 5));
+      setClock({
+        timeStr: hms,
+        dateStr: days[now.getDay()] + ' ' + hms.slice(0, 5)
+      });
     };
 
     const interval = setInterval(tick, 1000);
@@ -73,6 +74,8 @@ function Navbar() {
       cancelAnimationFrame(animationId);
     };
   }, []);
+
+  const { timeStr, dateStr } = clock;
 
   const navItems = [
     {

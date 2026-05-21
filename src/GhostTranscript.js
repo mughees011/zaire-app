@@ -1,51 +1,64 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useReducer, useEffect, useRef } from 'react';
 import './GhostTranscript.css';
 
+const initialTranscriptState = {
+  isAnimatingIn: false,
+  isAnimatingOut: false,
+  displayText: ''
+};
+
+function transcriptReducer(state, action) {
+  switch (action.type) {
+    case 'show_interim':
+      return {
+        ...state,
+        displayText: action.text
+      };
+    case 'show_final':
+      return {
+        isAnimatingIn: true,
+        isAnimatingOut: false,
+        displayText: action.text
+      };
+    case 'start_fade':
+      return {
+        ...state,
+        isAnimatingIn: false,
+        isAnimatingOut: true
+      };
+    case 'clear':
+      return initialTranscriptState;
+    default:
+      return state;
+  }
+}
+
 function GhostTranscript({ isListening, interimText, finalText, onTranscriptComplete }) {
-  const [transcriptState, setTranscriptState] = useState({
-    isAnimatingIn: false,
-    isAnimatingOut: false,
-    displayText: ''
-  });
+  const [transcriptState, dispatch] = useReducer(transcriptReducer, initialTranscriptState);
   const prevFinalRef = useRef('');
   const fadeTimerRef = useRef(null);
   const clearTimerRef = useRef(null);
 
   useEffect(() => {
     if (interimText && !finalText) {
-      setTranscriptState((prev) => ({
-        ...prev,
-        displayText: interimText
-      }));
+      dispatch({ type: 'show_interim', text: interimText });
     }
   }, [interimText, finalText]);
 
   useEffect(() => {
     if (finalText && finalText !== prevFinalRef.current) {
       prevFinalRef.current = finalText;
-      setTranscriptState({
-        isAnimatingIn: true,
-        isAnimatingOut: false,
-        displayText: finalText
-      });
+      dispatch({ type: 'show_final', text: finalText });
       
       if (onTranscriptComplete) {
         onTranscriptComplete(finalText);
       }
       
       fadeTimerRef.current = setTimeout(() => {
-        setTranscriptState((prev) => ({
-          ...prev,
-          isAnimatingIn: false,
-          isAnimatingOut: true
-        }));
+        dispatch({ type: 'start_fade' });
         
         clearTimerRef.current = setTimeout(() => {
-          setTranscriptState({
-            isAnimatingIn: false,
-            isAnimatingOut: false,
-            displayText: ''
-          });
+          dispatch({ type: 'clear' });
         }, 300);
       }, 1500);
     }

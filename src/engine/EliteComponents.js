@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import './EliteComponents.css';
+
+const deterministicUnit = (seed) => {
+  let hash = 0;
+  const source = String(seed);
+  for (let i = 0; i < source.length; i += 1) {
+    hash = (hash * 31 + source.charCodeAt(i)) >>> 0;
+  }
+  return (hash % 1000) / 1000;
+};
+
+const deterministicRange = (seed, min, max) => min + deterministicUnit(seed) * (max - min);
 
 /**
  * ZAIRE Elite Components Library
@@ -66,35 +78,152 @@ const CANDLESTICK_DATA = [
   { id: 'candle-20', isUp: false, height: 30, wickHeight: 45 }
 ];
 
-const TERMINAL_SHELL_STYLE = {
+const DIFF_VIEWER_SHELL_STYLE = {
+  height: '100%',
   display: 'flex',
   flexDirection: 'column',
-  height: '100%',
-  background: 'rgba(0,0,0,0.6)',
-  padding: '8px',
+  fontFamily: 'monospace',
+  fontSize: '12px',
+  background: '#0d0d0d',
   borderRadius: '4px',
-  position: 'relative',
   overflow: 'hidden'
 };
 
-const TERMINAL_OUTPUT_STYLE = {
-  flex: 1,
-  overflowY: 'auto',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '4px',
-  fontFamily: 'monospace',
-  fontSize: '12px'
+const getRiskMeterGaugeStyle = (color) => ({
+  width: '80px',
+  height: '40px',
+  borderTopLeftRadius: '40px',
+  borderTopRightRadius: '40px',
+  border: `4px solid ${color}44`,
+  borderBottom: 'none',
+  position: 'relative',
+  overflow: 'hidden'
+});
+
+const RISK_METER_NEEDLE_STYLE = {
+  width: '4px',
+  height: '35px',
+  background: '#fff',
+  position: 'absolute',
+  bottom: 0,
+  left: '50%',
+  transformOrigin: 'bottom center',
+  transform: 'translateX(-50%) rotate(30deg)',
+  borderRadius: '2px'
 };
 
-const LIVE_PREVIEW_SHELL_STYLE = {
-  height: '100%',
-  position: 'relative',
+const getFlashcardCardStyle = (color) => ({
+  width: '80%',
+  height: '80%',
+  background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.5))',
+  border: `1px solid ${color}55`,
+  borderRadius: '8px',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '20px',
+  textAlign: 'center',
+  boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+});
+
+const getMedicationStatusDotStyle = (color, status) => ({
+  position: 'absolute',
+  left: '-15px',
+  top: '4px',
+  width: '8px',
+  height: '8px',
+  borderRadius: '50%',
+  background: status === 'TAKEN' ? color : 'transparent',
+  border: `2px solid ${color}`
+});
+
+const getSecurityStatusCardStyle = (accentColor) => ({
+  background: 'rgba(255,255,255,0.02)',
+  border: `1px solid ${accentColor}33`,
+  padding: '8px',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderRadius: '4px'
+});
+
+const getVaultOuterRingStyle = (color) => ({
+  width: '45px',
+  height: '45px',
+  borderRadius: '50%',
+  border: `1px dashed ${color}`,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+});
+
+const getVaultInnerRingStyle = (color) => ({
+  width: '30px',
+  height: '30px',
+  borderRadius: '50%',
+  border: `2px dotted ${color}`,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+});
+
+const getCalendarDayStyle = (isActive, color) => ({
+  background: isActive ? color : 'rgba(255,255,255,0.05)',
+  borderRadius: '2px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: 'rgba(255,255,255,0.02)'
-};
+  color: isActive ? '#000' : '#fff',
+  fontSize: '12px',
+  fontWeight: 'bold'
+});
+
+const getCameraFeedShellStyle = (color) => ({
+  position: 'relative',
+  height: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  border: `1px solid ${color}44`,
+  background: 'rgba(0,0,0,0.5)',
+  overflow: 'hidden'
+});
+
+const getBrandScannerBadgeStyle = (color) => ({
+  width: '40px',
+  height: '40px',
+  background: 'rgba(255,255,255,0.1)',
+  borderRadius: '50%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  border: `1px solid ${color}`
+});
+
+const getRoadmapTrackStyle = (color) => ({
+  flex: 1,
+  position: 'relative',
+  borderLeft: `2px solid ${color}44`,
+  marginLeft: '8px',
+  paddingLeft: '12px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+  overflowY: 'auto'
+});
+
+const getRoadmapNodeDotStyle = (status, color) => ({
+  position: 'absolute',
+  left: '-17px',
+  top: '2px',
+  width: '8px',
+  height: '8px',
+  borderRadius: '50%',
+  background: status === 'done' ? color : status === 'active' ? '#fff' : '#222',
+  border: `2px solid ${status === 'pending' ? '#444' : color}`
+});
 
 export const NeuralConsole = ({ color }) => (
   <div style={{ padding: '10px', height: '100%', display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'hidden' }}>
@@ -108,9 +237,9 @@ export const NeuralConsole = ({ color }) => (
 );
 
 export const Terminal = ({ color }) => (
-  <div style={{ ...TERMINAL_SHELL_STYLE, border: `1px solid ${color}44` }}>
-    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '2px', background: `linear-gradient(90deg, transparent, ${color}, transparent)`, opacity: 0.5 }}></div>
-    <div style={TERMINAL_OUTPUT_STYLE}>
+  <div className="elite-terminal-shell" style={{ '--elite-accent': color, '--elite-accent-soft': `${color}44` }}>
+    <div className="elite-terminal-scanline"></div>
+    <div className="elite-terminal-output">
       <div style={{ color: '#aaa' }}>Welcome to ZAIRE Sovereign Interface</div>
       <div style={{ color: '#aaa' }}>Establishing secure connection… <span style={{ color: '#0f0' }}>OK</span></div>
       <div style={{ color: '#aaa' }}>Loading neural weights… <span style={{ color: '#0f0' }}>OK</span></div>
@@ -118,15 +247,15 @@ export const Terminal = ({ color }) => (
       <div style={{ color: '#ccc', opacity: 0.8 }}>[SYS] Daemon running on port 8080</div>
       <div style={{ color: '#ccc', opacity: 0.8 }}>[SYS] Received heartbeat from swarm</div>
     </div>
-    <div style={{ display: 'flex', marginTop: '8px', borderTop: `1px solid ${color}33`, paddingTop: '4px' }}>
-      <span style={{ color, marginRight: '8px', fontFamily: 'monospace', fontSize: '12px' }}>&gt;</span>
+    <div className="elite-terminal-footer" style={{ '--elite-accent-border': `${color}33` }}>
+      <span className="elite-terminal-prompt" style={{ color }}>&gt;</span>
       <div style={{ width: '8px', height: '12px', background: color, animation: 'blink 1s step-end infinite' }}></div>
     </div>
   </div>
 );
 
 export const LivePreview = ({ color }) => (
-  <div style={{ ...LIVE_PREVIEW_SHELL_STYLE, border: `1px dashed ${color}66` }}>
+  <div className="elite-live-preview-shell" style={{ '--elite-accent': color, '--elite-accent-dashed': `${color}66` }}>
     <div style={{ position: 'absolute', top: '10px', left: '10px', display: 'flex', gap: '6px' }}>
       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ff5f56' }}></div>
       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffbd2e' }}></div>
@@ -169,7 +298,7 @@ export const AgentStatus = ({ color }) => (
 );
 
 export const DiffViewer = ({ color }) => (
-  <div style={{ height: '100%', display: 'flex', flexDirection: 'column', fontFamily: 'monospace', fontSize: '12px', background: '#0d0d0d', borderRadius: '4px', overflow: 'hidden' }}>
+  <div style={DIFF_VIEWER_SHELL_STYLE}>
     <div style={{ padding: '6px', background: 'rgba(255,255,255,0.05)', color: '#fff', borderBottom: `1px solid ${color}33` }}>index.js (Working Tree)</div>
     <div style={{ flex: 1, padding: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
       <div style={{ color: '#888' }}>  function init() {'{'}</div>
@@ -185,14 +314,14 @@ export const DiffViewer = ({ color }) => (
 // ==========================================
 
 export const ReasoningMap = ({ color }) => (
-  <div style={{ height: '100%', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-    <div style={{ position: 'absolute', width: '100%', height: '100%', backgroundImage: `radial-gradient(circle at center, ${color}11 0%, transparent 70%)` }} />
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
-      <div style={{ padding: '6px 12px', border: `1px solid ${color}`, borderRadius: '4px', fontSize: '12px', color: '#fff', boxShadow: `0 0 10px ${color}44` }}>ROOT: USER INTENT</div>
+  <div className="elite-reasoning-map" style={{ '--elite-accent': color, '--elite-accent-soft': `${color}44`, '--elite-accent-faint': `${color}11`, '--elite-accent-muted': `${color}66` }}>
+    <div className="elite-reasoning-backdrop" />
+    <div className="elite-reasoning-tree">
+      <div className="elite-reasoning-root">ROOT: USER INTENT</div>
       <div style={{ width: '1px', height: '20px', background: color, opacity: 0.5 }}></div>
-      <div style={{ display: 'flex', gap: '20px' }}>
-        <div style={{ padding: '6px 12px', border: `1px solid ${color}66`, borderRadius: '4px', fontSize: '12px', color: '#ccc' }}>BRANCH: SEMANTIC</div>
-        <div style={{ padding: '6px 12px', border: `1px solid ${color}66`, borderRadius: '4px', fontSize: '12px', color: '#ccc' }}>BRANCH: LOGICAL</div>
+      <div className="elite-reasoning-branches">
+        <div className="elite-reasoning-branch">BRANCH: SEMANTIC</div>
+        <div className="elite-reasoning-branch">BRANCH: LOGICAL</div>
       </div>
     </div>
   </div>
@@ -262,7 +391,7 @@ export const MacroHeatmap = ({ color }) => (
       return (
         <div key={sector} style={{ background: bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: '2px', border: `1px solid ${fg}33` }}>
           <span style={{ fontSize: '12px', color: '#fff', letterSpacing: '0.02em' }}>{sector}</span>
-          <span style={{ fontSize: '11px', color: fg, fontWeight: 'bold', marginTop: '2px' }}>{isPos ? '+' : ''}{val}%</span>
+          <span style={{ fontSize: '12px', color: fg, fontWeight: 'bold', marginTop: '2px' }}>{isPos ? '+' : ''}{val}%</span>
         </div>
       )
     })}
@@ -270,12 +399,12 @@ export const MacroHeatmap = ({ color }) => (
 );
 
 export const CandlestickChart = ({ color }) => (
-  <div style={{ height: '100%', position: 'relative', display: 'flex', alignItems: 'flex-end', gap: '4px', padding: '10px 0' }}>
-    <div style={{ position: 'absolute', top: 10, left: 10, fontSize: '12px', color: '#fff' }}>BTC/USDT <span style={{ color: '#00ff66' }}>+2.45%</span></div>
+  <div className="elite-candlestick-chart">
+    <div className="elite-candlestick-header">BTC/USDT <span style={{ color: '#00ff66' }}>+2.45%</span></div>
     {CANDLESTICK_DATA.map(({ id, isUp, height, wickHeight }) => {
       const candleColor = isUp ? '#00ff66' : '#ff3333';
       return (
-        <div key={id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', height: `${wickHeight}%` }}>
+        <div key={id} className="elite-candlestick-column" style={{ '--elite-wick-height': `${wickHeight}%` }}>
           <div style={{ width: '1px', height: '100%', background: candleColor, opacity: 0.5, position: 'absolute' }}></div>
           <div style={{ width: '80%', height: `${(height/wickHeight)*100}%`, background: candleColor, zIndex: 1, borderRadius: '1px' }}></div>
         </div>
@@ -286,9 +415,9 @@ export const CandlestickChart = ({ color }) => (
 
 export const RiskMeter = ({ color }) => (
   <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-    <div style={{ width: '80px', height: '40px', borderTopLeftRadius: '40px', borderTopRightRadius: '40px', border: `4px solid ${color}44`, borderBottom: 'none', position: 'relative', overflow: 'hidden' }}>
+    <div style={getRiskMeterGaugeStyle(color)}>
       <div style={{ width: '100%', height: '100%', background: `linear-gradient(90deg, #00ff66, #ffaa00, #ff3333)`, opacity: 0.3 }}></div>
-      <div style={{ width: '4px', height: '35px', background: '#fff', position: 'absolute', bottom: 0, left: '50%', transformOrigin: 'bottom center', transform: 'translateX(-50%) rotate(30deg)', borderRadius: '2px' }}></div>
+      <div style={RISK_METER_NEEDLE_STYLE}></div>
     </div>
     <div style={{ position: 'absolute', bottom: 5, fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>RISK: HIGH</div>
   </div>
@@ -358,7 +487,7 @@ export const LectureView = ({ color }) => (
       <div style={{ position: 'absolute', bottom: 5, right: 10, fontSize: '12px', color: '#aaa' }}>12:45 / 45:00</div>
     </div>
     <div style={{ flex: 1, padding: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
-      <div style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>Advanced Neural Architectures</div>
+      <div style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>Advanced Neural Architectures</div>
       <div style={{ fontSize: '12px', color: '#ccc', marginTop: '4px' }}>Professor AI is explaining backpropagation through time…</div>
     </div>
   </div>
@@ -381,7 +510,7 @@ export const AtomicNotes = ({ color }) => (
 
 export const FlashcardGrid = ({ color }) => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-    <div style={{ width: '80%', height: '80%', background: `linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,0,0,0.5))`, border: `1px solid ${color}55`, borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center', boxShadow: `0 10px 30px rgba(0,0,0,0.5)` }}>
+    <div style={getFlashcardCardStyle(color)}>
       <div style={{ fontSize: '14px', color: '#fff', fontWeight: 'bold', marginBottom: '15px' }}>What is Backpropagation?</div>
       <div style={{ padding: '6px 12px', background: color, color: '#000', fontSize: '12px', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer' }}>REVEAL ANSWER</div>
     </div>
@@ -432,14 +561,14 @@ export const HealthTracker = ({ color }) => (
 );
 
 export const MedicationTimeline = ({ color }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', height: '100%', overflowY: 'auto', paddingLeft: '10px', borderLeft: `2px solid ${color}55` }}>
+  <div className="elite-medication-timeline" style={{ '--elite-accent-border': `${color}55` }}>
     {[
       { time: '08:00', med: 'Vitamin D3', status: 'TAKEN' },
       { time: '13:00', med: 'Omega 3', status: 'PENDING' },
       { time: '20:00', med: 'Magnesium', status: 'PENDING' }
     ].map((m, i) => (
       <div key={i} style={{ position: 'relative' }}>
-        <div style={{ position: 'absolute', left: '-15px', top: '4px', width: '8px', height: '8px', borderRadius: '50%', background: m.status === 'TAKEN' ? color : 'transparent', border: `2px solid ${color}` }}></div>
+        <div style={getMedicationStatusDotStyle(color, m.status)}></div>
         <div style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>{m.time} - {m.med}</div>
         <div style={{ fontSize: '12px', color: m.status === 'TAKEN' ? color : '#aaa', marginTop: '2px' }}>{m.status}</div>
       </div>
@@ -449,7 +578,7 @@ export const MedicationTimeline = ({ color }) => (
 
 export const PatientNotes = ({ color }) => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-    <div style={{ padding: '8px', borderBottom: `1px solid ${color}33`, fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>Patient ID: #88392-A</div>
+    <div style={{ padding: '8px', borderBottom: `1px solid ${color}33`, fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>Patient ID: #88392-A</div>
     <div style={{ flex: 1, padding: '8px', fontSize: '12px', color: '#ccc', lineHeight: '1.5', overflowY: 'auto' }}>
       Patient presents with standard baseline metrics. No anomalies detected in recent scans. 
       <br/><br/>
@@ -461,10 +590,10 @@ export const PatientNotes = ({ color }) => (
 export const SymptomMatrix = ({ color }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', height: '100%' }}>
     {Array.from({ length: 16 }).map((_, i) => {
-      const active = Math.random() > 0.8;
+      const active = deterministicUnit(`symptom-${i}`) > 0.8;
       return (
         <div key={i} style={{ background: active ? `${color}44` : 'rgba(255,255,255,0.02)', border: `1px solid ${active ? color : 'transparent'}`, borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {active && <span style={{ color: '#fff', fontSize: '8px' }}>!</span>}
+          {active && <span style={{ color: '#fff', fontSize: '12px' }}>!</span>}
         </div>
       );
     })}
@@ -473,7 +602,7 @@ export const SymptomMatrix = ({ color }) => (
 
 export const RecoveryTracker = ({ color }) => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'center', padding: '0 10px' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#fff', marginBottom: '8px' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#fff', marginBottom: '8px' }}>
       <span>RECOVERY PROTOCOL</span>
       <span style={{ color }}>65%</span>
     </div>
@@ -488,8 +617,8 @@ export const RecoveryTracker = ({ color }) => (
 // ==========================================
 
 export const PaletteStudio = ({ color }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', height: '100%' }}>
-    <div style={{ fontSize: '8px', letterSpacing: '0.04em', opacity: 0.7 }}>CHROMA HARMONY EXTRACTOR</div>
+  <div className="elite-palette-studio">
+    <div style={{ fontSize: '12px', letterSpacing: '0.04em', opacity: 0.7 }}>CHROMA HARMONY EXTRACTOR</div>
     <div style={{ display: 'flex', height: '40px', borderRadius: '4px', overflow: 'hidden' }}>
       <div style={{ flex: 2, background: color }}></div>
       <div style={{ flex: 1, background: `${color}cc` }}></div>
@@ -497,7 +626,7 @@ export const PaletteStudio = ({ color }) => (
       <div style={{ flex: 1, background: `${color}66` }}></div>
       <div style={{ flex: 1, background: `${color}33` }}></div>
     </div>
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', fontFamily: 'monospace', color: color }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontFamily: 'monospace', color: color }}>
       <span>PRIMARY</span>
       <span>ACCENT 1</span>
       <span>MUTED</span>
@@ -509,13 +638,13 @@ export const TypographyAnalyzer = ({ color }) => (
   <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
     <div style={{ fontSize: '18px', fontFamily: 'var(--font-orbitron)', color: '#fff' }}>Aa Bb Cc Dd</div>
     <div style={{ borderBottom: `1px solid ${color}33`, paddingBottom: '4px' }}>
-      <span style={{ fontSize: '9px', color: color }}>FONT FAMILY: </span>
-      <span style={{ fontSize: '9px', color: '#ccc' }}>ORBITRON (SANS-SERIF)</span>
+      <span style={{ fontSize: '12px', color: color }}>FONT FAMILY: </span>
+      <span style={{ fontSize: '12px', color: '#ccc' }}>ORBITRON (SANS-SERIF)</span>
     </div>
     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-      <div style={{ fontSize: '8px' }}><span style={{ color: color }}>WEIGHT:</span> 900</div>
-      <div style={{ fontSize: '8px' }}><span style={{ color: color }}>KERNING:</span> 1.5px</div>
-      <div style={{ fontSize: '8px' }}><span style={{ color: color }}>LEGIBILITY:</span> 98%</div>
+      <div style={{ fontSize: '12px' }}><span style={{ color: color }}>WEIGHT:</span> 900</div>
+      <div style={{ fontSize: '12px' }}><span style={{ color: color }}>KERNING:</span> 1.5px</div>
+      <div style={{ fontSize: '12px' }}><span style={{ color: color }}>LEGIBILITY:</span> 98%</div>
     </div>
   </div>
 );
@@ -532,8 +661,8 @@ export const ThreatFeed = ({ color }) => (
       { ip: '10.0.0.4', threat: 'DDoS Ping', status: 'MITIGATED' }
     ].map((t, i) => (
       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px', background: 'rgba(255,0,0,0.05)', border: '1px solid rgba(255,0,0,0.2)' }}>
-        <span style={{ fontSize: '9px', color: '#ff4d4d', fontFamily: 'monospace' }}>[{t.ip}] {t.threat}</span>
-        <span style={{ fontSize: '8px', background: '#ff4d4d', color: '#000', padding: '1px 4px', borderRadius: '2px', fontWeight: 'bold' }}>{t.status}</span>
+        <span style={{ fontSize: '12px', color: '#ff4d4d', fontFamily: 'monospace' }}>[{t.ip}] {t.threat}</span>
+        <span style={{ fontSize: '12px', background: '#ff4d4d', color: '#000', padding: '1px 4px', borderRadius: '2px', fontWeight: 'bold' }}>{t.status}</span>
       </div>
     ))}
   </div>
@@ -541,7 +670,7 @@ export const ThreatFeed = ({ color }) => (
 
 export const PermissionMatrix = ({ color }) => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', fontSize: '7px', color: color, marginBottom: '6px', borderBottom: `1px solid ${color}33`, paddingBottom: '4px' }}>
+    <div className="elite-permission-matrix-header" style={{ '--elite-accent': color, '--elite-accent-border': `${color}33` }}>
       <span>ROLE</span>
       <span>READ</span>
       <span>WRITE</span>
@@ -552,7 +681,7 @@ export const PermissionMatrix = ({ color }) => (
       { role: 'NEURAL_DAEMON', r: true, w: true, e: false },
       { role: 'GUEST_AGENT', r: true, w: false, e: false }
     ].map((r, i) => (
-      <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', fontSize: '9px', color: '#ccc', padding: '4px 0' }}>
+      <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', fontSize: '12px', color: '#ccc', padding: '4px 0' }}>
         <span>{r.role}</span>
         <span style={{ color: r.r ? '#00ff66' : '#ff3333' }}>{r.r ? '●' : '○'}</span>
         <span style={{ color: r.w ? '#00ff66' : '#ff3333' }}>{r.w ? '●' : '○'}</span>
@@ -588,7 +717,7 @@ export const ExecutionTimeline = ({ color }) => (
         <motion.div 
           animate={i === 1 ? { opacity: [0.5, 1, 0.5] } : {}}
           transition={{ repeat: Infinity, duration: 1.5 }}
-          style={{ position: 'absolute', top: '20px', fontSize: '9px', color: i < 2 ? '#fff' : '#888', fontWeight: 'bold' }}>
+          style={{ position: 'absolute', top: '20px', fontSize: '12px', color: i < 2 ? '#fff' : '#888', fontWeight: 'bold' }}>
           {step}
         </motion.div>
       </div>
@@ -604,9 +733,9 @@ export const StatusGrid = ({ color }) => (
       { label: 'SWARM AGENTS', status: 'IDLE', color: '#ffaa00' },
       { label: 'VAULT LOCK', status: 'SECURE', color: '#b200ff' }
     ].map((s, i) => (
-      <div key={i} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${s.color}33`, padding: '8px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', borderRadius: '4px' }}>
-        <div style={{ fontSize: '8px', color: '#aaa', marginBottom: '4px' }}>{s.label}</div>
-        <div style={{ fontSize: '10px', color: s.color, fontWeight: 'bold' }}>{s.status}</div>
+      <div key={i} style={getSecurityStatusCardStyle(s.color)}>
+        <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '4px' }}>{s.label}</div>
+        <div style={{ fontSize: '12px', color: s.color, fontWeight: 'bold' }}>{s.status}</div>
       </div>
     ))}
   </div>
@@ -614,14 +743,14 @@ export const StatusGrid = ({ color }) => (
 
 export const ContextWindow = ({ color }) => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '6px' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#aaa' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#aaa' }}>
       <span>TOKEN BUFFER</span>
       <span style={{ color }}>84.2%</span>
     </div>
     <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
       <div style={{ width: '84.2%', height: '100%', background: `linear-gradient(90deg, ${color}55, ${color})` }}></div>
     </div>
-    <div style={{ fontSize: '8px', color: '#888', marginTop: 'auto' }}>
+    <div style={{ fontSize: '12px', color: '#888', marginTop: 'auto' }}>
       LIMIT: 128,000 TOKENS <br />
       ACTIVE: 107,824 TOKENS
     </div>
@@ -637,7 +766,7 @@ export const SemanticMemory = ({ color }) => (
       { dim: 'v_market_bias', val: 0.42 }
     ].map((v, i) => (
       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
-        <div style={{ width: '80px', fontSize: '8px', color: '#aaa' }}>{v.dim}</div>
+        <div style={{ width: '80px', fontSize: '12px', color: '#aaa' }}>{v.dim}</div>
         <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
           <div style={{ width: `${v.val * 100}%`, height: '100%', background: color, borderRadius: '2px', opacity: 0.5 + (v.val * 0.5) }}></div>
         </div>
@@ -657,12 +786,16 @@ export const ModelRouter = ({ color }) => (
       />
     </div>
     {['FAST_CLAUDE', 'DEEP_THINK', 'VISION_PARSER'].map((m, i) => (
-      <div key={i} style={{ zIndex: 1, marginLeft: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: i === 1 ? `${color}22` : 'rgba(255,255,255,0.02)', padding: '6px 10px', borderRadius: '4px', border: `1px solid ${i === 1 ? color : 'rgba(255,255,255,0.05)'}` }}>
-        <div style={{ fontSize: '10px', color: i === 1 ? '#fff' : '#888', fontWeight: i === 1 ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <div
+        key={i}
+        className={`elite-model-switch-row ${i === 1 ? 'active' : ''}`}
+        style={{ '--elite-accent': color, '--elite-accent-bg': `${color}22` }}
+      >
+        <div style={{ fontSize: '12px', color: i === 1 ? '#fff' : '#888', fontWeight: i === 1 ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '6px' }}>
           {i === 1 && <motion.div animate={{ opacity: [0.2, 1, 0.2] }} transition={{ repeat: Infinity, duration: 1 }} style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, boxShadow: `0 0 5px ${color}` }} />}
           {m}
         </div>
-        <div style={{ fontSize: '8px', color: i === 1 ? color : '#555', fontFamily: 'monospace' }}>
+        <div style={{ fontSize: '12px', color: i === 1 ? color : '#555', fontFamily: 'monospace' }}>
           {i === 1 ? 'ACTIVE (14ms)' : 'STANDBY'}
         </div>
       </div>
@@ -673,7 +806,7 @@ export const ModelRouter = ({ color }) => (
 export const HabitTracker = ({ color }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', height: '100%' }}>
     {Array.from({ length: 28 }).map((_, i) => {
-      const active = Math.random() > 0.3;
+      const active = deterministicUnit(`habit-${i}`) > 0.3;
       return (
         <div key={i} style={{ background: active ? color : 'rgba(255,255,255,0.05)', borderRadius: '2px', opacity: active ? 0.8 : 0.5 }}></div>
       );
@@ -682,12 +815,12 @@ export const HabitTracker = ({ color }) => (
 );
 
 export const VideoTimeline = ({ color }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '8px', padding: '10px 0' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#fff', padding: '0 10px' }}>
+  <div className="elite-video-timeline">
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#fff', padding: '0 10px' }}>
       <span>00:00:00:00</span>
       <span style={{ color }}>00:14:23:12</span>
     </div>
-    <div style={{ position: 'relative', height: '30px', background: 'rgba(255,255,255,0.05)' }}>
+    <div className="elite-video-track">
       {/* Frames */}
       <div style={{ display: 'flex', width: '100%', height: '100%' }}>
         {Array.from({ length: 10 }).map((_, i) => (
@@ -695,8 +828,8 @@ export const VideoTimeline = ({ color }) => (
         ))}
       </div>
       {/* Playhead */}
-      <div style={{ position: 'absolute', top: -5, bottom: -5, left: '45%', width: '2px', background: color, boxShadow: `0 0 10px ${color}` }}>
-        <div style={{ position: 'absolute', top: 0, left: '-4px', width: '10px', height: '6px', background: color }}></div>
+      <div className="elite-video-playhead" style={{ '--elite-accent': color }}>
+        <div className="elite-video-playhead-cap" style={{ background: color }}></div>
       </div>
     </div>
   </div>
@@ -711,16 +844,16 @@ export const VaultAccess = ({ color }) => {
     return () => clearInterval(int);
   }, []);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'center', justifyContent: 'center', gap: '10px', position: 'relative', overflow: 'hidden' }}>
+    <div className="elite-vault-core-shell">
       <motion.div 
         animate={{ rotate: 360 }} 
         transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
-        style={{ width: '45px', height: '45px', borderRadius: '50%', border: `1px dashed ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        style={getVaultOuterRingStyle(color)}
       >
         <motion.div 
           animate={{ rotate: -360 }} 
           transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
-          style={{ width: '30px', height: '30px', borderRadius: '50%', border: `2px dotted ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={getVaultInnerRingStyle(color)}
         >
           <motion.div 
             animate={{ scale: [0.8, 1.2, 0.8] }} 
@@ -729,8 +862,8 @@ export const VaultAccess = ({ color }) => {
           />
         </motion.div>
       </motion.div>
-      <div style={{ fontSize: '11px', color: '#fff', letterSpacing: '0.04em', fontWeight: 'bold' }}>VAULT SECURE</div>
-      <div style={{ fontSize: '9px', color: color, fontFamily: 'monospace' }}>DECRYPTING: {hex}</div>
+      <div style={{ fontSize: '12px', color: '#fff', letterSpacing: '0.04em', fontWeight: 'bold' }}>VAULT SECURE</div>
+      <div style={{ fontSize: '12px', color: color, fontFamily: 'monospace' }}>DECRYPTING: {hex}</div>
     </div>
   );
 };
@@ -751,18 +884,19 @@ export const LayoutForge = ({ color }) => (
 export const AudioAnalyzer = ({ color }) => (
   <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100%', gap: '2px', padding: '10px 0' }}>
     {Array.from({ length: 24 }).map((_, i) => {
-      const height = Math.random() * 80 + 10;
+      const height = deterministicRange(`audio-height-${i}`, 10, 90);
+      const duration = deterministicRange(`audio-duration-${i}`, 0.5, 1.5);
       return (
         <div key={i} style={{
           width: '100%',
           height: `${height}%`,
           background: `linear-gradient(to top, ${color}33, ${color})`,
           borderRadius: '2px',
-          animation: `pulse ${Math.random() * 1 + 0.5}s infinite alternate`
+          animation: `pulse ${duration}s infinite alternate`
         }}></div>
       );
     })}
-    <div style={{ position: 'absolute', top: 10, left: 10, fontSize: '9px', color: '#fff' }}>FREQ_BAND :: 44.1kHz</div>
+    <div style={{ position: 'absolute', top: 10, left: 10, fontSize: '12px', color: '#fff' }}>FREQ_BAND :: 44.1kHz</div>
   </div>
 );
 
@@ -775,7 +909,7 @@ export const FaceVerification = ({ color }) => (
       <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '10px', height: '10px', borderBottom: `2px solid ${color}`, borderRight: `2px solid ${color}` }}></div>
       <div style={{ width: '100%', height: '2px', background: `${color}88`, position: 'absolute', animation: 'scan 2s infinite linear' }}></div>
     </div>
-    <div style={{ position: 'absolute', bottom: 10, fontSize: '9px', color: color, letterSpacing: '0.04em', fontWeight: 'bold' }}>BIOMETRIC_LOCK: ACTIVE</div>
+    <div style={{ position: 'absolute', bottom: 10, fontSize: '12px', color: color, letterSpacing: '0.04em', fontWeight: 'bold' }}>BIOMETRIC_LOCK: ACTIVE</div>
   </div>
 );
 
@@ -791,8 +925,8 @@ export const TaskQueue = ({ color }) => (
       { task: 'Scrape Competitor Pricing', prog: 22, stat: 'RUNNING' },
       { task: 'Defrag Semantic Memory', prog: 0, stat: 'QUEUED' }
     ].map((t, i) => (
-      <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#fff' }}>
+      <div key={i} className="elite-task-queue-item">
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#fff' }}>
           <span>{t.task}</span>
           <span style={{ color: t.prog === 100 ? '#00ff66' : t.prog === 0 ? '#888' : color }}>{t.stat}</span>
         </div>
@@ -805,7 +939,7 @@ export const TaskQueue = ({ color }) => (
 );
 
 export const CodeEditor = ({ color }) => (
-  <div style={{ fontFamily: 'monospace', fontSize: '10px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+  <div style={{ fontFamily: 'monospace', fontSize: '12px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
     <div style={{ color: '#888', marginBottom: '6px' }}>// Initialize Neural Sequence</div>
     <div style={{ color: '#fff' }}><span style={{ color: '#ff3366' }}>const</span> igniteEngine = <span style={{ color: '#00d4ff' }}>async</span> () <span style={{ color: '#ff3366' }}>=&gt;</span> {'{'}</div>
     <div style={{ color: '#fff', marginLeft: '12px' }}>
@@ -830,9 +964,9 @@ export const AgentFeed = ({ color }) => (
       <div key={i} style={{ display: 'flex', gap: '8px', padding: '6px', background: 'rgba(255,255,255,0.02)', borderLeft: `2px solid ${color}` }}>
         <div style={{ fontSize: '14px' }}>🤖</div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontSize: '9px', color: '#fff', fontWeight: 'bold' }}>{a.agent}</span>
-          <span style={{ fontSize: '8px', color: '#ccc' }}>{a.act}</span>
-          <span style={{ fontSize: '7px', opacity: 0.5, marginTop: '2px' }}>{a.time}</span>
+          <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>{a.agent}</span>
+          <span style={{ fontSize: '12px', color: '#ccc' }}>{a.act}</span>
+          <span style={{ fontSize: '12px', opacity: 0.5, marginTop: '2px' }}>{a.time}</span>
         </div>
       </div>
     ))}
@@ -848,9 +982,9 @@ export const FileBrowser = ({ color }) => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '6px', overflowY: 'auto' }}>
     {['agent_daemon.py', 'App.js', 'db_init.js', 'custom_modes.js', 'SettingsModal.js'].map((f, i) => (
       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', background: 'rgba(255,255,255,0.02)', borderLeft: `2px solid ${color}`, borderRadius: '2px' }}>
-        <span style={{ fontSize: '10px' }}>📄</span>
-        <span style={{ fontSize: '10px', color: '#fff', flex: 1 }}>{f}</span>
-        <span style={{ fontSize: '8px', color: '#888' }}>{Math.floor(Math.random() * 100) + 10} KB</span>
+        <span style={{ fontSize: '12px' }}>📄</span>
+        <span style={{ fontSize: '12px', color: '#fff', flex: 1 }}>{f}</span>
+        <span style={{ fontSize: '12px', color: '#888' }}>{Math.floor(deterministicRange(`file-size-${f}`, 10, 110))} KB</span>
       </div>
     ))}
   </div>
@@ -859,10 +993,10 @@ export const FileBrowser = ({ color }) => (
 export const CalendarPanel = ({ color }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', height: '100%' }}>
     {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-      <div key={`header-${i}`} style={{ fontSize: '8px', color, textAlign: 'center', fontWeight: 'bold' }}>{d}</div>
+      <div key={`header-${i}`} style={{ fontSize: '12px', color, textAlign: 'center', fontWeight: 'bold' }}>{d}</div>
     ))}
     {Array.from({ length: 28 }).map((_, i) => (
-      <div key={i} style={{ background: i === 18 ? color : 'rgba(255,255,255,0.05)', borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: i === 18 ? '#000' : '#fff', fontSize: '9px', fontWeight: 'bold' }}>
+      <div key={i} style={getCalendarDayStyle(i === 18, color)}>
         {i + 1}
       </div>
     ))}
@@ -873,56 +1007,63 @@ export const ChartPanel = ({ color }) => (
   <div style={{ display: 'flex', height: '100%', alignItems: 'flex-end', gap: '8px', padding: '10px 4px' }}>
     {[40, 75, 50, 90, 60, 80, 100].map((h, i) => (
       <div key={i} style={{ flex: 1, height: `${h}%`, background: `linear-gradient(to top, ${color}33, ${color})`, borderRadius: '1px 1px 0 0', position: 'relative' }}>
-        <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', fontSize: '8px', color: '#fff' }}>{h}</div>
+        <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', fontSize: '12px', color: '#fff' }}>{h}</div>
       </div>
     ))}
   </div>
 );
 
 export const CameraFeed = ({ color }) => (
-  <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${color}44`, background: 'rgba(0,0,0,0.5)', overflow: 'hidden' }}>
+  <div style={getCameraFeedShellStyle(color)}>
     <div style={{ width: '80%', height: '80%', border: `1px dashed ${color}88`, position: 'relative' }}>
       <div style={{ position: 'absolute', top: '-2px', left: '-2px', width: '10px', height: '10px', borderTop: `2px solid ${color}`, borderLeft: `2px solid ${color}` }}></div>
       <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '10px', height: '10px', borderTop: `2px solid ${color}`, borderRight: `2px solid ${color}` }}></div>
       <div style={{ position: 'absolute', bottom: '-2px', left: '-2px', width: '10px', height: '10px', borderBottom: `2px solid ${color}`, borderLeft: `2px solid ${color}` }}></div>
       <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '10px', height: '10px', borderBottom: `2px solid ${color}`, borderRight: `2px solid ${color}` }}></div>
     </div>
-    <div style={{ position: 'absolute', bottom: 10, fontSize: '9px', color: color, letterSpacing: '0.04em', fontWeight: 'bold' }}>SECURE LINK: ACTIVE</div>
+    <div style={{ position: 'absolute', bottom: 10, fontSize: '12px', color: color, letterSpacing: '0.04em', fontWeight: 'bold' }}>SECURE LINK: ACTIVE</div>
   </div>
 );
 
 export const VoicePanel = ({ color }) => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '4px' }}>
-    {Array.from({ length: 15 }).map((_, i) => (
-      <div key={i} style={{ width: '6px', height: `${Math.random() * 80 + 20}%`, background: color, borderRadius: '3px', animation: `pulse ${Math.random() * 0.5 + 0.5}s infinite alternate` }}></div>
-    ))}
+    {Array.from({ length: 15 }).map((_, i) => {
+      const height = deterministicRange(`voice-height-${i}`, 20, 100);
+      const duration = deterministicRange(`voice-duration-${i}`, 0.5, 1);
+      return (
+        <div key={i} style={{ width: '6px', height: `${height}%`, background: color, borderRadius: '3px', animation: `pulse ${duration}s infinite alternate` }}></div>
+      );
+    })}
   </div>
 );
 
 export const Timeline = ({ color }) => (
-  <div style={{ display: 'flex', alignItems: 'center', height: '100%', padding: '0 10px', position: 'relative' }}>
-    <div style={{ position: 'absolute', top: '50%', left: '10px', right: '10px', height: '2px', background: 'rgba(255,255,255,0.1)', transform: 'translateY(-50%)' }}></div>
+  <div className="elite-timeline">
+    <div className="elite-timeline-track"></div>
     {['INGESTION', 'EXECUTION', 'AUDITING'].map((step, i) => (
-      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, position: 'relative' }}>
-        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: i < 2 ? color : '#333', border: `2px solid ${i < 2 ? color : '#555'}`, boxShadow: i < 2 ? `0 0 10px ${color}` : 'none' }}></div>
-        <div style={{ position: 'absolute', top: '20px', fontSize: '9px', color: i < 2 ? '#fff' : '#888', fontWeight: 'bold' }}>{step}</div>
+      <div key={i} className="elite-timeline-step">
+        <div
+          className={`elite-timeline-node ${i < 2 ? 'active' : ''}`}
+          style={i < 2 ? { '--elite-accent': color, '--elite-accent-soft': `0 0 10px ${color}` } : undefined}
+        ></div>
+        <div style={{ position: 'absolute', top: '20px', fontSize: '12px', color: i < 2 ? '#fff' : '#888', fontWeight: 'bold' }}>{step}</div>
       </div>
     ))}
   </div>
 );
 
 export const ResearchPanel = ({ color }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', height: '100%', overflowY: 'auto' }}>
+  <div className="elite-research-panel">
     {[
       { src: 'Reuters', time: '05:30', title: 'Global Sovereign AI networks expansion reaches 85% adoption.' },
       { src: 'Bloomberg', time: '03:15', title: 'Venture flow accelerates towards custom agentic interfaces.' }
     ].map((r, i) => (
-      <div key={i} style={{ padding: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', borderLeft: `2px solid ${color}` }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color, marginBottom: '4px' }}>
+      <div key={i} className="elite-research-item" style={{ '--elite-accent': color }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color, marginBottom: '4px' }}>
           <span>{r.src}</span>
           <span>{r.time}</span>
         </div>
-        <div style={{ fontSize: '10px', color: '#ccc', lineHeight: '1.4' }}>{r.title}</div>
+        <div style={{ fontSize: '12px', color: '#ccc', lineHeight: '1.4' }}>{r.title}</div>
       </div>
     ))}
   </div>
@@ -931,11 +1072,11 @@ export const ResearchPanel = ({ color }) => (
 export const FinancePanel = ({ color }) => (
   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', height: '100%', alignItems: 'center' }}>
     <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '4px', textAlign: 'center', border: `1px solid ${color}33` }}>
-      <div style={{ fontSize: '9px', color: '#aaa', marginBottom: '4px' }}>REVENUE</div>
+      <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '4px' }}>REVENUE</div>
       <div style={{ fontSize: '16px', color: color, fontWeight: 'bold' }}>$48,250</div>
     </div>
     <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '4px', textAlign: 'center', border: `1px solid rgba(255,51,51,0.3)` }}>
-      <div style={{ fontSize: '9px', color: '#aaa', marginBottom: '4px' }}>GAS COST</div>
+      <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '4px' }}>GAS COST</div>
       <div style={{ fontSize: '16px', color: '#ff3333', fontWeight: 'bold' }}>$0.24</div>
     </div>
   </div>
@@ -945,9 +1086,9 @@ export const DocumentViewer = ({ color }) => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '4px', border: `1px solid ${color}33` }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: `1px solid ${color}33`, paddingBottom: '8px', marginBottom: '8px' }}>
       <span style={{ fontSize: '14px' }}>📄</span>
-      <span style={{ fontSize: '10px', color: '#fff', fontWeight: 'bold' }}>ZAIRE_ARCHITECTURE_SPEC.PDF</span>
+      <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>ZAIRE_ARCHITECTURE_SPEC.PDF</span>
     </div>
-    <div style={{ fontSize: '10px', color: '#ccc', lineHeight: '1.6', flex: 1, overflowY: 'auto' }}>
+    <div style={{ fontSize: '12px', color: '#ccc', lineHeight: '1.6', flex: 1, overflowY: 'auto' }}>
       This document defines the 4-layer dynamic workspace engine supporting real-time secure state synchronization.
       <br/><br/>
       <span style={{ color }}>Key capabilities:</span> Dynamic drag-and-drop, real-time agentic swarms, encrypted vaults.
@@ -957,25 +1098,28 @@ export const DocumentViewer = ({ color }) => (
 
 export const Moodboard = ({ color }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', height: '100%' }}>
-    {Array.from({ length: 6 }).map((_, i) => (
-      <div key={i} style={{ background: `rgba(255,255,255,0.0${Math.floor(Math.random()*5)+2})`, border: `1px solid ${color}22`, borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: '20px', height: '20px', borderRadius: '2px', background: `linear-gradient(45deg, ${color}, transparent)`, opacity: 0.5 }}></div>
-      </div>
-    ))}
+    {Array.from({ length: 6 }).map((_, i) => {
+      const opacity = Math.floor(deterministicRange(`moodboard-${i}`, 2, 7));
+      return (
+        <div key={i} style={{ background: `rgba(255,255,255,0.0${opacity})`, border: `1px solid ${color}22`, borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '20px', height: '20px', borderRadius: '2px', background: `linear-gradient(45deg, ${color}, transparent)`, opacity: 0.5 }}></div>
+        </div>
+      );
+    })}
   </div>
 );
 
 export const BrandScanner = ({ color }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', height: '100%' }}>
-    <div style={{ fontSize: '9px', color: '#aaa', letterSpacing: '0.04em' }}>COMPETITOR ANALYSIS</div>
+    <div style={{ fontSize: '12px', color: '#aaa', letterSpacing: '0.04em' }}>COMPETITOR ANALYSIS</div>
     <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-      <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${color}` }}>
+      <div style={getBrandScannerBadgeStyle(color)}>
         <span style={{ fontSize: '14px' }}>A</span>
       </div>
       <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
         <div style={{ width: '85%', height: '100%', background: color, borderRadius: '2px' }}></div>
       </div>
-      <div style={{ fontSize: '9px', color }}>85% OVERLAP</div>
+      <div style={{ fontSize: '12px', color }}>85% OVERLAP</div>
     </div>
   </div>
 );
@@ -988,7 +1132,7 @@ export const FocusTimer = ({ color }) => (
     </svg>
     <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
       <div style={{ fontSize: '18px', color: '#fff', fontWeight: 'bold', fontFamily: 'monospace' }}>24:32</div>
-      <div style={{ fontSize: '8px', color, letterSpacing: '0.04em' }}>DEEP WORK</div>
+      <div style={{ fontSize: '12px', color, letterSpacing: '0.04em' }}>DEEP WORK</div>
     </div>
   </div>
 );
@@ -996,10 +1140,10 @@ export const FocusTimer = ({ color }) => (
 export const MeetingNotes = ({ color }) => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '4px', borderBottom: `1px solid ${color}33` }}>
-      <span style={{ fontSize: '9px', color: '#fff', fontWeight: 'bold' }}>Q3 Strategy Sync</span>
-      <span style={{ fontSize: '9px', color: color }}>● REC</span>
+      <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>Q3 Strategy Sync</span>
+      <span style={{ fontSize: '12px', color: color }}>● REC</span>
     </div>
-    <div style={{ flex: 1, padding: '8px 0', fontSize: '9px', color: '#ccc', lineHeight: '1.6', overflowY: 'auto' }}>
+    <div style={{ flex: 1, padding: '8px 0', fontSize: '12px', color: '#ccc', lineHeight: '1.6', overflowY: 'auto' }}>
       - Alice: We need to finalize the neural core transition by Friday. <br/>
       <span style={{ color }}>- ZAIRE: I have already compiled the necessary weights.</span> <br/>
       - Bob: Excellent. Let's review the API metrics.
@@ -1018,7 +1162,7 @@ export const GoalTree = ({ color }) => (
       <circle cx="50%" cy="80%" r="6" fill={color} />
       <circle cx="80%" cy="80%" r="6" fill={color} />
     </svg>
-    <div style={{ position: 'absolute', top: '15px', fontSize: '8px', color: '#fff', background: 'rgba(0,0,0,0.5)', padding: '2px 4px', borderRadius: '2px' }}>Q3 OKR</div>
+    <div style={{ position: 'absolute', top: '15px', fontSize: '12px', color: '#fff', background: 'rgba(0,0,0,0.5)', padding: '2px 4px', borderRadius: '2px' }}>Q3 OKR</div>
   </div>
 );
 
@@ -1040,7 +1184,7 @@ export const TranscriptPanel = ({ color }) => (
       { time: '00:05', text: 'Target acquired. Locking on.', highlight: true },
       { time: '00:12', text: 'Commencing data transfer.' }
     ].map((t, i) => (
-      <div key={i} style={{ display: 'flex', gap: '8px', fontSize: '9px', lineHeight: '1.5' }}>
+      <div key={i} style={{ display: 'flex', gap: '8px', fontSize: '12px', lineHeight: '1.5' }}>
         <span style={{ color: '#888' }}>[{t.time}]</span>
         <span style={{ color: t.highlight ? color : '#ccc', fontWeight: t.highlight ? 'bold' : 'normal' }}>{t.text}</span>
       </div>
@@ -1050,7 +1194,7 @@ export const TranscriptPanel = ({ color }) => (
 
 export const DecisionMatrix = ({ color }) => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '4px' }}>
-    <div style={{ display: 'flex', borderBottom: `1px solid ${color}33`, paddingBottom: '4px', marginBottom: '4px', fontSize: '8px', color: '#aaa', fontWeight: 'bold' }}>
+    <div style={{ display: 'flex', borderBottom: `1px solid ${color}33`, paddingBottom: '4px', marginBottom: '4px', fontSize: '12px', color: '#aaa', fontWeight: 'bold' }}>
       <div style={{ flex: 2 }}>OPTION</div>
       <div style={{ flex: 1, textAlign: 'center' }}>RISK</div>
       <div style={{ flex: 1, textAlign: 'center' }}>ROI</div>
@@ -1061,7 +1205,7 @@ export const DecisionMatrix = ({ color }) => (
       { opt: 'Hold Position', r: 'LOW', roi: '5%', s: 64 },
       { opt: 'Liquidate', r: 'NONE', roi: '-2%', s: 41 }
     ].map((d, i) => (
-      <div key={i} style={{ display: 'flex', padding: '4px 0', fontSize: '9px', color: '#fff', alignItems: 'center' }}>
+      <div key={i} style={{ display: 'flex', padding: '4px 0', fontSize: '12px', color: '#fff', alignItems: 'center' }}>
         <div style={{ flex: 2 }}>{d.opt}</div>
         <div style={{ flex: 1, textAlign: 'center', color: d.r === 'HIGH' ? '#ff3333' : d.r === 'LOW' ? '#00ff66' : '#888' }}>{d.r}</div>
         <div style={{ flex: 1, textAlign: 'center', color: d.s > 80 ? '#00ff66' : '#fff' }}>{d.roi}</div>
@@ -1073,16 +1217,16 @@ export const DecisionMatrix = ({ color }) => (
 
 export const RoadmapGenerator = ({ color }) => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '6px' }}>
-    <div style={{ fontSize: '9px', color: '#fff', fontWeight: 'bold' }}>PROJECT: SENTINEL</div>
-    <div style={{ flex: 1, position: 'relative', borderLeft: `2px solid ${color}44`, marginLeft: '8px', paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto' }}>
+    <div style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>PROJECT: SENTINEL</div>
+    <div style={getRoadmapTrackStyle(color)}>
       {[
         { step: 'Phase 1: Architecture', status: 'done' },
         { step: 'Phase 2: Core Loop', status: 'active' },
         { step: 'Phase 3: Beta Test', status: 'pending' }
       ].map((r, i) => (
         <div key={i} style={{ position: 'relative' }}>
-          <div style={{ position: 'absolute', left: '-17px', top: '2px', width: '8px', height: '8px', borderRadius: '50%', background: r.status === 'done' ? color : r.status === 'active' ? '#fff' : '#222', border: `2px solid ${r.status === 'pending' ? '#444' : color}` }}></div>
-          <div style={{ fontSize: '9px', color: r.status === 'pending' ? '#888' : '#fff', fontWeight: r.status === 'active' ? 'bold' : 'normal' }}>{r.step}</div>
+          <div style={getRoadmapNodeDotStyle(r.status, color)}></div>
+          <div style={{ fontSize: '12px', color: r.status === 'pending' ? '#888' : '#fff', fontWeight: r.status === 'active' ? 'bold' : 'normal' }}>{r.step}</div>
         </div>
       ))}
     </div>
@@ -1090,7 +1234,7 @@ export const RoadmapGenerator = ({ color }) => (
 );
 
 export const ThinkingStream = ({ color }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'hidden', gap: '4px', fontFamily: 'monospace', fontSize: '9px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'hidden', gap: '4px', fontFamily: 'monospace', fontSize: '12px' }}>
     {[
       'Analyzing vector embeddings...',
       'Matching user intent to latent tree...',
@@ -1107,12 +1251,12 @@ export const ThinkingStream = ({ color }) => (
 export const MachineStatus = ({ color }) => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-around' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span style={{ fontSize: '10px', color: '#aaa' }}>KERNEL UPTIME</span>
+      <span style={{ fontSize: '12px', color: '#aaa' }}>KERNEL UPTIME</span>
       <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold', fontFamily: 'monospace' }}>24:18:45</span>
     </div>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span style={{ fontSize: '10px', color: '#aaa' }}>DAEMON HEALTH</span>
-      <span style={{ fontSize: '10px', color: color, background: `${color}22`, padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>OPTIMAL</span>
+      <span style={{ fontSize: '12px', color: '#aaa' }}>DAEMON HEALTH</span>
+      <span style={{ fontSize: '12px', color: color, background: `${color}22`, padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>OPTIMAL</span>
     </div>
   </div>
 );

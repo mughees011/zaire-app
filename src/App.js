@@ -33,6 +33,62 @@ const handleAccessibleActivate = (event, action) => {
   }
 };
 
+function ClientLocalTime({ value, mode = 'time', options }) {
+  const [formatted, setFormatted] = React.useState('');
+
+  React.useEffect(() => {
+    if (!value) {
+      setFormatted('');
+      return;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      setFormatted('');
+      return;
+    }
+
+    if (mode === 'datetime') {
+      setFormatted(date.toLocaleString(undefined, options));
+      return;
+    }
+
+    setFormatted(date.toLocaleTimeString([], options));
+  }, [mode, options, value]);
+
+  return <>{formatted || '--'}</>;
+}
+
+const appendSystemActionLogEntry = (logRef, entry) => {
+  logRef.current = [entry, ...logRef.current].slice(0, 6);
+};
+
+const syncBlobPosition = (blobPositionRef, nextPosition, mainGroupRef) => {
+  blobPositionRef.current = nextPosition;
+  localStorage.setItem(BLOB_POSITION_STORAGE_KEY, JSON.stringify(nextPosition));
+  if (mainGroupRef.current) {
+    mainGroupRef.current.position.set(nextPosition.x, nextPosition.y, 0);
+  }
+};
+
+const getNextSystemState = ({
+  biometricData,
+  isSecurityAlert,
+  isMicrophoneActive,
+  isTyping,
+  isOmniBoxOpen,
+  zaireStatus,
+  zaireResponseStream
+}) => {
+  const masterPresent = biometricData && biometricData.name === 'Master';
+  const activeIntruder = biometricData && biometricData.intruder_present;
+
+  if (!masterPresent && (isSecurityAlert || activeIntruder)) return 'ALERT';
+  if (isMicrophoneActive) return 'LISTENING';
+  if (isTyping || isOmniBoxOpen || zaireStatus === 'processing' || zaireResponseStream) return 'THINKING';
+  return 'IDLE';
+};
+
 function FileTreeNode({ node, depth = 0, onOpenFile }) {
   const [isOpen, setIsOpen] = React.useState(depth === 0);
   const isDir = node.type === 'directory';
@@ -101,6 +157,7 @@ function App() {
   const { getToken } = useAuth();
   const threeCanvasRef = useRef(null);
   const gridCanvasRef = useRef(null);
+  const containerRef = useRef(null);
   const cameraRef = useRef(null);
   const dragStateRef = useRef({ isPointerDown: false, tempPosition: { x: 0, y: 0 } });
 
@@ -236,10 +293,11 @@ function App() {
 
   const [blobColor, setBlobColor] = useState(() => normalizeHexColor(localStorage.getItem(BLOB_COLOR_STORAGE_KEY) || DEFAULT_BLOB_COLOR));
   const [blobSize, setBlobSize] = useState(() => parseFloat(localStorage.getItem(BLOB_SIZE_STORAGE_KEY)) || 1.0);
-  const [blobPosition, setBlobPosition] = useState(() => {
-    const saved = localStorage.getItem(BLOB_POSITION_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : { x: 0, y: 0 };
-  });
+  const blobPositionRef = useRef(null);
+  if (!blobPositionRef.current) {
+    const savedBlobPosition = localStorage.getItem(BLOB_POSITION_STORAGE_KEY);
+    blobPositionRef.current = savedBlobPosition ? JSON.parse(savedBlobPosition) : { x: 0, y: 0 };
+  }
 
   const [activityFeed] = useState([
     { time: '15:47', message: 'System boot complete' },
@@ -252,7 +310,6 @@ function App() {
   const mainGroupRef = useRef(null);
   const blobSizeRef = useRef(blobSize);
   const blobColorRef = useRef(blobColor);
-  const blobPositionRef = useRef(blobPosition);
   const uniformsRef = useRef(null);
   const voiceWaveformRef = useRef(null);
   const neuralGaugeRef = useRef(null);
@@ -266,7 +323,7 @@ function App() {
   const audioStreamRef = useRef(null);
   const recognitionRef = useRef(null);
   const [lastCommand, setLastCommand] = useState('');
-  const [sessionUptime, setSessionUptime] = useState(0);
+  const sessionUptimeRef = useRef(0);
   const [recognizedText, setRecognizedText] = useState('');
   const [finalRecognizedText, setFinalRecognizedText] = useState('');
   const [inputValue, setInputValue] = useState('');
@@ -279,8 +336,8 @@ function App() {
   const [isVisionScanning, setIsVisionScanning] = useState(false);
   const [storedMemories, setStoredMemories] = useState([]);
   const [memoryFlash, setMemoryFlash] = useState(false);
-  const [lastSystemAction, setLastSystemAction] = useState(null);
-  const [systemActionLog, setSystemActionLog] = useState([]);
+  const lastSystemActionRef = useRef(null);
+  const systemActionLogRef = useRef([]);
   const [isDiagnosticActive, setIsDiagnosticActive] = useState(false);
   const [chatSessions, setChatSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
@@ -332,7 +389,45 @@ function App() {
 
 
 
-  const [lastUserPrompt, setLastUserPrompt] = useState('');
+  const syncSpecialistVisualState = React.useEffectEvent(() => {
+    if (!specialistData) return;
+
+    if (activeMode === 'TRADER') {
+      if (specialistData.phase) setTraderPhase(specialistData.phase);
+      if (specialistData.progress !== undefined) setTraderProgress(specialistData.progress);
+      if (specialistData.live_pulse) {
+        const pulses = Object.entries(specialistData.live_pulse).map(([pair, d]) => ({
+          id: pair,
+          pair: `${pair}/USDT`,
+          type: d.percent > 0 ? 'LONG' : 'SHORT',
+          price: d.price.toLocaleString(),
+          amount: 'LIVE',
+          status: 'MONITORING'
+        }));
+        setLiveTrades(pulses);
+      }
+      return;
+    }
+
+    if (activeMode === 'PROFESSOR') {
+      if (specialistData.phase) setProfessorPhase(specialistData.phase);
+      if (specialistData.progress !== undefined) setLearningProgress(specialistData.progress);
+      return;
+    }
+
+    if (activeMode === 'ENGINEER') {
+      if (specialistData.phase) setEngineerPhase(specialistData.phase);
+      if (specialistData.progress !== undefined) setForgeProgress(specialistData.progress);
+      return;
+    }
+
+    if (activeMode === 'SWARM') {
+      if (specialistData.phase) setSwarmPhase(specialistData.phase);
+      if (specialistData.messages) setSwarmMessages(specialistData.messages);
+    }
+  });
+
+  const lastUserPromptRef = useRef('');
 
   const handleSpecialistAction = async (mode, action, payload = {}) => {
     try {
@@ -343,7 +438,10 @@ function App() {
       });
       const data = await response.json();
       if (data.success) {
-        setSystemActionLog(prev => [{ time: new Date().toLocaleTimeString(), message: data.result.message }, ...prev]);
+        appendSystemActionLogEntry(systemActionLogRef, {
+          time: new Date().toLocaleTimeString(),
+          message: data.result.message
+        });
       }
     } catch (err) {
       console.error("Specialist action failed:", err);
@@ -366,33 +464,8 @@ function App() {
   }, [activeMode]);
 
   useEffect(() => {
-    if (!specialistData) return;
-
-    if (activeMode === 'TRADER') {
-      if (specialistData.phase) setTraderPhase(specialistData.phase);
-      if (specialistData.progress !== undefined) setTraderProgress(specialistData.progress);
-      if (specialistData.live_pulse) {
-        const pulses = Object.entries(specialistData.live_pulse).map(([pair, d]) => ({
-          id: pair,
-          pair: `${pair}/USDT`,
-          type: d.percent > 0 ? 'LONG' : 'SHORT',
-          price: d.price.toLocaleString(),
-          amount: 'LIVE',
-          status: 'MONITORING'
-        }));
-        setLiveTrades(pulses);
-      }
-    } else if (activeMode === 'PROFESSOR') {
-      if (specialistData.phase) setProfessorPhase(specialistData.phase);
-      if (specialistData.progress !== undefined) setLearningProgress(specialistData.progress);
-    } else if (activeMode === 'ENGINEER') {
-      if (specialistData.phase) setEngineerPhase(specialistData.phase);
-      if (specialistData.progress !== undefined) setForgeProgress(specialistData.progress);
-    } else if (activeMode === 'SWARM') {
-      if (specialistData.phase) setSwarmPhase(specialistData.phase);
-      if (specialistData.messages) setSwarmMessages(specialistData.messages);
-    }
-  }, [specialistData, activeMode]);
+    syncSpecialistVisualState();
+  }, [specialistData, activeMode, syncSpecialistVisualState]);
 
 
 
@@ -407,7 +480,7 @@ function App() {
   const [manifestedFiles, setManifestedFiles] = useState([]); // [{name, code}]
   const [darwinResults, setDarwinResults] = useState(null); // {v1: score, v2: score, v3: score}
   const [thermalActive, setThermalActive] = useState(false);
-  const [showHallOfFame, setShowHallOfFame] = useState(false);
+  const showHallOfFameRef = useRef(false);
   const darwinResetTimeoutRef = useRef(null);
   const customIdRef = useRef(1);
 
@@ -425,10 +498,9 @@ function App() {
     }
   };
 
-  useEffect(() => {
+  const syncForgeTelemetryState = React.useEffectEvent(() => {
     if (specialistData?.forge_telemetry?.darwin_results) {
       setDarwinResults(specialistData.forge_telemetry.darwin_results);
-      // Automatically hide after 5 seconds of 'OK' status
       if (specialistData.status === 'OK') {
         if (darwinResetTimeoutRef.current) clearTimeout(darwinResetTimeoutRef.current);
         darwinResetTimeoutRef.current = setTimeout(() => setDarwinResults(null), 5000);
@@ -444,13 +516,17 @@ function App() {
         setManifestedFiles(newFiles);
       }
     }
+  });
+
+  useEffect(() => {
+    syncForgeTelemetryState();
 
     return () => {
       if (darwinResetTimeoutRef.current) clearTimeout(darwinResetTimeoutRef.current);
     };
-  }, [specialistData, activeMode, forgeCode]);
+  }, [specialistData, activeMode, forgeCode, syncForgeTelemetryState]);
 
-  const [liveCodeStream, setLiveCodeStream] = useState('');
+  const liveCodeStreamRef = useRef('');
   const [professorSlides] = useState([
     { title: 'Neural Architectures', content: 'Understanding multi-head attention mechanisms in Transformers.', image: null },
     { title: 'Latent Space', content: 'Visualizing high-dimensional embeddings in vector databases.', image: null },
@@ -529,21 +605,15 @@ function App() {
   const [selectedComponent, setSelectedComponent] = useState('');
 
   useEffect(() => {
-    // Red Light Override: If master is present, we NEVER show ALERT state
-    const masterPresent = biometricData && biometricData.name === 'Master';
-    const activeIntruder = biometricData && biometricData.intruder_present;
-
-    if (!masterPresent && (isSecurityAlert || activeIntruder)) {
-      setSystemState('ALERT');
-    } else if (isMicrophoneActive) {
-      setSystemState('LISTENING');
-    } else if (isTyping || isOmniBoxOpen) {
-      setSystemState('THINKING');
-    } else if (zaireStatus === 'processing' || zaireResponseStream) {
-      setSystemState('THINKING');
-    } else {
-      setSystemState('IDLE');
-    }
+    setSystemState(getNextSystemState({
+      biometricData,
+      isSecurityAlert,
+      isMicrophoneActive,
+      isTyping,
+      isOmniBoxOpen,
+      zaireStatus,
+      zaireResponseStream
+    }));
   }, [isSecurityAlert, biometricData, isMicrophoneActive, isTyping, isOmniBoxOpen, zaireStatus, zaireResponseStream]);
 
   const updateComponentNudge = (id, updates) => {
@@ -561,8 +631,8 @@ function App() {
     };
   };
 
-  const [artifactTokens, setArtifactTokens] = useState([]);
-  const [pendingArtifactTokens, setPendingArtifactTokens] = useState([]);
+  const artifactTokensRef = useRef([]);
+  const pendingArtifactTokensRef = useRef([]);
   const [isMinigameActive, setIsMinigameActive] = useState(false);
   const [minigameScore, setMinigameScore] = useState(0);
   const [gameNodes, setGameNodes] = useState([]);
@@ -804,8 +874,7 @@ function App() {
   useEffect(() => {
     localStorage.setItem(BLOB_COLOR_STORAGE_KEY, blobColor);
     localStorage.setItem(BLOB_SIZE_STORAGE_KEY, blobSize);
-    localStorage.setItem(BLOB_POSITION_STORAGE_KEY, JSON.stringify(blobPosition));
-  }, [blobColor, blobSize, blobPosition]);
+  }, [blobColor, blobSize]);
 
   // ── PHASE 3: NEURAL THEME SYNC ─────────────────────
   useEffect(() => {
@@ -1018,7 +1087,10 @@ function App() {
     if (!transcript) return;
     try {
       await navigator.clipboard.writeText(transcript);
-      setSystemActionLog(prev => [{ time: new Date().toLocaleTimeString(), message: `ARCHIVE COPIED: ${detail.title || sessionId}` }, ...prev]);
+      appendSystemActionLogEntry(systemActionLogRef, {
+        time: new Date().toLocaleTimeString(),
+        message: `ARCHIVE COPIED: ${detail.title || sessionId}`
+      });
     } catch (e) {
       console.error('Copy failed:', e);
     }
@@ -1038,7 +1110,10 @@ function App() {
       } else {
         await navigator.clipboard.writeText(payload.text);
       }
-      setSystemActionLog(prev => [{ time: new Date().toLocaleTimeString(), message: `ARCHIVE SHARED: ${detail.title || sessionId}` }, ...prev]);
+      appendSystemActionLogEntry(systemActionLogRef, {
+        time: new Date().toLocaleTimeString(),
+        message: `ARCHIVE SHARED: ${detail.title || sessionId}`
+      });
     } catch (e) {
       console.error('Share failed:', e);
     }
@@ -1084,7 +1159,7 @@ function App() {
           console.log('[SYSTEM] Restored HUD config from core.');
           if (res.data.blobColor) setBlobColor(res.data.blobColor);
           if (res.data.blobSize) setBlobSize(res.data.blobSize);
-          if (res.data.blobPosition) setBlobPosition(res.data.blobPosition);
+          if (res.data.blobPosition) syncBlobPosition(blobPositionRef, res.data.blobPosition, mainGroupRef);
         }
       })
       .catch(() => { });
@@ -1095,6 +1170,157 @@ function App() {
     loadInitialSystemData();
   }, [loadInitialSystemData]);
 
+  const handleSocketConnect = React.useEffectEvent(() => {
+    console.log('[SOCKET] Connected to backend');
+    socketRef.current.emit('REQUEST_SYNC');
+  });
+
+  const handleModeSyncEvent = React.useEffectEvent((data) => {
+    console.log('[SOCKET] System Sync:', data.mode);
+    if (data.mode) handleModeSync(data.mode);
+  });
+
+  const handleSessionStarted = React.useEffectEvent((data) => {
+    setCurrentSessionId(data.sessionId);
+    fetchChatSessions();
+  });
+
+  const handleSessionRenamed = React.useEffectEvent(({ sessionId }) => {
+    fetchChatSessions();
+    if (currentSessionId === sessionId) {
+      // Optional: update anything else related to current session
+    }
+  });
+
+  const handleSessionLoaded = React.useEffectEvent((session) => {
+    setCurrentSessionId(session.id);
+    const historyText = session.messages
+      .map(m => `${m.role === 'user' ? 'USER' : 'ZAIRE'}: ${m.content}`)
+      .join('\n\n');
+    setZaireResponseStream(historyText);
+    setShowResponsePanel(true);
+  });
+
+  const handleSocketAiError = React.useEffectEvent((err) => {
+    const msg = typeof err === 'string' ? err : (err.message || "Unknown neural link error");
+    console.error('[SOCKET] AI Error:', msg);
+    appendSystemActionLogEntry(systemActionLogRef, {
+      time: new Date().toLocaleTimeString(),
+      message: `ERR: ${msg}`
+    });
+  });
+
+  const handleTextDelta = React.useEffectEvent((delta) => {
+    setZaireResponseStream(prev => {
+      if (pendingActivationLineRef.current && delta === pendingActivationLineRef.current) {
+        const currentActivationLine = pendingActivationLineRef.current;
+        pendingActivationLineRef.current = null;
+        return prev === currentActivationLine ? prev : (prev || delta);
+      }
+      const next = prev + delta;
+      if (next.includes('[NEURAL_VIDEO_PAYLOAD]')) {
+        const parts = next.split('[NEURAL_VIDEO_PAYLOAD]');
+        try {
+          const jsonStr = parts[1].trim().split('\n')[0];
+          const data = JSON.parse(jsonStr);
+          setNeuralVideoData(data);
+          setIsVideoPlaying(true);
+          console.log('[PROFESSOR] Neural Video Payload Received:', data);
+        } catch (e) {
+          console.error('Failed to parse video payload:', e);
+        }
+        return parts[0];
+      }
+
+      if (next.includes('[NEURAL_PULSE_TRIGGER]')) {
+        setIsNeuralPulseActive(true);
+        setTimeout(() => setIsNeuralPulseActive(false), 2000);
+        return next.replace('[NEURAL_PULSE_TRIGGER]', '');
+      }
+
+      if (next.includes('breakthrough') || next.includes('correct') || next.includes('excellent')) {
+        spawnKnowledgeParticles();
+      }
+
+      if (next.includes('```')) {
+        const codeBlocks = next.match(/```[\s\S]*?```/g);
+        if (codeBlocks && codeBlocks.length > 0) {
+          const lastBlock = codeBlocks[codeBlocks.length - 1];
+          const cleaned = lastBlock.replace(/```[a-zA-Z]*\n?/, '').replace(/```$/, '');
+          liveCodeStreamRef.current = cleaned;
+        } else if (next.includes('```')) {
+          const partial = next.split('```').pop().replace(/^[a-zA-Z]*\n?/, '');
+          liveCodeStreamRef.current = partial;
+        }
+      }
+
+      return next;
+    });
+    setShowResponsePanel(true);
+    if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+    responseTimeoutRef.current = setTimeout(() => {
+      setShowResponsePanel(false);
+      setZaireResponseStream('');
+    }, 12000);
+  });
+
+  const handleZaireStatus = React.useEffectEvent((status) => {
+    setZaireStatus(status);
+    setIsVisionScanning(status === 'scanning');
+  });
+
+  const handleMemoryStored = React.useEffectEvent(({ text }) => {
+    const ts = new Date().toISOString();
+    setStoredMemories(prev => [{ id: Date.now(), timestamp: ts, text }, ...prev].slice(0, 5));
+    setMemoryFlash(true);
+    setTimeout(() => setMemoryFlash(false), 2000);
+  });
+
+  const handleNeuralLog = React.useEffectEvent((data) => {
+    if (data && data.content) {
+      const now = new Date();
+      const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
+      setZaireActionFeed(prev => [{ time, message: data.content }, ...prev].slice(0, 5));
+    }
+  });
+
+  const handleSystemAction = React.useEffectEvent((action) => {
+    lastSystemActionRef.current = action;
+    const now = new Date();
+    const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
+    let label = '';
+    if (action.type === 'mouse') label = `[MOUSE] ${action.action.toUpperCase()} → (${action.x ?? '?'}, ${action.y ?? '?'})`;
+    else if (action.type === 'keyboard') label = `[TYPE] "${action.text}"`;
+    else if (action.type === 'hotkey') label = `[HOTKEY] ${action.keys.join('+').toUpperCase()}`;
+    appendSystemActionLogEntry(systemActionLogRef, { time, label });
+  });
+
+  const handleNeuralInterrupt = React.useEffectEvent((data) => {
+    const { text, type } = data;
+    console.log(`[PROACTIVE] ${type}: ${text}`);
+    setZaireResponseStream(text);
+    setShowResponsePanel(true);
+    setIsNeuralInterruptActive(true);
+    if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+    responseTimeoutRef.current = setTimeout(() => {
+      setShowResponsePanel(false);
+      setZaireResponseStream('');
+      setIsNeuralInterruptActive(false);
+    }, 10000);
+  });
+
+  const handleIntruderDetected = React.useEffectEvent((data) => {
+    console.log('[SECURITY] 🚨 INTRUDER DETECTED!!', data);
+    setIsSecurityAlert(true);
+    setShowSecurityOverlay(true);
+    setActiveIntruder(data);
+    setZaireResponseStream('🚨 SECURITY ALERT: UNKNOWN USER DETECTED AT YOUR SYSTEM! SNAPSHOT CAPTURED.');
+    setShowResponsePanel(true);
+    setTimeout(() => {
+      setShowSecurityOverlay(false);
+    }, 10000);
+  });
+
   useEffect(() => {
     socketRef.current = io(`${API_BASE_URL}`, {
       transports: ['websocket', 'polling'],
@@ -1104,109 +1330,23 @@ function App() {
       timeout: 10000
     });
 
-    socketRef.current.on('connect', () => {
-      console.log('[SOCKET] Connected to backend');
-      // Request state sync just in case
-      socketRef.current.emit('REQUEST_SYNC');
-    });
+    socketRef.current.on('connect', handleSocketConnect);
 
-    socketRef.current.on('MODE_SYNC', (data) => {
-      console.log('[SOCKET] System Sync:', data.mode);
-      if (data.mode) {
-        handleModeSync(data.mode);
-      }
-    });
+    socketRef.current.on('MODE_SYNC', handleModeSyncEvent);
 
-    socketRef.current.on('session_started', (data) => {
-      setCurrentSessionId(data.sessionId);
-      fetchChatSessions();
-    });
+    socketRef.current.on('session_started', handleSessionStarted);
 
-    socketRef.current.on('session_renamed', ({ sessionId, title }) => {
-      fetchChatSessions();
-      if (currentSessionId === sessionId) {
-        // Optional: update anything else related to current session
-      }
-    });
+    socketRef.current.on('session_renamed', handleSessionRenamed);
 
-    socketRef.current.on('session_loaded', (session) => {
-      setCurrentSessionId(session.id);
-      // Re-populate the stream with previous messages
-      const historyText = session.messages
-        .map(m => `${m.role === 'user' ? 'USER' : 'ZAIRE'}: ${m.content}`)
-        .join('\n\n');
-      setZaireResponseStream(historyText);
-      setShowResponsePanel(true);
-    });
+    socketRef.current.on('session_loaded', handleSessionLoaded);
 
-    socketRef.current.on('ai_error', (err) => {
-      const msg = typeof err === 'string' ? err : (err.message || "Unknown neural link error");
-      console.error('[SOCKET] AI Error:', msg);
-      // Removed glitch effect
-      setSystemActionLog(prev => [{ time: new Date().toLocaleTimeString(), message: `ERR: ${msg}` }, ...prev]);
-    });
+    socketRef.current.on('ai_error', handleSocketAiError);
 
     socketRef.current.on('connect_error', (err) => {
       console.error('[SOCKET] Connection error:', err.message);
     });
 
-    socketRef.current.on('ai_text_delta', (delta) => {
-      setZaireResponseStream(prev => {
-        if (pendingActivationLineRef.current && delta === pendingActivationLineRef.current) {
-          const currentActivationLine = pendingActivationLineRef.current;
-          pendingActivationLineRef.current = null;
-          return prev === currentActivationLine ? prev : (prev || delta);
-        }
-        const next = prev + delta;
-        // Check for Neural Video Payload
-        if (next.includes('[NEURAL_VIDEO_PAYLOAD]')) {
-          const parts = next.split('[NEURAL_VIDEO_PAYLOAD]');
-          try {
-            const jsonStr = parts[1].trim().split('\n')[0];
-            const data = JSON.parse(jsonStr);
-            setNeuralVideoData(data);
-            setIsVideoPlaying(true);
-            console.log('[PROFESSOR] Neural Video Payload Received:', data);
-          } catch (e) {
-            console.error('Failed to parse video payload:', e);
-          }
-          return parts[0];
-        }
-
-        if (next.includes('[NEURAL_PULSE_TRIGGER]')) {
-          setIsNeuralPulseActive(true);
-          setTimeout(() => setIsNeuralPulseActive(false), 2000);
-          return next.replace('[NEURAL_PULSE_TRIGGER]', '');
-        }
-
-        if (next.includes('breakthrough') || next.includes('correct') || next.includes('excellent')) {
-          spawnKnowledgeParticles();
-        }
-
-        if (next.includes('```')) {
-          const codeBlocks = next.match(/```[\s\S]*?```/g);
-          if (codeBlocks && codeBlocks.length > 0) {
-            const lastBlock = codeBlocks[codeBlocks.length - 1];
-            const cleaned = lastBlock.replace(/```[a-zA-Z]*\n?/, '').replace(/```$/, '');
-            setLiveCodeStream(cleaned);
-          } else if (next.includes('```')) {
-            // Handle partial block (starting with ``` but not ending)
-            const partial = next.split('```').pop().replace(/^[a-zA-Z]*\n?/, '');
-            setLiveCodeStream(partial);
-          }
-        }
-
-        return next;
-      });
-      setShowResponsePanel(true);
-
-      // Reset fade timeout
-      if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
-      responseTimeoutRef.current = setTimeout(() => {
-        setShowResponsePanel(false);
-        setZaireResponseStream('');
-      }, 12000); // Fade after 12s of silence
-    });
+    socketRef.current.on('ai_text_delta', handleTextDelta);
 
     socketRef.current.on('audio_chunk', (data) => {
       console.log('[SOCKET] Received audio_chunk:', data.index);
@@ -1243,14 +1383,7 @@ function App() {
     });
 
     // Vision status
-    socketRef.current.on('zaire_status', (status) => setZaireStatus(status));
-    socketRef.current.on('zaire_status', (status) => {
-      if (status === 'scanning') {
-        setIsVisionScanning(true);
-      } else {
-        setIsVisionScanning(false);
-      }
-    });
+    socketRef.current.on('zaire_status', handleZaireStatus);
 
     // Deep thinking status
     socketRef.current.on('deep_thinking', (isThinking) => {
@@ -1258,22 +1391,10 @@ function App() {
     });
 
     // Memory stored event
-    socketRef.current.on('memory_stored', ({ text, count }) => {
-      const now = new Date();
-      const ts = now.toISOString();
-      setStoredMemories(prev => [{ id: Date.now(), timestamp: ts, text }, ...prev].slice(0, 5));
-      setMemoryFlash(true);
-      setTimeout(() => setMemoryFlash(false), 2000);
-    });
+    socketRef.current.on('memory_stored', handleMemoryStored);
 
     // Neural Log events from Agent Daemon
-    socketRef.current.on('neural_log', (data) => {
-      if (data && data.content) {
-        const now = new Date();
-        const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
-        setZaireActionFeed(prev => [{ time, message: data.content }, ...prev].slice(0, 5));
-      }
-    });
+    socketRef.current.on('neural_log', handleNeuralLog);
 
     socketRef.current.on('SPECIALIST_DATA', (data) => {
       console.log('[SOCKET] Specialist Telemetry:', data);
@@ -1283,14 +1404,14 @@ function App() {
 
     // System action events (mouse/keyboard)
     socketRef.current.on('system_action', (action) => {
-      setLastSystemAction(action);
+      lastSystemActionRef.current = action;
       const now = new Date();
       const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
       let label = '';
       if (action.type === 'mouse') label = `[MOUSE] ${action.action.toUpperCase()} → (${action.x ?? '?'}, ${action.y ?? '?'})`;
       else if (action.type === 'keyboard') label = `[TYPE] "${action.text}"`;
       else if (action.type === 'hotkey') label = `[HOTKEY] ${action.keys.join('+').toUpperCase()}`;
-      setSystemActionLog(prev => [{ time, label }, ...prev].slice(0, 6));
+      appendSystemActionLogEntry(systemActionLogRef, { time, label });
     });
 
     // Proactive Briefing & Diagnostic Pulse
@@ -1298,36 +1419,10 @@ function App() {
       setIsDiagnosticActive(active);
     });
 
-    socketRef.current.on('neural_interrupt', (data) => {
-      const { text, type } = data;
-      console.log(`[PROACTIVE] ${type}: ${text}`);
-      setZaireResponseStream(text);
-      setShowResponsePanel(true);
-      setIsNeuralInterruptActive(true);
-
-      // Auto-hide after 10s
-      if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
-      responseTimeoutRef.current = setTimeout(() => {
-        setShowResponsePanel(false);
-        setZaireResponseStream('');
-        setIsNeuralInterruptActive(false);
-      }, 10000);
-    });
+    socketRef.current.on('neural_interrupt', handleNeuralInterrupt);
 
     // Tier 5: Intruder Detection
-    socketRef.current.on('intruder_detected', (data) => {
-      console.log('[SECURITY] 🚨 INTRUDER DETECTED!!', data);
-      setIsSecurityAlert(true);
-      setShowSecurityOverlay(true);
-      setActiveIntruder(data);
-      setZaireResponseStream('🚨 SECURITY ALERT: UNKNOWN USER DETECTED AT YOUR SYSTEM! SNAPSHOT CAPTURED.');
-      setShowResponsePanel(true);
-
-      // Flash threat for 10 seconds
-      setTimeout(() => {
-        setShowSecurityOverlay(false);
-      }, 10000);
-    });
+    socketRef.current.on('intruder_detected', handleIntruderDetected);
 
     socketRef.current.on('intruder_snapshots', (data) => {
       if (data.snapshots) intruderSnapshotsRef.current = data.snapshots;
@@ -1352,7 +1447,7 @@ function App() {
         socketRef.current.off();
       }
     };
-  }, [handleModeSync]);
+  }, [fetchChatSessions, fetchTTSAudio, handleIntruderDetected, handleMemoryStored, handleModeSyncEvent, handleNeuralInterrupt, handleNeuralLog, handleSessionLoaded, handleSessionRenamed, handleSessionStarted, handleSocketAiError, handleSocketConnect, handleTextDelta, handleZaireStatus, playNextAudioChunk]);
 
   // NOTE: Direct browser camera access is disabled to prevent hardware contention 
   // with the Tier 5 Face Security Daemon (Python). Only one process can hold the camera lock.
@@ -1361,34 +1456,32 @@ function App() {
     return () => { };
   }, []);
 
-  useEffect(() => {
-    const pollBiometrics = async () => {
-      try {
-        // Updated to port 3001 proxy for the new Tier 5 daemon
-        const res = await fetch(`${API_BASE_URL}/api/security/status`);
-        const data = await res.json();
-        if (data.success) {
-          setBiometricData({
-            detected: data.master_present || data.running,
-            name: data.master_present ? 'Master' : (data.running ? 'Scanning...' : 'Offline'),
-            locked: data.pc_locked,
-            enabled: data.face_lock_enabled,
-            intruders: data.total_intruders,
-            intruder_present: data.intruder_present,
-            disabled: data.security_disabled
-          });
+  const pollBiometrics = React.useEffectEvent(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/security/status`);
+      const data = await res.json();
+      if (data.success) {
+        setBiometricData({
+          detected: data.master_present || data.running,
+          name: data.master_present ? 'Master' : (data.running ? 'Scanning...' : 'Offline'),
+          locked: data.pc_locked,
+          enabled: data.face_lock_enabled,
+          intruders: data.total_intruders,
+          intruder_present: data.intruder_present,
+          disabled: data.security_disabled
+        });
 
-          // If master present, clear alerts
-          if (data.master_present || data.security_disabled) {
-            setIsSecurityAlert(false);
-            setShowSecurityOverlay(false);
-          }
+        if (data.master_present || data.security_disabled) {
+          setIsSecurityAlert(false);
+          setShowSecurityOverlay(false);
         }
-      } catch (e) {
-        // Security daemon offline?
       }
-    };
+    } catch (e) {
+      // Security daemon offline?
+    }
+  });
 
+  useEffect(() => {
     const toggleSecuritySystem = async (disabled) => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/security/toggle_system`, {
@@ -1430,7 +1523,7 @@ function App() {
       clearInterval(biometricInterval);
       window.removeEventListener('ZAIRE_PERSIST_CONFIG', handlePersist);
     };
-  }, [activeMode, biometricData.detected]);
+  }, [activeMode, biometricData.detected, pollBiometrics]);
 
   // Poll for specialist data
   useEffect(() => {
@@ -1460,16 +1553,8 @@ function App() {
   useEffect(() => {
     blobSizeRef.current = blobSize;
     blobColorRef.current = blobColor;
-    blobPositionRef.current = blobPosition;
-
     localStorage.setItem(BLOB_COLOR_STORAGE_KEY, blobColor);
     localStorage.setItem(BLOB_SIZE_STORAGE_KEY, blobSize.toString());
-    localStorage.setItem(BLOB_POSITION_STORAGE_KEY, JSON.stringify(blobPosition));
-
-    // Push position update immediately (not dependent on animation loop)
-    if (mainGroupRef.current) {
-      mainGroupRef.current.position.set(blobPosition.x, blobPosition.y, 0);
-    }
 
     if (uniformsRef.current && blobColor) {
       const baseColor = new THREE.Color(blobColor);
@@ -1483,7 +1568,7 @@ function App() {
       uniformsRef.current.uColorMid.value = mid;
       uniformsRef.current.uColorDeep.value = deep;
     }
-  }, [blobColor, blobSize, blobPosition]);
+  }, [blobColor, blobSize]);
 
   const updateBlobPositionFromPointer = (clientX, clientY) => {
     const camera = cameraRef.current;
@@ -1542,21 +1627,21 @@ function App() {
             setFinalRecognizedText(text);
 
             // Send to Real-time Backend - include pending artifacts
-            console.log('[DEBUG] Voice (Groq) sending with artifacts:', pendingArtifactTokens.length, pendingArtifactTokens);
+            console.log('[DEBUG] Voice (Groq) sending with artifacts:', pendingArtifactTokensRef.current.length, pendingArtifactTokensRef.current);
             setZaireResponseStream('');
-            const allArtifacts = [...artifactTokens, ...pendingArtifactTokens];
+            const allArtifacts = [...artifactTokensRef.current, ...pendingArtifactTokensRef.current];
             if (socketRef.current) {
               socketRef.current.emit('user_message', text, { artifactTokens: allArtifacts });
             }
 
             // Move pending artifacts to active
-            if (pendingArtifactTokens.length > 0) {
-              setArtifactTokens(prev => [...prev, ...pendingArtifactTokens]);
-              setPendingArtifactTokens([]);
+            if (pendingArtifactTokensRef.current.length > 0) {
+              artifactTokensRef.current = [...artifactTokensRef.current, ...pendingArtifactTokensRef.current];
+              pendingArtifactTokensRef.current = [];
             }
 
             setLastCommand(text);
-            setLastUserPrompt(text);
+            lastUserPromptRef.current = text;
             setTimeout(() => setFinalRecognizedText(''), 2000);
           },
           (interim) => {
@@ -1685,21 +1770,21 @@ function App() {
         setFinalRecognizedText(text);
 
         // Send to Real-time Backend - include pending artifacts
-        console.log('[DEBUG] Voice (browser) sending with artifacts:', pendingArtifactTokens.length, pendingArtifactTokens);
+        console.log('[DEBUG] Voice (browser) sending with artifacts:', pendingArtifactTokensRef.current.length, pendingArtifactTokensRef.current);
         setZaireResponseStream('');
-        const allArtifacts = [...artifactTokens, ...pendingArtifactTokens];
+        const allArtifacts = [...artifactTokensRef.current, ...pendingArtifactTokensRef.current];
         if (socketRef.current) {
           socketRef.current.emit('user_message', text, { artifactTokens: allArtifacts });
         }
 
         // Move pending artifacts to active
-        if (pendingArtifactTokens.length > 0) {
-          setArtifactTokens(prev => [...prev, ...pendingArtifactTokens]);
-          setPendingArtifactTokens([]);
+        if (pendingArtifactTokensRef.current.length > 0) {
+          artifactTokensRef.current = [...artifactTokensRef.current, ...pendingArtifactTokensRef.current];
+          pendingArtifactTokensRef.current = [];
         }
 
         setLastCommand(text);
-        setLastUserPrompt(text);
+        lastUserPromptRef.current = text;
 
         setTimeout(() => {
           setFinalRecognizedText('');
@@ -1758,7 +1843,7 @@ function App() {
       const result = await response.json();
       if (result.success) {
         // Store as pending - will be sent with next user message
-        setPendingArtifactTokens(prev => [...prev, ...result.manifest]);
+        pendingArtifactTokensRef.current = [...pendingArtifactTokensRef.current, ...result.manifest];
         // Switch mode to ARTIFACT if it's the first upload
         if (activeMode !== 'ARTIFACT') {
           handleModeChange('ARTIFACT');
@@ -2069,7 +2154,7 @@ function App() {
     uniformsRef.current = plasmaMat.uniforms;
 
     mainGroup.scale.set(blobSize, blobSize, blobSize);
-    mainGroup.position.set(blobPosition.x, blobPosition.y, 0);
+    mainGroup.position.set(blobPositionRef.current.x, blobPositionRef.current.y, 0);
     const initialBase = new THREE.Color(blobColorToUse);
     const idxHsl = {};
     initialBase.getHSL(idxHsl);
@@ -2316,7 +2401,7 @@ function App() {
 
   useEffect(() => {
     const uptimeInterval = setInterval(() => {
-      setSessionUptime(prev => prev + 1);
+      sessionUptimeRef.current += 1;
     }, 1000);
     return () => clearInterval(uptimeInterval);
   }, []);
@@ -2643,12 +2728,12 @@ function App() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && customChatInput.trim()) {
                     const txt = customChatInput.trim();
-                    setLastUserPrompt(txt);
+                    lastUserPromptRef.current = txt;
                     setCustomChatInput('');
                     setZaireResponseStream('');
-                    setLiveCodeStream('');
+                    liveCodeStreamRef.current = '';
                     if (socketRef.current) {
-                      socketRef.current.emit('user_message', txt, { artifactTokens: [...artifactTokens, ...pendingArtifactTokens] });
+                      socketRef.current.emit('user_message', txt, { artifactTokens: [...artifactTokensRef.current, ...pendingArtifactTokensRef.current] });
                     }
                   }
                 }}
@@ -2658,12 +2743,12 @@ function App() {
                 onClick={() => {
                   if (customChatInput.trim()) {
                     const txt = customChatInput.trim();
-                    setLastUserPrompt(txt);
+                    lastUserPromptRef.current = txt;
                     setCustomChatInput('');
                     setZaireResponseStream('');
-                    setLiveCodeStream('');
+                    liveCodeStreamRef.current = '';
                     if (socketRef.current) {
-                      socketRef.current.emit('user_message', txt, { artifactTokens: [...artifactTokens, ...pendingArtifactTokens] });
+                      socketRef.current.emit('user_message', txt, { artifactTokens: [...artifactTokensRef.current, ...pendingArtifactTokensRef.current] });
                     }
                   }
                 }}
@@ -2751,7 +2836,7 @@ function App() {
               ) : (
                 storedMemories.map(m => (
                   <div key={m.id} className="custom-task-card" style={{ fontSize: '12px', padding: '8px' }}>
-                    <div style={{ opacity: 0.4, fontSize: '10px', marginBottom: '4px' }}>{m.timestamp}</div>
+                    <div style={{ opacity: 0.4, fontSize: '12px', marginBottom: '4px' }}>{m.timestamp}</div>
                     <div style={{ color: 'rgba(255,255,255,0.9)' }}>{m.text}</div>
                   </div>
                 ))
@@ -2885,8 +2970,30 @@ function App() {
     return wrapPremiumWorkspaceCard(comp.type, key, innerJSX, statusText, icon);
   };
 
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const vars = {
+      '--left-width': `${layoutOffsets.leftWidth}px`,
+      '--right-width': `${layoutOffsets.rightWidth}px`,
+      '--bottom-height': `${layoutOffsets.bottomHeight}px`,
+      '--left-x': `${layoutOffsets.leftX}px`,
+      '--left-y': `${layoutOffsets.leftY}px`,
+      '--right-x': `${layoutOffsets.rightX}px`,
+      '--right-y': `${layoutOffsets.rightY}px`,
+      '--bottom-x': `${layoutOffsets.bottomX}px`,
+      '--bottom-y': `${layoutOffsets.bottomY}px`
+    };
+
+    Object.entries(vars).forEach(([name, value]) => {
+      container.style.setProperty(name, value);
+    });
+  }, [layoutOffsets]);
+
   return (
     <div
+      ref={containerRef}
       className={`
 
       zaire-container 
@@ -2898,17 +3005,6 @@ function App() {
       ${isNeuralInterruptActive ? 'neural-interrupt-flash' : ''}
     `.trim()}
       data-mode={activeMode}
-      style={{
-        '--left-width': `${layoutOffsets.leftWidth}px`,
-        '--right-width': `${layoutOffsets.rightWidth}px`,
-        '--bottom-height': `${layoutOffsets.bottomHeight}px`,
-        '--left-x': `${layoutOffsets.leftX}px`,
-        '--left-y': `${layoutOffsets.leftY}px`,
-        '--right-x': `${layoutOffsets.rightX}px`,
-        '--right-y': `${layoutOffsets.rightY}px`,
-        '--bottom-x': `${layoutOffsets.bottomX}px`,
-        '--bottom-y': `${layoutOffsets.bottomY}px`
-      }}
     >
       <canvas id="three-canvas" ref={threeCanvasRef}></canvas>
       <canvas id="grid-canvas" ref={gridCanvasRef}></canvas>
@@ -3172,9 +3268,9 @@ function App() {
                 <div className="panel-section">
                   <div className="section-label" >HALAL FILTER</div>
                   <div style={{ padding: '8px', background: 'rgba(0,255,136,0.04)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '2px' }}>
-                    <div style={{ fontSize: '8px', color: '#00ff88', letterSpacing: '1px' }}>✓ {specialistData?.halal_filter || 'ACTIVE'}</div>
-                    <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>LEVERAGE: BLOCKED</div>
-                    <div style={{ fontSize: '7px', opacity: 0.4 }}>MEME COINS: BLOCKED</div>
+                    <div style={{ fontSize: '12px', color: '#00ff88', letterSpacing: '1px' }}>✓ {specialistData?.halal_filter || 'ACTIVE'}</div>
+                    <div style={{ fontSize: '12px', opacity: 0.4, marginTop: '4px' }}>LEVERAGE: BLOCKED</div>
+                    <div style={{ fontSize: '12px', opacity: 0.4 }}>MEME COINS: BLOCKED</div>
                   </div>
                 </div>
 
@@ -3270,8 +3366,8 @@ function App() {
                 <div className="panel-section">
                   <div className="section-label" >ACTIVE PROJECT</div>
                   <div style={{ padding: '8px', background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: '2px' }}>
-                    <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '10px', color: '#f97316', letterSpacing: '1.5px' }}>ZAIRE CORE</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.5, marginTop: '4px' }}>
+                    <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '12px', color: '#f97316', letterSpacing: '1.5px' }}>ZAIRE CORE</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', opacity: 0.5, marginTop: '4px' }}>
                       <span>TYPE: NEXT.JS 15</span>
                       <span>BUILD: STABLE</span>
                     </div>
@@ -3415,7 +3511,9 @@ function App() {
                     <div className="alpha-list">
                       {specialistData?.alpha_feed?.map((a, i) => (
                         <div key={i} className={`alpha-item ${a.sentiment}`}>
-                          <span className="alpha-time">{new Date(a.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="alpha-time">
+                            <ClientLocalTime value={a.time} options={{ hour: '2-digit', minute: '2-digit' }} />
+                          </span>
                           <span className="alpha-event">{a.event}</span>
                           <span className="alpha-sentiment-tag">{a.sentiment}</span>
                         </div>
@@ -3487,9 +3585,9 @@ function App() {
                             {specialistData?.current_concept?.insight || 'Focus on the relationship between entropy and information density.'}
                           </div>
                           <div className="professor-controls">
-                            <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'GENERATE_QUIZ', { topic: lastUserPrompt || professorTopic })}>GENERATE QUIZ</button>
-                            <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'ARCHITECT_ROADMAP', { topic: lastUserPrompt || professorTopic })}>ARCHITECT ROADMAP</button>
-                            <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'MANIFEST_VISUAL_LAB', { concept: lastUserPrompt || professorTopic })}>INITIALIZE LAB</button>
+                            <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'GENERATE_QUIZ', { topic: lastUserPromptRef.current || professorTopic })}>GENERATE QUIZ</button>
+                            <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'ARCHITECT_ROADMAP', { topic: lastUserPromptRef.current || professorTopic })}>ARCHITECT ROADMAP</button>
+                            <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'MANIFEST_VISUAL_LAB', { concept: lastUserPromptRef.current || professorTopic })}>INITIALIZE LAB</button>
                           </div>
                         </div>
                       </div>
@@ -3588,7 +3686,9 @@ function App() {
                     <div className="notebook-entries">
                       {specialistData?.notebook?.map((n, i) => (
                         <div key={i} className="note-entry">
-                          <span className="note-time">{new Date(n.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="note-time">
+                            <ClientLocalTime value={n.time} options={{ hour: '2-digit', minute: '2-digit' }} />
+                          </span>
                           <span className="note-text">{n.note}</span>
                         </div>
                       )) || <div className="note-empty">NO ATOMIC NOTES ARCHIVED.</div>}
@@ -3798,7 +3898,7 @@ function App() {
                         <span className="dna-indicator" title="User Design DNA Alignment">DNA: <span style={{ color: '#00ff88' }}>OPTIMIZED</span></span>
                       </span>
                       <div className="console-actions">
-                        <button className="c-btn" onClick={() => handleSpecialistAction('ENGINEER', 'MANIFEST_PROJECT', { prompt: lastUserPrompt, project_name: 'zaire-engineered-site' })}>MANIFEST</button>
+                        <button className="c-btn" onClick={() => handleSpecialistAction('ENGINEER', 'MANIFEST_PROJECT', { prompt: lastUserPromptRef.current, project_name: 'zaire-engineered-site' })}>MANIFEST</button>
                         <button className={`c-btn ${specialistData?.forge_telemetry?.is_healing ? 'healing-active' : ''}`} onClick={() => handleSpecialistAction('ENGINEER', 'VISION_AUDIT')}>
                           {specialistData?.forge_telemetry?.is_healing ? 'HEALING…' : 'AUDIT'}
                         </button>
@@ -3848,7 +3948,7 @@ function App() {
                 </div>
 
                 <div className="swarm-controls">
-                  <button className="swarm-btn" onClick={() => handleSpecialistAction('SWARM', 'INITIATE_TASK', { task: lastUserPrompt })}>INITIATE GLOBAL SYNC</button>
+                  <button className="swarm-btn" onClick={() => handleSpecialistAction('SWARM', 'INITIATE_TASK', { task: lastUserPromptRef.current })}>INITIATE GLOBAL SYNC</button>
                 </div>
               </div>
             )}
@@ -3979,7 +4079,7 @@ function App() {
                       <span className="tc-asset" >SOL/USDT</span>
                       <span className="tc-badge">HALAL</span>
                     </div>
-                    <div style={{ fontSize: '8px', opacity: 0.6, lineHeight: '1.4' }}>Breakout detected at $142.50. Target: $158.00.</div>
+                    <div style={{ fontSize: '12px', opacity: 0.6, lineHeight: '1.4' }}>Breakout detected at $142.50. Target: $158.00.</div>
                     <div className="tc-btns">
                       <div className="tc-btn" style={{ borderColor: '#00ff88', color: '#00ff88' }}>CONFIRM</div>
                       <div className="tc-btn" style={{ borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)' }}>CANCEL</div>
@@ -4004,7 +4104,7 @@ function App() {
                     <canvas ref={neuralGaugeRef} width="80" height="80"></canvas>
                     <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
                       <div style={{ fontSize: '14px', color: '#a78bfa', fontWeight: 'bold' }}>84%</div>
-                      <div style={{ fontSize: '6px', opacity: 0.4 }}>SYNC</div>
+                      <div style={{ fontSize: '12px', opacity: 0.4 }}>SYNC</div>
                     </div>
                   </div>
                 </div>
@@ -4023,8 +4123,8 @@ function App() {
                 <div className="panel-section">
                   <div className="section-label" >SPACED REVIEW</div>
                   <div style={{ padding: '10px', background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.2)' }}>
-                    <div style={{ fontSize: '8px', color: '#a78bfa' }}>Next Review in 4h</div>
-                    <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '4px' }}>Topic: Backpropagation</div>
+                    <div style={{ fontSize: '12px', color: '#a78bfa' }}>Next Review in 4h</div>
+                    <div style={{ fontSize: '12px', opacity: 0.4, marginTop: '4px' }}>Topic: Backpropagation</div>
                   </div>
                 </div>
               </>
@@ -4087,7 +4187,7 @@ function App() {
                     <button className="ops-btn" onClick={() => handleSpecialistAction('ENGINEER', 'MIRROR_SANDBOX_SYNC')}>
                       SYNC MIRROR
                     </button>
-                    <button className="ops-btn" onClick={() => setShowHallOfFame(!showHallOfFame)}>
+                    <button className="ops-btn" onClick={() => { showHallOfFameRef.current = !showHallOfFameRef.current; }}>
                       HALL OF FAME
                     </button>
                   </div>
@@ -4095,7 +4195,7 @@ function App() {
 
                 <div className="panel-section">
                   <div className="section-label" >DESIGN BRIEF</div>
-                  <div style={{ fontSize: '7px', opacity: 0.5, lineHeight: '1.4' }}>
+                  <div style={{ fontSize: '12px', opacity: 0.5, lineHeight: '1.4' }}>
                     "Ensure high-fidelity glassmorphism across all modules."
                   </div>
                 </div>
@@ -4109,29 +4209,29 @@ function App() {
                   <div className="section-label">{activeMode} LAYOUT CALIBRATION</div>
                   <div className="calibration-controls" style={{ padding: '4px' }}>
                     <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                        <label>LEFT WIDTH</label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
+                        <label htmlFor="zaire-left-width">LEFT WIDTH</label>
                         <span>{layoutOffsets.leftWidth}px</span>
                       </div>
-                      <input type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200}
+                      <input id="zaire-left-width" type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200}
                         onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })}
                         style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
                     </div>
                     <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                        <label>RIGHT WIDTH</label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
+                        <label htmlFor="zaire-right-width">RIGHT WIDTH</label>
                         <span>{layoutOffsets.rightWidth}px</span>
                       </div>
-                      <input type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200}
+                      <input id="zaire-right-width" type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200}
                         onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })}
                         style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
                     </div>
                     <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                        <label>CMD HEIGHT</label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
+                        <label htmlFor="zaire-cmd-height">CMD HEIGHT</label>
                         <span>{layoutOffsets.bottomHeight}px</span>
                       </div>
-                      <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150}
+                      <input id="zaire-cmd-height" type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150}
                         onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })}
                         style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
                     </div>
@@ -4140,15 +4240,15 @@ function App() {
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
                       <div className="cal-col">
-                        <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
+                        <div style={{ fontSize: '12px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
                         <div style={{ marginBottom: '6px' }}>
-                          <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
+                          <div style={{ fontSize: '12px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
                           <input type="range" min="-100" max="100" value={layoutOffsets.leftX}
                             onChange={(e) => updateCurrentLayout({ leftX: parseInt(e.target.value) })}
                             style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
                         </div>
                         <div>
-                          <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
+                          <div style={{ fontSize: '12px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
                           <input type="range" min="-100" max="100" value={layoutOffsets.leftY}
                             onChange={(e) => updateCurrentLayout({ leftY: parseInt(e.target.value) })}
                             style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
@@ -4156,15 +4256,15 @@ function App() {
                       </div>
 
                       <div className="cal-col">
-                        <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
+                        <div style={{ fontSize: '12px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
                         <div style={{ marginBottom: '6px' }}>
-                          <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
+                          <div style={{ fontSize: '12px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
                           <input type="range" min="-100" max="100" value={layoutOffsets.rightX}
                             onChange={(e) => updateCurrentLayout({ rightX: parseInt(e.target.value) })}
                             style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
                         </div>
                         <div>
-                          <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
+                          <div style={{ fontSize: '12px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
                           <input type="range" min="-100" max="100" value={layoutOffsets.rightY}
                             onChange={(e) => updateCurrentLayout({ rightY: parseInt(e.target.value) })}
                             style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
@@ -4172,15 +4272,15 @@ function App() {
                       </div>
 
                       <div className="cal-col">
-                        <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
+                        <div style={{ fontSize: '12px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
                         <div style={{ marginBottom: '6px' }}>
-                          <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
+                          <div style={{ fontSize: '12px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
                           <input type="range" min="-100" max="100" value={layoutOffsets.bottomX}
                             onChange={(e) => updateCurrentLayout({ bottomX: parseInt(e.target.value) })}
                             style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
                         </div>
                         <div>
-                          <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
+                          <div style={{ fontSize: '12px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
                           <input type="range" min="-100" max="100" value={layoutOffsets.bottomY}
                             onChange={(e) => updateCurrentLayout({ bottomY: parseInt(e.target.value) })}
                             style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
@@ -4190,7 +4290,7 @@ function App() {
 
                     <button
                       className="cmd-btn"
-                      style={{ width: '100%', marginTop: '12px', fontSize: '7px', padding: '4px', opacity: 0.6 }}
+                      style={{ width: '100%', marginTop: '12px', fontSize: '12px', padding: '4px', opacity: 0.6 }}
                       onClick={() => {
                         const defaults = {
                           'ZAIRE': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
@@ -4213,7 +4313,7 @@ function App() {
                     <select
                       value={selectedComponent}
                       onChange={(e) => setSelectedComponent(e.target.value)}
-                      style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '8px', padding: '4px', marginBottom: '8px' }}
+                      style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px', padding: '4px', marginBottom: '8px' }}
                     >
                       <option value="">SELECT COMPONENT...</option>
                       {(({
@@ -4235,29 +4335,29 @@ function App() {
               <div className="section-label">{activeMode} LAYOUT CALIBRATION</div>
               <div className="calibration-controls" style={{ padding: '4px' }}>
                 <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                    <label>LEFT WIDTH</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
+                    <label htmlFor="layout-left-width">LEFT WIDTH</label>
                     <span>{layoutOffsets.leftWidth}px</span>
                   </div>
-                  <input type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200}
+                  <input id="layout-left-width" type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200}
                     onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })}
                     style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
                 </div>
                 <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                    <label>RIGHT WIDTH</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
+                    <label htmlFor="layout-right-width">RIGHT WIDTH</label>
                     <span>{layoutOffsets.rightWidth}px</span>
                   </div>
-                  <input type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200}
+                  <input id="layout-right-width" type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200}
                     onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })}
                     style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
                 </div>
                 <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', marginBottom: '2px' }}>
-                    <label>CMD HEIGHT</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
+                    <label htmlFor="layout-cmd-height">CMD HEIGHT</label>
                     <span>{layoutOffsets.bottomHeight}px</span>
                   </div>
-                  <input type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150}
+                  <input id="layout-cmd-height" type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150}
                     onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })}
                     style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
                 </div>
@@ -4266,15 +4366,15 @@ function App() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
                   <div className="cal-col">
-                    <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
+                    <div style={{ fontSize: '12px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
                     <div style={{ marginBottom: '6px' }}>
-                      <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
+                      <div style={{ fontSize: '12px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
                       <input type="range" min="-100" max="100" value={layoutOffsets.leftX}
                         onChange={(e) => updateCurrentLayout({ leftX: parseInt(e.target.value) })}
                         style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
+                      <div style={{ fontSize: '12px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
                       <input type="range" min="-100" max="100" value={layoutOffsets.leftY}
                         onChange={(e) => updateCurrentLayout({ leftY: parseInt(e.target.value) })}
                         style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
@@ -4282,15 +4382,15 @@ function App() {
                   </div>
 
                   <div className="cal-col">
-                    <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
+                    <div style={{ fontSize: '12px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
                     <div style={{ marginBottom: '6px' }}>
-                      <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
+                      <div style={{ fontSize: '12px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
                       <input type="range" min="-100" max="100" value={layoutOffsets.rightX}
                         onChange={(e) => updateCurrentLayout({ rightX: parseInt(e.target.value) })}
                         style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
+                      <div style={{ fontSize: '12px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
                       <input type="range" min="-100" max="100" value={layoutOffsets.rightY}
                         onChange={(e) => updateCurrentLayout({ rightY: parseInt(e.target.value) })}
                         style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
@@ -4298,15 +4398,15 @@ function App() {
                   </div>
 
                   <div className="cal-col">
-                    <div style={{ fontSize: '7px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
+                    <div style={{ fontSize: '12px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
                     <div style={{ marginBottom: '6px' }}>
-                      <div style={{ fontSize: '6px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
+                      <div style={{ fontSize: '12px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
                       <input type="range" min="-100" max="100" value={layoutOffsets.bottomX}
                         onChange={(e) => updateCurrentLayout({ bottomX: parseInt(e.target.value) })}
                         style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '6px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
+                      <div style={{ fontSize: '12px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
                       <input type="range" min="-100" max="100" value={layoutOffsets.bottomY}
                         onChange={(e) => updateCurrentLayout({ bottomY: parseInt(e.target.value) })}
                         style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
@@ -4316,7 +4416,7 @@ function App() {
 
                 <button
                   className="cmd-btn"
-                  style={{ width: '100%', marginTop: '12px', fontSize: '7px', padding: '4px', opacity: 0.6 }}
+                  style={{ width: '100%', marginTop: '12px', fontSize: '12px', padding: '4px', opacity: 0.6 }}
                   onClick={() => {
                     const defaults = {
                       'ZAIRE': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
@@ -4339,7 +4439,7 @@ function App() {
                 <select
                   value={selectedComponent}
                   onChange={(e) => setSelectedComponent(e.target.value)}
-                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '8px', padding: '4px', marginBottom: '8px' }}
+                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px', padding: '4px', marginBottom: '8px' }}
                 >
                   <option value="">SELECT COMPONENT...</option>
                   {(({
@@ -4355,20 +4455,20 @@ function App() {
                 {selectedComponent && (
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.4 }}>
-                        <label>X NUDGE</label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', opacity: 0.4 }}>
+                        <label htmlFor="component-nudge-x">X NUDGE</label>
                         <span>{(componentNudges[selectedComponent]?.x || 0)}px</span>
                       </div>
-                      <input type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.x || 0}
+                      <input id="component-nudge-x" type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.x || 0}
                         onChange={(e) => updateComponentNudge(selectedComponent, { x: parseInt(e.target.value) })}
                         style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '6px', opacity: 0.4 }}>
-                        <label>Y NUDGE</label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', opacity: 0.4 }}>
+                        <label htmlFor="component-nudge-y">Y NUDGE</label>
                         <span>{(componentNudges[selectedComponent]?.y || 0)}px</span>
                       </div>
-                      <input type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.y || 0}
+                      <input id="component-nudge-y" type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.y || 0}
                         onChange={(e) => updateComponentNudge(selectedComponent, { y: parseInt(e.target.value) })}
                         style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
                     </div>
@@ -4377,7 +4477,7 @@ function App() {
 
                 <button
                   className="cmd-btn"
-                  style={{ width: '100%', marginTop: '10px', fontSize: '7px', padding: '4px', opacity: 0.4 }}
+                  style={{ width: '100%', marginTop: '10px', fontSize: '12px', padding: '4px', opacity: 0.4 }}
                   onClick={() => {
                     if (window.confirm('RESET ALL COMPONENT NUDGES?')) setComponentNudges({});
                   }}
@@ -4439,7 +4539,9 @@ function App() {
                           >
                             <div className="archive-card-title">{session.title}</div>
                             <div className="archive-card-meta">
-                              <span>{new Date(session.timestamp).toLocaleString()}</span>
+                              <span>
+                                <ClientLocalTime value={session.timestamp} mode="datetime" />
+                              </span>
                               <span>{session.messageCount} MSGS</span>
                             </div>
                             <div className="archive-card-actions">
@@ -4557,13 +4659,16 @@ function App() {
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && e.target.value.trim()) {
                           const userText = e.target.value;
-                          setLastUserPrompt(userText);
+                          lastUserPromptRef.current = userText;
                           setInputValue('');
                           setIsTyping(false);
                           setZaireResponseStream('');
-                          setLiveCodeStream('');
-                          if (socketRef.current) socketRef.current.emit('user_message', userText, { artifactTokens: [...artifactTokens, ...pendingArtifactTokens] });
-                          if (pendingArtifactTokens.length > 0) { setArtifactTokens(prev => [...prev, ...pendingArtifactTokens]); setPendingArtifactTokens([]); }
+                          liveCodeStreamRef.current = '';
+                          if (socketRef.current) socketRef.current.emit('user_message', userText, { artifactTokens: [...artifactTokensRef.current, ...pendingArtifactTokensRef.current] });
+                          if (pendingArtifactTokensRef.current.length > 0) {
+                            artifactTokensRef.current = [...artifactTokensRef.current, ...pendingArtifactTokensRef.current];
+                            pendingArtifactTokensRef.current = [];
+                          }
                         }
                       }}
                       disabled={isMicrophoneActive}
@@ -4718,7 +4823,7 @@ function App() {
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setBlobPosition(dragStateRef.current.tempPosition);
+                  syncBlobPosition(blobPositionRef, dragStateRef.current.tempPosition, mainGroupRef);
                   dragStateRef.current.isPointerDown = false;
                   setIsDragging(false);
                 }}

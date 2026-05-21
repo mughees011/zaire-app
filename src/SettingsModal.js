@@ -1108,26 +1108,13 @@ function SettingsModal({
               <div className="page-sub">Step-by-step modular specialist creation workspace</div>
 
               {/* Wizard Steps Header */}
-              <div className="wizard-step-header" style={{ marginBottom: 20 }}>
-                <div style={{ display: 'flex', gap: 15 }}>
+              <div className="wizard-step-header wizard-step-header-spaced">
+                <div className="wizard-step-tabs">
                   {['1. IDENTITY', '2. INTELLIGENCE', '3. INTERFACE', '4. PERMISSIONS'].map((lbl, idx) => (
                     <button
                       type="button"
                       key={lbl}
-                      className="wizard-step-tab"
-                      style={{
-                        fontSize: 9,
-                        fontWeight: 'bold',
-                        letterSpacing: 1.5,
-                        color: creatorStep === idx + 1 ? '#00d4ff' : creatorStep > idx + 1 ? '#00ff88' : 'rgba(255,255,255,0.2)',
-                        borderBottom: creatorStep === idx + 1 ? '2px solid #00d4ff' : 'none',
-                        paddingBottom: 4,
-                        cursor: 'pointer',
-                        background: 'transparent',
-                        borderLeft: 'none',
-                        borderRight: 'none',
-                        borderTop: 'none'
-                      }}
+                      className={`wizard-step-tab ${creatorStep === idx + 1 ? 'active' : creatorStep > idx + 1 ? 'done' : ''}`}
                       onClick={() => setCreatorStep(idx + 1)}
                     >
                       {lbl}
@@ -1169,7 +1156,7 @@ function SettingsModal({
                       />
                     </div>
                     <div className="wizard-field">
-                      <label className="wf-label">CHROMA COLOR (AESTHETICS)</label>
+                      <div className="wf-label">CHROMA COLOR (AESTHETICS)</div>
                       <div className="color-row">
                         {['#00d4ff', '#00ff88', '#a78bfa', '#fbbf24', '#f97316', '#ec4899', '#60a5fa', '#34d399'].map((color) => (
                           <button
@@ -1263,7 +1250,7 @@ function SettingsModal({
                       </select>
                     </div>
                     <div className="wizard-field">
-                      <label className="wf-label">ROUTING PRIORITY</label>
+                      <div className="wf-label">ROUTING PRIORITY</div>
                       <Segment
                         value={creatorDraft.routingPriority}
                         options={['Speed', 'Balanced', 'Reasoning']}
@@ -1271,7 +1258,7 @@ function SettingsModal({
                       />
                     </div>
                     <div className="wizard-field">
-                      <label className="wf-label">ACTIVE SYSTEM CAPABILITIES</label>
+                      <div className="wf-label">ACTIVE SYSTEM CAPABILITIES</div>
                       <div className="component-grid">
                         {['WEB SEARCH', 'FILE SYSTEM', 'SCREEN VISION', 'COMPUTER USE', 'CHARTS', 'IMAGE GEN'].map((item) => (
                           <button
@@ -1298,7 +1285,7 @@ function SettingsModal({
               {creatorStep === 3 && (
                 <div style={{ animation: 'fadeIn 0.3s' }}>
                   <Section title="MODE INTERFACE BUILDER">
-                    <div style={{ fontSize: 9, color: 'rgba(0, 212, 255, 0.4)', marginBottom: 10 }}>
+                    <div style={{ fontSize: '12px', color: 'rgba(0, 212, 255, 0.4)', marginBottom: 10 }}>
                       Drag components from the library or click the green "+" button to assign them to layout zones.
                     </div>
 
@@ -1433,7 +1420,7 @@ function SettingsModal({
               {creatorStep === 4 && (
                 <div style={{ animation: 'fadeIn 0.3s' }}>
                   <Section title="MODE PERMISSIONS POLICY">
-                    <div style={{ fontSize: 9, color: 'rgba(0, 212, 255, 0.4)', marginBottom: 15 }}>
+                    <div style={{ fontSize: '12px', color: 'rgba(0, 212, 255, 0.4)', marginBottom: 15 }}>
                       Establish cryptographic permission boundaries and security policies for this specialist mode.
                     </div>
 
@@ -1640,12 +1627,12 @@ function SettingsModal({
                   </button>
                 </div>
                 {licensingError && (
-                  <div style={{ color: '#ff3333', fontSize: 11, fontFamily: 'Courier New', marginBottom: 15 }}>
+                  <div style={{ color: '#ff3333', fontSize: '12px', fontFamily: 'Courier New', marginBottom: 15 }}>
                     FAIL_ERROR: {licensingError === 'INVALID_KEY' ? 'INVALID OR ACTIVE SLOTS DEPLETED' : licensingError}
                   </div>
                 )}
                 {licensingLoading && (
-                  <div style={{ color: '#00f2ff', fontSize: 11, fontFamily: 'Courier New', marginBottom: 15 }}>
+                  <div style={{ color: '#00f2ff', fontSize: '12px', fontFamily: 'Courier New', marginBottom: 15 }}>
                     ESTABLISHING SECURE PORTAL DEPLOYMENT…
                   </div>
                 )}
@@ -1669,24 +1656,24 @@ function SettingsModal({
 
                   <Section title="DEPLOYED HARDWARE CORES">
                     {licensingInfo.machines && licensingInfo.machines.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div className="license-machine-list">
                         {licensingInfo.machines.map((m) => (
-                          <div key={m.machine_id} style={{ background: '#001528', border: '1px solid rgba(0, 242, 255, 0.1)', padding: 10, borderRadius: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ color: '#00f2ff', fontFamily: 'Courier New', fontSize: 12, fontWeight: 'bold' }}>
+                          <div key={m.machine_id} className="license-machine-card">
+                            <div className="license-machine-info">
+                              <div className="license-machine-name">
                                 {m.machine_name} {m.machine_id === 'BROWSER_HUD' ? '(Console)' : ''}
                               </div>
-                              <div style={{ color: '#888', fontSize: 10, fontFamily: 'Courier New' }}>
+                              <div className="license-machine-meta">
                                 OS: {m.os_version} | ID: {m.machine_id?.substring(0, 12)}...
                               </div>
-                              <div style={{ color: '#666', fontSize: 9, fontFamily: 'Courier New' }}>
+                              <div className="license-machine-last-active">
                                 LAST ACTIVE: {formatLicenseTimestamp(m.last_seen, 'Never')}
                               </div>
                             </div>
                             <button
                               type="button"
                               onClick={() => deactivateDevice(m.machine_id)}
-                              style={{ background: '#ff3333', color: '#fff', border: 'none', padding: '4px 8px', fontFamily: 'Courier New', fontSize: 9, fontWeight: 'bold', cursor: 'pointer', borderRadius: 2 }}
+                              className="deactivate-device-btn"
                             >
                               DEACTIVATE
                             </button>
@@ -1694,7 +1681,7 @@ function SettingsModal({
                         ))}
                       </div>
                     ) : (
-                      <div style={{ color: '#888', fontSize: 11, fontStyle: 'italic' }}>
+                      <div style={{ color: '#888', fontSize: '12px', fontStyle: 'italic' }}>
                         No physical client cores deployed. Validate on your desktop system to register.
                       </div>
                     )}

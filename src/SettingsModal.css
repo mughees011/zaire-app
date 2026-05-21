@@ -555,6 +555,32 @@
   justify-content: space-between;
   margin-bottom: 14px;
 }
+.wizard-step-header-spaced {
+  margin-bottom: 20px;
+}
+.wizard-step-tabs {
+  display: flex;
+  gap: 15px;
+}
+.wizard-step-tab {
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 1.5px;
+  color: rgba(255,255,255,0.2);
+  padding-bottom: 4px;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font-family: 'Share Tech Mono', monospace;
+}
+.wizard-step-tab.active {
+  color: #00d4ff;
+  border-bottom-color: #00d4ff;
+}
+.wizard-step-tab.done {
+  color: #00ff88;
+}
 .step-indicator {
   display: flex;
   gap: 4px;
@@ -617,6 +643,51 @@
   height: 60px;
   letter-spacing: .5px;
   box-sizing: border-box;
+}
+.license-machine-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.license-machine-card {
+  background: #001528;
+  border: 1px solid rgba(0, 242, 255, 0.1);
+  padding: 10px;
+  border-radius: 3px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.license-machine-info {
+  flex: 1;
+}
+.license-machine-name {
+  color: #00f2ff;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: bold;
+}
+.license-machine-meta {
+  color: #888;
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+}
+.license-machine-last-active {
+  color: #666;
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+}
+.deactivate-device-btn {
+  background: #ff3333;
+  color: #fff;
+  border: none;
+  padding: 4px 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 2px;
 }
 .wf-textarea::placeholder {
   color: rgba(0,212,255,0.2);
