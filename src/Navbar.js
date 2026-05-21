@@ -148,7 +148,7 @@ function Navbar() {
             {/* NAV LINKS */}
             <div className="nav-links">
               {navItems.map((item, idx) => {
-                if (item === 'DIVIDER') return <div key={`div-${idx}`} className="nav-divider"></div>;
+                if (item === 'DIVIDER') return <div key="nav-divider-primary" className="nav-divider"></div>;
                 return (
                   <div
                     key={item.id}

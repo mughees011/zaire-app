@@ -27,7 +27,7 @@ const GoalExecutionHUD = ({ goal, steps, currentStepIdx, isSonaMatch, isComplete
           const isDone = idx < currentStepIdx || (isComplete && idx === steps.length - 1);
 
           return (
-            <div key={idx} className={`timeline-step ${isActive ? 'active' : ''} ${isDone ? 'done' : ''} ${isPending ? 'pending' : ''}`}>
+            <div key={step.id || `${step.specialist}-${step.name}`} className={`timeline-step ${isActive ? 'active' : ''} ${isDone ? 'done' : ''} ${isPending ? 'pending' : ''}`}>
               <div className="step-node">
                 <div className="node-core"></div>
                 {idx < steps.length - 1 && <div className="node-connector"></div>}

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import SettingsModal from './SettingsModal';
@@ -33,31 +33,155 @@ const handleAccessibleActivate = (event, action) => {
   }
 };
 
-function ClientLocalTime({ value, mode = 'time', options }) {
-  const [formatted, setFormatted] = React.useState('');
+const mapWithStableKeys = (items, getBaseKey, renderItem) => {
+  const seenKeys = new Map();
+  return items.map((item, itemIndex) => {
+    const baseKey = String(getBaseKey(item, itemIndex));
+    const occurrence = seenKeys.get(baseKey) || 0;
+    seenKeys.set(baseKey, occurrence + 1);
+    const stableKey = occurrence === 0 ? baseKey : `${baseKey}-${occurrence}`;
+    return renderItem(item, stableKey, itemIndex);
+  });
+};
 
-  React.useEffect(() => {
+function ClientLocalTime({ value, mode = 'time', options }) {
+  const formatted = useMemo(() => {
     if (!value) {
-      setFormatted('');
-      return;
+      return '';
     }
 
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
-      setFormatted('');
-      return;
+      return '';
     }
 
     if (mode === 'datetime') {
-      setFormatted(date.toLocaleString(undefined, options));
-      return;
+      return date.toLocaleString(undefined, options);
     }
 
-    setFormatted(date.toLocaleTimeString([], options));
+    return date.toLocaleTimeString([], options);
   }, [mode, options, value]);
 
   return <>{formatted || '--'}</>;
 }
+
+const INITIAL_BIOMETRIC_DATA = { detected: false, name: 'ABSENT', confidence: 0 };
+
+const INITIAL_SECURITY_STATE = {
+  biometricData: INITIAL_BIOMETRIC_DATA,
+  isSecurityAlert: false,
+  showSecurityOverlay: false,
+  activeIntruder: null
+};
+
+const securityStateReducer = (state, action) => {
+  switch (action.type) {
+    case 'SYNC_STATUS': {
+      const { data } = action;
+      return {
+        ...state,
+        biometricData: {
+          detected: data.master_present || data.running,
+          name: data.master_present ? 'Master' : (data.running ? 'Scanning…' : 'Offline'),
+          locked: data.pc_locked,
+          enabled: data.face_lock_enabled,
+          intruders: data.total_intruders,
+          intruder_present: data.intruder_present,
+          disabled: data.security_disabled
+        },
+        isSecurityAlert: data.master_present || data.security_disabled ? false : state.isSecurityAlert,
+        showSecurityOverlay: data.master_present || data.security_disabled ? false : state.showSecurityOverlay
+      };
+    }
+    case 'SET_DISABLED':
+      return {
+        ...state,
+        biometricData: { ...state.biometricData, disabled: action.disabled }
+      };
+    case 'INTRUDER_DETECTED':
+      return {
+        ...state,
+        isSecurityAlert: true,
+        showSecurityOverlay: true,
+        activeIntruder: action.intruder
+      };
+    case 'HIDE_SECURITY_OVERLAY':
+      return {
+        ...state,
+        showSecurityOverlay: false
+      };
+    default:
+      return state;
+  }
+};
+
+const INITIAL_SPECIALIST_VISUAL_STATE = {
+  engineerPhase: 'IDLE',
+  forgeProgress: 0,
+  professorPhase: 'IDLE',
+  learningProgress: 0,
+  traderPhase: 'IDLE',
+  traderProgress: 0,
+  liveTrades: [],
+  swarmPhase: 'IDLE',
+  swarmMessages: []
+};
+
+const buildLiveTrades = (livePulse = {}) =>
+  Object.entries(livePulse).map(([pair, d]) => ({
+    id: pair,
+    pair: `${pair}/USDT`,
+    type: d.percent > 0 ? 'LONG' : 'SHORT',
+    price: d.price.toLocaleString(),
+    amount: 'LIVE',
+    status: 'MONITORING'
+  }));
+
+const specialistVisualReducer = (state, action) => {
+  switch (action.type) {
+    case 'SYNC_FROM_SPECIALIST_DATA': {
+      const { activeMode, specialistData } = action;
+      if (!specialistData) return state;
+
+      if (activeMode === 'TRADER') {
+        return {
+          ...state,
+          traderPhase: specialistData.phase || state.traderPhase,
+          traderProgress: specialistData.progress !== undefined ? specialistData.progress : state.traderProgress,
+          liveTrades: specialistData.live_pulse ? buildLiveTrades(specialistData.live_pulse) : state.liveTrades
+        };
+      }
+
+      if (activeMode === 'PROFESSOR') {
+        return {
+          ...state,
+          professorPhase: specialistData.phase || state.professorPhase,
+          learningProgress: specialistData.progress !== undefined ? specialistData.progress : state.learningProgress
+        };
+      }
+
+      if (activeMode === 'ENGINEER') {
+        return {
+          ...state,
+          engineerPhase: specialistData.phase || state.engineerPhase,
+          forgeProgress: specialistData.progress !== undefined ? specialistData.progress : state.forgeProgress
+        };
+      }
+
+      if (activeMode === 'SWARM') {
+        return {
+          ...state,
+          swarmPhase: specialistData.phase || state.swarmPhase,
+          swarmMessages: specialistData.messages || state.swarmMessages
+        };
+      }
+
+      return state;
+    }
+    default:
+      return state;
+  }
+};
 
 const appendSystemActionLogEntry = (logRef, entry) => {
   logRef.current = [entry, ...logRef.current].slice(0, 6);
@@ -198,11 +322,9 @@ function App() {
   ]);
 
   // Biometric State
-  const [biometricData, setBiometricData] = useState({ detected: false, name: 'ABSENT', confidence: 0 });
-  const [isSecurityAlert, setIsSecurityAlert] = useState(false);
+  const [securityState, dispatchSecurityState] = useReducer(securityStateReducer, INITIAL_SECURITY_STATE);
+  const { biometricData, isSecurityAlert, showSecurityOverlay, activeIntruder } = securityState;
   const intruderSnapshotsRef = useRef([]);
-  const [showSecurityOverlay, setShowSecurityOverlay] = useState(false);
-  const [activeIntruder, setActiveIntruder] = useState(null);
   const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
 
   const [liveMetrics, setLiveMetrics] = useState({ cpu: 0, ram: 0, gpu: 0, latency: 4 });
@@ -359,23 +481,13 @@ function App() {
   // ── System State Engine ──
   const [systemState, setSystemState] = useState('IDLE'); // IDLE, LISTENING, THINKING, ALERT, SUCCESS
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [engineerPhase, setEngineerPhase] = useState('IDLE'); // IDLE, BLUEPRINT, RESEARCH, FORGE, AUDIT, DEPLOY
   const [forgeCode, setForgeCode] = useState('');
-  const [forgeProgress, setForgeProgress] = useState(0);
-
-  const [professorPhase, setProfessorPhase] = useState('IDLE'); // IDLE, ARCHITECTING, SYNCING, LECTURE, QUIZ, GRADUATION
   const [professorSubMode, setProfessorSubMode] = useState('LECTURE'); // LECTURE, ROADMAP, LAB
   const [professorTopic, setProfessorTopic] = useState('Neural Networks');
   const [professorNoteInput, setProfessorNoteInput] = useState('');
-  const [learningProgress, setLearningProgress] = useState(0);
-
-  const [traderPhase, setTraderPhase] = useState('IDLE'); // IDLE, ANALYSIS, SIGNAL, EXECUTION, AUDIT, HARVEST
   const [traderSubMode, setTraderSubMode] = useState('CHART'); // CHART, STRATEGY, ALPHA
-  const [traderProgress, setTraderProgress] = useState(0);
-  const [liveTrades, setLiveTrades] = useState([]);
-
-  const [swarmPhase, setSwarmPhase] = useState('IDLE'); // IDLE, RECRUITING, ANALYZING, SYNTHESIZING
-  const [swarmMessages, setSwarmMessages] = useState([]);
+  const [specialistVisualState, dispatchSpecialistVisualState] = useReducer(specialistVisualReducer, INITIAL_SPECIALIST_VISUAL_STATE);
+  const { engineerPhase, forgeProgress, professorPhase, learningProgress, traderPhase, traderProgress, liveTrades, swarmPhase, swarmMessages } = specialistVisualState;
 
   const [specialistData, setSpecialistData] = useState({
     active_persona: 'STARK_GRADE',
@@ -391,40 +503,7 @@ function App() {
 
   const syncSpecialistVisualState = React.useEffectEvent(() => {
     if (!specialistData) return;
-
-    if (activeMode === 'TRADER') {
-      if (specialistData.phase) setTraderPhase(specialistData.phase);
-      if (specialistData.progress !== undefined) setTraderProgress(specialistData.progress);
-      if (specialistData.live_pulse) {
-        const pulses = Object.entries(specialistData.live_pulse).map(([pair, d]) => ({
-          id: pair,
-          pair: `${pair}/USDT`,
-          type: d.percent > 0 ? 'LONG' : 'SHORT',
-          price: d.price.toLocaleString(),
-          amount: 'LIVE',
-          status: 'MONITORING'
-        }));
-        setLiveTrades(pulses);
-      }
-      return;
-    }
-
-    if (activeMode === 'PROFESSOR') {
-      if (specialistData.phase) setProfessorPhase(specialistData.phase);
-      if (specialistData.progress !== undefined) setLearningProgress(specialistData.progress);
-      return;
-    }
-
-    if (activeMode === 'ENGINEER') {
-      if (specialistData.phase) setEngineerPhase(specialistData.phase);
-      if (specialistData.progress !== undefined) setForgeProgress(specialistData.progress);
-      return;
-    }
-
-    if (activeMode === 'SWARM') {
-      if (specialistData.phase) setSwarmPhase(specialistData.phase);
-      if (specialistData.messages) setSwarmMessages(specialistData.messages);
-    }
+    dispatchSpecialistVisualState({ type: 'SYNC_FROM_SPECIALIST_DATA', activeMode, specialistData });
   });
 
   const lastUserPromptRef = useRef('');
@@ -463,9 +542,79 @@ function App() {
     return () => clearInterval(interval);
   }, [activeMode]);
 
+  const handleSocketConnectError = React.useEffectEvent((err) => {
+    console.error('[SOCKET] Connection error:', err.message);
+  });
+
+  const handleAudioChunk = React.useEffectEvent((data) => {
+    console.log('[SOCKET] Received audio_chunk:', data.index);
+    if (data.index === 0) {
+      console.log('[TTS] Sequence Reset detected (index 0)');
+      nextExpectedIndexRef.current = 0;
+    }
+    audioQueueRef.current[data.index] = data;
+    playNextAudioChunk();
+  });
+
+  const handleAiTextComplete = React.useEffectEvent(() => {
+    fetchChatSessions();
+  });
+
+  const handleTextChunks = React.useEffectEvent(async ({ chunks }) => {
+    console.log('[SOCKET] Received text_chunks:', chunks.length);
+    nextExpectedIndexRef.current = 0;
+    for (const chunk of chunks) {
+      const audioData = await fetchTTSAudio(chunk.text);
+      if (audioData) {
+        audioQueueRef.current[chunk.index] = { index: chunk.index, audio: audioData, isBase64: false };
+        playNextAudioChunk();
+      }
+    }
+  });
+
+  const handleDeepThinking = React.useEffectEvent((isThinking) => {
+    isDeepThinkingRef.current = isThinking;
+  });
+
+  const handleSpecialistTelemetry = React.useEffectEvent((data) => {
+    console.log('[SOCKET] Specialist Telemetry:', data);
+    setSpecialistData(data);
+  });
+
+  const handleSystemActionEvent = React.useEffectEvent((action) => {
+    lastSystemActionRef.current = action;
+    const now = new Date();
+    const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
+    let label = '';
+    if (action.type === 'mouse') label = `[MOUSE] ${action.action.toUpperCase()} â†’ (${action.x ?? '?'}, ${action.y ?? '?'})`;
+    else if (action.type === 'keyboard') label = `[TYPE] "${action.text}"`;
+    else if (action.type === 'hotkey') label = `[HOTKEY] ${action.keys.join('+').toUpperCase()}`;
+    appendSystemActionLogEntry(systemActionLogRef, { time, label });
+  });
+
+  const handleDiagnosticAlert = React.useEffectEvent((active) => {
+    setIsDiagnosticActive(active);
+  });
+
+  const handleIntruderSnapshots = React.useEffectEvent((data) => {
+    if (data.snapshots) intruderSnapshotsRef.current = data.snapshots;
+  });
+
+  const handleSystemMetrics = React.useEffectEvent((metrics) => {
+    setLiveMetrics(prev => ({ ...prev, ...metrics }));
+  });
+
+  const handleSpecialistDataPayload = React.useEffectEvent(({ data }) => {
+    setSpecialistData(data);
+  });
+
+  const handleZaireActionFeed = React.useEffectEvent((actions) => {
+    setZaireActionFeed(actions);
+  });
+
   useEffect(() => {
     syncSpecialistVisualState();
-  }, [specialistData, activeMode, syncSpecialistVisualState]);
+  }, [specialistData, activeMode]);
 
 
 
@@ -524,7 +673,7 @@ function App() {
     return () => {
       if (darwinResetTimeoutRef.current) clearTimeout(darwinResetTimeoutRef.current);
     };
-  }, [specialistData, activeMode, forgeCode, syncForgeTelemetryState]);
+  }, [specialistData, activeMode, forgeCode]);
 
   const liveCodeStreamRef = useRef('');
   const [professorSlides] = useState([
@@ -1311,13 +1460,11 @@ function App() {
 
   const handleIntruderDetected = React.useEffectEvent((data) => {
     console.log('[SECURITY] 🚨 INTRUDER DETECTED!!', data);
-    setIsSecurityAlert(true);
-    setShowSecurityOverlay(true);
-    setActiveIntruder(data);
+    dispatchSecurityState({ type: 'INTRUDER_DETECTED', intruder: data });
     setZaireResponseStream('🚨 SECURITY ALERT: UNKNOWN USER DETECTED AT YOUR SYSTEM! SNAPSHOT CAPTURED.');
     setShowResponsePanel(true);
     setTimeout(() => {
-      setShowSecurityOverlay(false);
+      dispatchSecurityState({ type: 'HIDE_SECURITY_OVERLAY' });
     }, 10000);
   });
 
@@ -1342,53 +1489,22 @@ function App() {
 
     socketRef.current.on('ai_error', handleSocketAiError);
 
-    socketRef.current.on('connect_error', (err) => {
-      console.error('[SOCKET] Connection error:', err.message);
-    });
+    socketRef.current.on('connect_error', handleSocketConnectError);
 
     socketRef.current.on('ai_text_delta', handleTextDelta);
 
-    socketRef.current.on('audio_chunk', (data) => {
-      console.log('[SOCKET] Received audio_chunk:', data.index);
+    socketRef.current.on('audio_chunk', handleAudioChunk);
 
-      // If we get index 0, it's a new interaction, reset the sequence!
-      if (data.index === 0) {
-        console.log('[TTS] Sequence Reset detected (index 0)');
-        nextExpectedIndexRef.current = 0;
-      }
-
-      audioQueueRef.current[data.index] = data;
-      playNextAudioChunk();
-    });
-
-    socketRef.current.on('ai_text_complete', () => {
-      // Sequence will reset on next index 0
-      fetchChatSessions();
-    });
+    socketRef.current.on('ai_text_complete', handleAiTextComplete);
 
     // Handle text chunks - fetch audio via HTTP for each chunk
-    socketRef.current.on('text_chunks', async ({ chunks }) => {
-      console.log('[SOCKET] Received text_chunks:', chunks.length);
-
-      // New interaction, reset sequence
-      nextExpectedIndexRef.current = 0;
-
-      for (const chunk of chunks) {
-        const audioData = await fetchTTSAudio(chunk.text);
-        if (audioData) {
-          audioQueueRef.current[chunk.index] = { index: chunk.index, audio: audioData, isBase64: false };
-          playNextAudioChunk();
-        }
-      }
-    });
+    socketRef.current.on('text_chunks', handleTextChunks);
 
     // Vision status
     socketRef.current.on('zaire_status', handleZaireStatus);
 
     // Deep thinking status
-    socketRef.current.on('deep_thinking', (isThinking) => {
-      isDeepThinkingRef.current = isThinking;
-    });
+    socketRef.current.on('deep_thinking', handleDeepThinking);
 
     // Memory stored event
     socketRef.current.on('memory_stored', handleMemoryStored);
@@ -1396,10 +1512,7 @@ function App() {
     // Neural Log events from Agent Daemon
     socketRef.current.on('neural_log', handleNeuralLog);
 
-    socketRef.current.on('SPECIALIST_DATA', (data) => {
-      console.log('[SOCKET] Specialist Telemetry:', data);
-      setSpecialistData(data);
-    });
+    socketRef.current.on('SPECIALIST_DATA', handleSpecialistTelemetry);
 
 
     // System action events (mouse/keyboard)
@@ -1415,31 +1528,21 @@ function App() {
     });
 
     // Proactive Briefing & Diagnostic Pulse
-    socketRef.current.on('diagnostic_alert', (active) => {
-      setIsDiagnosticActive(active);
-    });
+    socketRef.current.on('diagnostic_alert', handleDiagnosticAlert);
 
     socketRef.current.on('neural_interrupt', handleNeuralInterrupt);
 
     // Tier 5: Intruder Detection
     socketRef.current.on('intruder_detected', handleIntruderDetected);
 
-    socketRef.current.on('intruder_snapshots', (data) => {
-      if (data.snapshots) intruderSnapshotsRef.current = data.snapshots;
-    });
+    socketRef.current.on('intruder_snapshots', handleIntruderSnapshots);
 
     // Tier 7: HUD Live Telemetry
-    socketRef.current.on('system_metrics', (metrics) => {
-      setLiveMetrics(prev => ({ ...prev, ...metrics }));
-    });
+    socketRef.current.on('system_metrics', handleSystemMetrics);
 
-    socketRef.current.on('SPECIALIST_DATA', ({ mode, data }) => {
-      setSpecialistData(data);
-    });
+    socketRef.current.on('SPECIALIST_DATA', handleSpecialistDataPayload);
 
-    socketRef.current.on('zaire_action_feed', (actions) => {
-      setZaireActionFeed(actions);
-    });
+    socketRef.current.on('zaire_action_feed', handleZaireActionFeed);
 
     return () => {
       if (socketRef.current) {
@@ -1447,7 +1550,7 @@ function App() {
         socketRef.current.off();
       }
     };
-  }, [fetchChatSessions, fetchTTSAudio, handleIntruderDetected, handleMemoryStored, handleModeSyncEvent, handleNeuralInterrupt, handleNeuralLog, handleSessionLoaded, handleSessionRenamed, handleSessionStarted, handleSocketAiError, handleSocketConnect, handleTextDelta, handleZaireStatus, playNextAudioChunk]);
+  }, [fetchChatSessions, handleAiTextComplete, handleAudioChunk, handleDeepThinking, handleDiagnosticAlert, handleIntruderDetected, handleIntruderSnapshots, handleModeSyncEvent, handleNeuralInterrupt, handleNeuralLog, handleSessionLoaded, handleSessionRenamed, handleSessionStarted, handleSocketAiError, handleSocketConnect, handleSocketConnectError, handleSpecialistDataPayload, handleSpecialistTelemetry, handleSystemMetrics, handleTextChunks, handleTextDelta, handleZaireActionFeed, handleZaireStatus, handleMemoryStored]);
 
   // NOTE: Direct browser camera access is disabled to prevent hardware contention 
   // with the Tier 5 Face Security Daemon (Python). Only one process can hold the camera lock.
@@ -1461,42 +1564,42 @@ function App() {
       const res = await fetch(`${API_BASE_URL}/api/security/status`);
       const data = await res.json();
       if (data.success) {
-        setBiometricData({
-          detected: data.master_present || data.running,
-          name: data.master_present ? 'Master' : (data.running ? 'Scanning...' : 'Offline'),
-          locked: data.pc_locked,
-          enabled: data.face_lock_enabled,
-          intruders: data.total_intruders,
-          intruder_present: data.intruder_present,
-          disabled: data.security_disabled
-        });
-
-        if (data.master_present || data.security_disabled) {
-          setIsSecurityAlert(false);
-          setShowSecurityOverlay(false);
-        }
+        dispatchSecurityState({ type: 'SYNC_STATUS', data });
       }
     } catch (e) {
       // Security daemon offline?
     }
   });
 
-  useEffect(() => {
-    const toggleSecuritySystem = async (disabled) => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/security/toggle_system`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ disabled })
-        });
-        const data = await res.json();
-        if (data.success) {
-          setBiometricData(prev => ({ ...prev, disabled }));
-        }
-      } catch (e) {
-        console.error("Failed to toggle security:", e);
+  const toggleSecuritySystem = useCallback(async (disabled) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/security/toggle_system`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disabled })
+      });
+      const data = await res.json();
+      if (data.success) {
+        dispatchSecurityState({ type: 'SET_DISABLED', disabled });
       }
-    };
+    } catch (e) {
+      console.error("Failed to toggle security:", e);
+    }
+  }, []);
+
+  const fetchSpecialistData = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/agent/specialist_data?mode=${activeMode}`);
+      const data = await res.json();
+      if (data.success) {
+        setSpecialistData(data.data || { active_persona: 'STARK_GRADE', forge_telemetry: {}, active_projects: [] });
+      }
+    } catch (e) {
+      console.error('Failed to fetch specialist data:', e);
+    }
+  }, [activeMode]);
+
+  useEffect(() => {
     window.toggleSecuritySystem = toggleSecuritySystem; // Expose for SettingsModal if needed
 
     const biometricInterval = setInterval(pollBiometrics, 3000);
@@ -1522,8 +1625,9 @@ function App() {
     return () => {
       clearInterval(biometricInterval);
       window.removeEventListener('ZAIRE_PERSIST_CONFIG', handlePersist);
+      delete window.toggleSecuritySystem;
     };
-  }, [activeMode, biometricData.detected, pollBiometrics]);
+  }, [activeMode, biometricData.detected, pollBiometrics, toggleSecuritySystem]);
 
   // Poll for specialist data
   useEffect(() => {
@@ -1532,22 +1636,10 @@ function App() {
       return;
     }
 
-    const fetchSpecialistData = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/agent/specialist_data?mode=${activeMode}`);
-        const data = await res.json();
-        if (data.success) {
-          setSpecialistData(data.data || { active_persona: 'STARK_GRADE', forge_telemetry: {}, active_projects: [] });
-        }
-      } catch (e) {
-        console.error('Failed to fetch specialist data:', e);
-      }
-    };
-
     fetchSpecialistData();
     const interval = setInterval(fetchSpecialistData, 5000);
     return () => clearInterval(interval);
-  }, [activeMode]);
+  }, [activeMode, fetchSpecialistData]);
 
   // Sync refs so the animation loop and blob-update effect always read latest values
   useEffect(() => {
@@ -1618,7 +1710,7 @@ function App() {
     try {
       if (useGroqSpeech) {
         // Use Groq Whisper API for better multilingual support
-        setGroqStatus('Starting...');
+        setGroqStatus('Starting…');
         console.log('Starting Groq speech service...');
         groqSpeechRef.current = new GroqSpeechService(
           (text) => {
@@ -1646,7 +1738,7 @@ function App() {
           },
           (interim) => {
             console.log('Groq interim:', interim);
-            setGroqStatus('Listening...');
+            setGroqStatus('Listening…');
             setRecognizedText(interim);
           },
           (error) => {
@@ -1655,7 +1747,7 @@ function App() {
           }
         );
 
-        setGroqStatus('Connecting...');
+        setGroqStatus('Connecting…');
         const started = await groqSpeechRef.current.start();
         console.log('Groq started:', started);
         if (started) {
@@ -2705,12 +2797,16 @@ function App() {
                   AWAITING UPLINK
                 </div>
               )}
-              {currentMessages.map((msg, idx) => (
-                <div key={idx} className={`custom-chat-bubble ${msg.role}`}>
+              {mapWithStableKeys(
+                currentMessages,
+                (msg) => msg.id || `${msg.role}-${msg.content}`,
+                (msg, stableKey) => (
+                <div key={stableKey} className={`custom-chat-bubble ${msg.role}`}>
                   <span className="bubble-role">{msg.role === 'user' ? 'USER' : 'ZAIRE'}</span>
                   <div>{msg.content}</div>
                 </div>
-              ))}
+                )
+              )}
               {isAIActive && zaireResponseStream && (
                 <div className="custom-chat-bubble assistant">
                   <span className="bubble-role">ZAIRE [STREAMING]</span>
@@ -2853,9 +2949,11 @@ function App() {
         innerJSX = (
           <div className="terminal-custom">
             <div className="custom-terminal-body" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-              {customTerminalLines.map((line, idx) => (
-                <div key={idx} className="terminal-line">{line}</div>
-              ))}
+              {mapWithStableKeys(
+                customTerminalLines,
+                (line) => `terminal-line-${line}`,
+                (line, stableKey) => <div key={stableKey} className="terminal-line">{line}</div>
+              )}
             </div>
             <div className="custom-terminal-prompt">
               <span className="prompt-arrow">&gt;</span>
@@ -2934,12 +3032,16 @@ function App() {
 
         innerJSX = (
           <div className="system-logs-body" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-            {zaireActionFeed.map((log, i) => (
-              <div key={i} className="log-row">
+            {mapWithStableKeys(
+              zaireActionFeed,
+              (log) => `${log.time}-${log.message}`,
+              (log, stableKey) => (
+              <div key={stableKey} className="log-row">
                 <span className="log-time">[{log.time}]</span>
                 <span className="log-msg">{log.message}</span>
               </div>
-            ))}
+              )
+            )}
           </div>
         );
         break;
@@ -3492,15 +3594,31 @@ function App() {
                   <div className="strategy-manifest">
                     <div className="strategy-header">NEURAL STRATEGY FORGE // {specialistData?.active_strategy?.risk_score || '0'} RISK SCORE</div>
                     <div className="strategy-grid">
-                      {specialistData?.active_strategy?.steps?.map((s, i) => (
-                        <div key={i} className="strategy-node">
-                          <div className="node-id">STEP 0{i + 1}</div>
+                      {mapWithStableKeys(
+                        specialistData?.active_strategy?.steps || [],
+                        (step) => step.id || `${step.name}-${step.desc}`,
+                        (step, stableKey, stepIndex) => (
+                        <div key={stableKey} className="strategy-node">
+                          <div className="node-id">STEP 0{stepIndex + 1}</div>
                           <div className="node-content">
-                            <div className="node-title">{s.name}</div>
-                            <div className="node-desc">{s.desc}</div>
+                            <div className="node-title">{step.name}</div>
+                            <div className="node-desc">{step.desc}</div>
                           </div>
                         </div>
-                      )) || <div className="strategy-empty">FORGE A STRATEGY TO MANIFEST TACTICAL BLUEPRINTS.</div>}
+                        )
+                      ).length > 0 ? mapWithStableKeys(
+                        specialistData?.active_strategy?.steps || [],
+                        (step) => step.id || `${step.name}-${step.desc}`,
+                        (step, stableKey, stepIndex) => (
+                          <div key={stableKey} className="strategy-node">
+                            <div className="node-id">STEP 0{stepIndex + 1}</div>
+                            <div className="node-content">
+                              <div className="node-title">{step.name}</div>
+                              <div className="node-desc">{step.desc}</div>
+                            </div>
+                          </div>
+                        )
+                      ) : <div className="strategy-empty">FORGE A STRATEGY TO MANIFEST TACTICAL BLUEPRINTS.</div>}
                     </div>
                   </div>
                 )}
@@ -3509,15 +3627,22 @@ function App() {
                   <div className="alpha-manifest">
                     <div className="alpha-header">WHALE FORENSICS // LIVE ALPHA FEED</div>
                     <div className="alpha-list">
-                      {specialistData?.alpha_feed?.map((a, i) => (
-                        <div key={i} className={`alpha-item ${a.sentiment}`}>
-                          <span className="alpha-time">
-                            <ClientLocalTime value={a.time} options={{ hour: '2-digit', minute: '2-digit' }} />
-                          </span>
-                          <span className="alpha-event">{a.event}</span>
-                          <span className="alpha-sentiment-tag">{a.sentiment}</span>
-                        </div>
-                      )) || <div className="alpha-empty">SCANNING ON-CHAIN PROTOCOLS…</div>}
+                      {(() => {
+                        const alphaFeedItems = mapWithStableKeys(
+                          specialistData?.alpha_feed || [],
+                          (a) => a.id || `${a.time}-${a.event}`,
+                          (a, stableKey) => (
+                            <div key={stableKey} className={`alpha-item ${a.sentiment}`}>
+                              <span className="alpha-time">
+                                <ClientLocalTime value={a.time} options={{ hour: '2-digit', minute: '2-digit' }} />
+                              </span>
+                              <span className="alpha-event">{a.event}</span>
+                              <span className="alpha-sentiment-tag">{a.sentiment}</span>
+                            </div>
+                          )
+                        );
+                        return alphaFeedItems.length > 0 ? alphaFeedItems : <div className="alpha-empty">SCANNING ON-CHAIN PROTOCOLS…</div>;
+                      })()}
                     </div>
                   </div>
                 )}
@@ -3567,15 +3692,20 @@ function App() {
                           <div className="concept-body">
                             <p>{specialistData?.current_concept?.body || 'In the quantum realm, information is not binary. It exists in a state of probability, defined by the wave function Ψ. ZAIRE is currently synchronizing this knowledge core with your neural baseline.'}</p>
                             <ul className="learning-points">
-                              {specialistData?.current_concept?.points?.map((p, i) => (
-                                <li key={i}>✦ {p}</li>
-                              )) || (
+                              {(() => {
+                                const pointItems = mapWithStableKeys(
+                                  specialistData?.current_concept?.points || [],
+                                  (p) => (typeof p === 'string' ? p : JSON.stringify(p)),
+                                  (p, stableKey) => <li key={stableKey}>✦ {p}</li>
+                                );
+                                return pointItems.length > 0 ? pointItems : (
                                   <>
                                     <li>✦ Superposition: N-dimensional state vectors.</li>
                                     <li>✦ Interference: Constructive reinforcement of data.</li>
                                     <li>✦ Decoherence: The primary bottleneck in neural sync.</li>
                                   </>
-                                )}
+                                );
+                              })()}
                             </ul>
                           </div>
                         </div>
@@ -3601,18 +3731,25 @@ function App() {
                           <div className="q-label">QUESTION 01</div>
                           <div className="q-text">{specialistData?.active_quiz?.question || 'What is the primary cause of decoherence in a neural-sync environment?'}</div>
                           <div className="q-options">
-                            {specialistData?.active_quiz?.options?.map((opt, i) => (
-                              <button key={i} className={`q-opt ${opt.correct ? 'correct' : ''}`} onClick={() => handleSpecialistAction('PROFESSOR', 'SUBMIT_QUIZ', { answer: opt.text, is_correct: opt.correct })}>
-                                {String.fromCharCode(65 + i)}) {opt.text}
-                              </button>
-                            )) || (
+                            {(() => {
+                              const quizOptionItems = mapWithStableKeys(
+                                specialistData?.active_quiz?.options || [],
+                                (opt) => opt.id || opt.text,
+                                (opt, stableKey, optionIndex) => (
+                                  <button key={stableKey} className={`q-opt ${opt.correct ? 'correct' : ''}`} onClick={() => handleSpecialistAction('PROFESSOR', 'SUBMIT_QUIZ', { answer: opt.text, is_correct: opt.correct })}>
+                                    {String.fromCharCode(65 + optionIndex)}) {opt.text}
+                                  </button>
+                                )
+                              );
+                              return quizOptionItems.length > 0 ? quizOptionItems : (
                                 <>
                                   <button className="q-opt">A) Atmospheric Pressure</button>
                                   <button className="q-opt correct">B) Quantum Interference</button>
                                   <button className="q-opt">C) Clock Speed Mismatch</button>
                                   <button className="q-opt">D) Thermal Exhaustion</button>
                                 </>
-                              )}
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -3624,16 +3761,23 @@ function App() {
                   <div className="roadmap-manifest">
                     <div className="roadmap-header">SOVEREIGN STUDY ROADMAP // {professorTopic}</div>
                     <div className="roadmap-grid">
-                      {specialistData?.roadmap?.modules?.map((m, i) => (
-                        <div key={i} className={`roadmap-node ${m.status}`}>
-                          <div className="node-id">0{i + 1}</div>
-                          <div className="node-content">
-                            <div className="node-title">{m.title}</div>
-                            <div className="node-desc">{m.desc}</div>
-                          </div>
-                          <div className="node-status-tag">{m.status || 'LOCKED'}</div>
-                        </div>
-                      )) || <div className="roadmap-empty">AWAITING ARCHITECTURAL COMMAND...</div>}
+                      {(() => {
+                        const roadmapItems = mapWithStableKeys(
+                          specialistData?.roadmap?.modules || [],
+                          (m) => m.id || `${m.title}-${m.status}`,
+                          (m, stableKey, moduleIndex) => (
+                            <div key={stableKey} className={`roadmap-node ${m.status}`}>
+                              <div className="node-id">0{moduleIndex + 1}</div>
+                              <div className="node-content">
+                                <div className="node-title">{m.title}</div>
+                                <div className="node-desc">{m.desc}</div>
+                              </div>
+                              <div className="node-status-tag">{m.status || 'LOCKED'}</div>
+                            </div>
+                          )
+                        );
+                        return roadmapItems.length > 0 ? roadmapItems : <div className="roadmap-empty">AWAITING ARCHITECTURAL COMMAND…</div>;
+                      })()}
                     </div>
                   </div>
                 )}
@@ -3658,9 +3802,14 @@ function App() {
                 <div className="research-summary">
                   <div className="summary-label">NEURAL SUMMARY FEED</div>
                   <div className="summary-items">
-                    {specialistData?.research_feed?.map((f, i) => (
-                      <div key={i} className="s-item">✦ Source: {f.source} {'//'} {f.title}</div>
-                    )) || <div className="s-item opacity-30">PARSING GLOBAL KNOWLEDGE CORES…</div>}
+                    {(() => {
+                      const researchItems = mapWithStableKeys(
+                        specialistData?.research_feed || [],
+                        (f) => f.id || `${f.source}-${f.title}-${f.time || ''}`,
+                        (f, stableKey) => <div key={stableKey} className="s-item">✦ Source: {f.source} {'//'} {f.title}</div>
+                      );
+                      return researchItems.length > 0 ? researchItems : <div className="s-item opacity-30">PARSING GLOBAL KNOWLEDGE CORES…</div>;
+                    })()}
                   </div>
                 </div>
 
@@ -3684,14 +3833,21 @@ function App() {
                   <div className="sidebar-section">
                     <div className="sidebar-label">NEURAL NOTEBOOK</div>
                     <div className="notebook-entries">
-                      {specialistData?.notebook?.map((n, i) => (
-                        <div key={i} className="note-entry">
-                          <span className="note-time">
-                            <ClientLocalTime value={n.time} options={{ hour: '2-digit', minute: '2-digit' }} />
-                          </span>
-                          <span className="note-text">{n.note}</span>
-                        </div>
-                      )) || <div className="note-empty">NO ATOMIC NOTES ARCHIVED.</div>}
+                      {(() => {
+                        const notebookItems = mapWithStableKeys(
+                          specialistData?.notebook || [],
+                          (n) => n.id || `${n.time}-${n.note}`,
+                          (n, stableKey) => (
+                            <div key={stableKey} className="note-entry">
+                              <span className="note-time">
+                                <ClientLocalTime value={n.time} options={{ hour: '2-digit', minute: '2-digit' }} />
+                              </span>
+                              <span className="note-text">{n.note}</span>
+                            </div>
+                          )
+                        );
+                        return notebookItems.length > 0 ? notebookItems : <div className="note-empty">NO ATOMIC NOTES ARCHIVED.</div>;
+                      })()}
                     </div>
                     <div className="note-input-wrap">
                       <input
@@ -3721,7 +3877,7 @@ function App() {
                       <div className="tabs-container">
                         {manifestedFiles.length > 0 ? manifestedFiles.map((file, i) => (
                           <div
-                            key={i}
+                            key={file.id || file.name}
                             className={`file-tab ${activeTab === i ? 'active' : ''}`}
                             onClick={() => {
                               setActiveTab(i);
@@ -3754,19 +3910,23 @@ function App() {
                     </div>
                     <div className="editor-content-wrapper">
                       <div className="line-numbers">
-                        {forgeCode.split('\n').map((_, i) => <div key={i}>{i + 1}</div>)}
+                        {Array.from({ length: forgeCode.split('\n').length }, (_, index) => index + 1).map((lineNumber) => <div key={`line-${lineNumber}`}>{lineNumber}</div>)}
                       </div>
                       <div className="editor-main">
                         <pre className="code-block">
                           <code>
                             {showDiff && diffData ? (
                               <div className="diff-viewer">
-                                {diffData.map((line, i) => (
-                                  <div key={i} className={`diff-line ${line.type}`}>
+                                {mapWithStableKeys(
+                                  diffData,
+                                  (line) => line.id || `${line.type}-${line.number || ''}-${line.content}`,
+                                  (line, stableKey) => (
+                                  <div key={stableKey} className={`diff-line ${line.type}`}>
                                     <span className="line-marker">{line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' '}</span>
                                     {line.content}
                                   </div>
-                                ))}
+                                  )
+                                )}
                               </div>
                             ) : (
                               (manifestedFiles[activeTab]?.code || forgeCode) || '// AWAITING NEURAL FORGE MANIFESTATION…'
@@ -3787,8 +3947,8 @@ function App() {
                       <div className="darwin-overlay">
                         <div className="darwin-header">NEURAL DARWINISM: VARIANT COMPETITION</div>
                         <div className="darwin-grid">
-                          {Object.entries(darwinResults).map(([variant, score], i) => (
-                            <div key={i} className="darwin-variant">
+                          {Object.entries(darwinResults).map(([variant, score]) => (
+                            <div key={variant} className="darwin-variant">
                               <div className="variant-label">{variant}</div>
                               <div className="variant-preview-small"></div>
                               <div className="variant-score-bar">
@@ -3906,13 +4066,17 @@ function App() {
                     </div>
                     <div className="console-output">
                       {specialistData?.forge_build_log?.length > 0 ? (
-                        specialistData.forge_build_log.map((log, i) => (
-                          <div key={i} className="log-line">
+                        mapWithStableKeys(
+                          specialistData.forge_build_log,
+                          (log) => log.id || `${log.timestamp}-${log.status}-${log.activity}`,
+                          (log, stableKey) => (
+                          <div key={stableKey} className="log-line">
                             <span className="log-ts">[{log.timestamp}]</span>
                             <span className={`log-tag ${log.status.toLowerCase()}`}>{log.status}</span>
                             <span className="log-msg">{log.activity}</span>
                           </div>
-                        ))
+                          )
+                        )
                       ) : (
                         <>
                           <div className="log-line"><span className="log-ts">[17:28:01]</span> <span className="log-tag init">INIT</span> <span className="log-msg">Autonomous Web Studio Manifested.</span></div>
@@ -3939,11 +4103,15 @@ function App() {
                   <div className={`agent-node professor ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>PROFESSOR</div>
                   <div className={`agent-node engineer ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>ENGINEER</div>
                   <div className="swarm-stream">
-                    {swarmMessages.map((m, i) => (
-                      <div key={i} className={`s-msg ${m.from.toLowerCase()}`}>
+                    {mapWithStableKeys(
+                      swarmMessages,
+                      (m) => m.id || `${m.from}-${m.text}-${m.timestamp || ''}`,
+                      (m, stableKey) => (
+                      <div key={stableKey} className={`s-msg ${m.from.toLowerCase()}`}>
                         <span className="s-from">[{m.from}]</span> {m.text}
                       </div>
-                    ))}
+                      )
+                    )}
                   </div>
                 </div>
 
@@ -4025,12 +4193,16 @@ function App() {
                     <div className="panel-section" style={getComponentStyle('ZAIRE_FEED')}>
                       <div className="section-label">SYSTEM_LOGS</div>
                       <div className="log-feed">
-                        {zaireActionFeed.map((log, idx) => (
-                          <div key={idx} className="log-entry">
+                        {mapWithStableKeys(
+                          zaireActionFeed,
+                          (log) => log.id || `${log.time}-${log.message}`,
+                          (log, stableKey) => (
+                          <div key={stableKey} className="log-entry">
                             <span className="log-time">[{log.time}]</span>
                             <span className="log-msg">{log.message}</span>
                           </div>
-                        ))}
+                          )
+                        )}
                       </div>
                     </div>
                   </div>
@@ -4315,7 +4487,7 @@ function App() {
                       onChange={(e) => setSelectedComponent(e.target.value)}
                       style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px', padding: '4px', marginBottom: '8px' }}
                     >
-                      <option value="">SELECT COMPONENT...</option>
+                      <option value="">SELECT COMPONENT…</option>
                       {(({
                         'ZAIRE': ['ACTIVE_MODE', 'SYSTEM_VITALS', 'BIOMETRIC_SCAN', 'SCREEN_VISION', 'SYSTEM_METRICS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
                         'TRADER': ['PORTFOLIO', 'WATCHLIST', 'HALAL_FILTER', 'TOP_OPPORTUNITY', 'MACRO_SIGNALS'],
@@ -4441,7 +4613,7 @@ function App() {
                   onChange={(e) => setSelectedComponent(e.target.value)}
                   style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px', padding: '4px', marginBottom: '8px' }}
                 >
-                  <option value="">SELECT COMPONENT...</option>
+                  <option value="">SELECT COMPONENT…</option>
                   {(({
                     'ZAIRE': ['ACTIVE_MODE', 'SYSTEM_VITALS', 'BIOMETRIC_SCAN', 'SCREEN_VISION', 'SYSTEM_METRICS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
                     'TRADER': ['PORTFOLIO', 'WATCHLIST', 'HALAL_FILTER', 'TOP_OPPORTUNITY', 'MACRO_SIGNALS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
@@ -4767,7 +4939,7 @@ function App() {
                   <div className="meta-row"><span className="L">ACTION:</span> <span className="V">PUSH_SENT</span></div>
                 </div>
               </div>
-              <button className="threat-dismiss" onClick={() => setShowSecurityOverlay(false)}>ACKNOWLEDGE RISK</button>
+              <button className="threat-dismiss" onClick={() => dispatchSecurityState({ type: 'HIDE_SECURITY_OVERLAY' })}>ACKNOWLEDGE RISK</button>
             </div>
           </div>
         )}

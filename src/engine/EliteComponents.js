@@ -12,6 +12,7 @@ const deterministicUnit = (seed) => {
 };
 
 const deterministicRange = (seed, min, max) => min + deterministicUnit(seed) * (max - min);
+const buildStableSequence = (prefix, length) => Array.from({ length }, (_, index) => `${prefix}-${index + 1}`);
 
 /**
  * ZAIRE Elite Components Library
@@ -367,8 +368,8 @@ export const WhaleScanner = ({ color }) => (
       { pair: 'ETH/USDT', type: 'SELL', amt: '2,400 ETH', time: '2m ago' },
       { pair: 'SOL/USDT', type: 'BUY', amt: '15,000 SOL', time: '5m ago' },
       { pair: 'BTC/USDT', type: 'BUY', amt: '120.0 BTC', time: '12m ago' }
-    ].map((tx, i) => (
-      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(255,255,255,0.02)', borderLeft: `2px solid ${tx.type === 'BUY' ? '#00ff66' : '#ff3333'}` }}>
+    ].map((tx) => (
+      <div key={`${tx.pair}-${tx.time}`} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(255,255,255,0.02)', borderLeft: `2px solid ${tx.type === 'BUY' ? '#00ff66' : '#ff3333'}` }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>{tx.pair}</span>
           <span style={{ fontSize: '12px', opacity: 0.5 }}>{tx.time}</span>
@@ -429,8 +430,8 @@ export const SignalFeed = ({ color }) => (
       { asset: 'ETH', signal: 'STRONG BUY', confidence: '94%' },
       { asset: 'SOL', signal: 'HOLD', confidence: '72%' },
       { asset: 'DOGE', signal: 'SELL', confidence: '88%' },
-    ].map((s, i) => (
-      <div key={i} style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', border: `1px solid ${color}33`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    ].map((s) => (
+      <div key={s.asset} style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', border: `1px solid ${color}33`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>{s.asset}</span>
           <span style={{ fontSize: '12px', color: color }}>CONF: {s.confidence}</span>
@@ -450,8 +451,8 @@ export const PortfolioGrid = ({ color }) => (
       { token: 'BTC', balance: '$8,540.21', pct: '27%' },
       { token: 'ETH', balance: '$5,120.00', pct: '16%' },
       { token: 'SOL', balance: '$3,890.11', pct: '12%' }
-    ].map((t, i) => (
-      <div key={i} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${color}33`, padding: '8px', borderRadius: '4px', display: 'flex', flexDirection: 'column' }}>
+    ].map((t) => (
+      <div key={t.token} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${color}33`, padding: '8px', borderRadius: '4px', display: 'flex', flexDirection: 'column' }}>
         <span style={{ fontSize: '12px', color: '#aaa' }}>{t.token}</span>
         <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold', margin: '4px 0' }}>{t.balance}</span>
         <div style={{ width: '100%', height: '2px', background: 'rgba(255,255,255,0.1)', marginTop: 'auto' }}>
@@ -499,8 +500,8 @@ export const AtomicNotes = ({ color }) => (
       { title: 'Zettel 104', excerpt: 'Transformers use self-attention.' },
       { title: 'Zettel 105', excerpt: 'Embeddings map meaning to vector space.' },
       { title: 'Zettel 106', excerpt: 'Loss functions guide gradient descent.' }
-    ].map((n, i) => (
-      <div key={i} style={{ padding: '8px', background: 'rgba(255,255,255,0.02)', borderLeft: `3px solid ${color}`, borderRadius: '2px' }}>
+    ].map((n) => (
+      <div key={n.title} style={{ padding: '8px', background: 'rgba(255,255,255,0.02)', borderLeft: `3px solid ${color}`, borderRadius: '2px' }}>
         <div style={{ fontSize: '12px', color: color, fontWeight: 'bold', marginBottom: '4px' }}>{n.title}</div>
         <div style={{ fontSize: '12px', color: '#ccc' }}>{n.excerpt}</div>
       </div>
@@ -522,7 +523,7 @@ export const QuizGenerator = ({ color }) => (
     <div style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>Q: Which activation function outputs values between 0 and 1?</div>
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {['ReLU', 'Sigmoid', 'Tanh', 'Softmax'].map((opt, i) => (
-        <div key={i} style={{ padding: '8px', border: `1px solid rgba(255,255,255,0.1)`, borderRadius: '4px', fontSize: '12px', color: '#ccc', cursor: 'pointer', transition: 'border-color 0.2s, color 0.2s, background-color 0.2s' }}>
+        <div key={opt} style={{ padding: '8px', border: `1px solid rgba(255,255,255,0.1)`, borderRadius: '4px', fontSize: '12px', color: '#ccc', cursor: 'pointer', transition: 'border-color 0.2s, color 0.2s, background-color 0.2s' }}>
           <span style={{ color: color, marginRight: '8px', fontWeight: 'bold' }}>{String.fromCharCode(65 + i)}</span> {opt}
         </div>
       ))}
@@ -566,8 +567,8 @@ export const MedicationTimeline = ({ color }) => (
       { time: '08:00', med: 'Vitamin D3', status: 'TAKEN' },
       { time: '13:00', med: 'Omega 3', status: 'PENDING' },
       { time: '20:00', med: 'Magnesium', status: 'PENDING' }
-    ].map((m, i) => (
-      <div key={i} style={{ position: 'relative' }}>
+    ].map((m) => (
+      <div key={`${m.time}-${m.med}`} style={{ position: 'relative' }}>
         <div style={getMedicationStatusDotStyle(color, m.status)}></div>
         <div style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>{m.time} - {m.med}</div>
         <div style={{ fontSize: '12px', color: m.status === 'TAKEN' ? color : '#aaa', marginTop: '2px' }}>{m.status}</div>
@@ -589,10 +590,10 @@ export const PatientNotes = ({ color }) => (
 
 export const SymptomMatrix = ({ color }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', height: '100%' }}>
-    {Array.from({ length: 16 }).map((_, i) => {
-      const active = deterministicUnit(`symptom-${i}`) > 0.8;
+    {buildStableSequence('symptom', 16).map((cellId, i) => {
+      const active = deterministicUnit(cellId) > 0.8;
       return (
-        <div key={i} style={{ background: active ? `${color}44` : 'rgba(255,255,255,0.02)', border: `1px solid ${active ? color : 'transparent'}`, borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div key={cellId} style={{ background: active ? `${color}44` : 'rgba(255,255,255,0.02)', border: `1px solid ${active ? color : 'transparent'}`, borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {active && <span style={{ color: '#fff', fontSize: '12px' }}>!</span>}
         </div>
       );
@@ -659,8 +660,8 @@ export const ThreatFeed = ({ color }) => (
       { ip: '192.168.1.105', threat: 'Port Scan', status: 'BLOCKED' },
       { ip: '45.33.21.90', threat: 'Brute Force', status: 'BLOCKED' },
       { ip: '10.0.0.4', threat: 'DDoS Ping', status: 'MITIGATED' }
-    ].map((t, i) => (
-      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px', background: 'rgba(255,0,0,0.05)', border: '1px solid rgba(255,0,0,0.2)' }}>
+    ].map((t) => (
+      <div key={`${t.ip}-${t.threat}`} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px', background: 'rgba(255,0,0,0.05)', border: '1px solid rgba(255,0,0,0.2)' }}>
         <span style={{ fontSize: '12px', color: '#ff4d4d', fontFamily: 'monospace' }}>[{t.ip}] {t.threat}</span>
         <span style={{ fontSize: '12px', background: '#ff4d4d', color: '#000', padding: '1px 4px', borderRadius: '2px', fontWeight: 'bold' }}>{t.status}</span>
       </div>
@@ -680,8 +681,8 @@ export const PermissionMatrix = ({ color }) => (
       { role: 'SYSTEM_ADMIN', r: true, w: true, e: true },
       { role: 'NEURAL_DAEMON', r: true, w: true, e: false },
       { role: 'GUEST_AGENT', r: true, w: false, e: false }
-    ].map((r, i) => (
-      <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', fontSize: '12px', color: '#ccc', padding: '4px 0' }}>
+    ].map((r) => (
+      <div key={r.role} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', fontSize: '12px', color: '#ccc', padding: '4px 0' }}>
         <span>{r.role}</span>
         <span style={{ color: r.r ? '#00ff66' : '#ff3333' }}>{r.r ? '●' : '○'}</span>
         <span style={{ color: r.w ? '#00ff66' : '#ff3333' }}>{r.w ? '●' : '○'}</span>
@@ -699,7 +700,7 @@ export const ExecutionTimeline = ({ color }) => (
   <div style={{ display: 'flex', alignItems: 'center', height: '100%', padding: '0 10px', position: 'relative' }}>
     <div style={{ position: 'absolute', top: '50%', left: '10px', right: '10px', height: '2px', background: 'rgba(255,255,255,0.1)', transform: 'translateY(-50%)' }}></div>
     {['INIT', 'FETCH', 'PARSE', 'RENDER'].map((step, i) => (
-      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, position: 'relative' }}>
+      <div key={step} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, position: 'relative' }}>
         <motion.div 
           animate={i === 1 ? { boxShadow: [`0 0 0px ${color}`, `0 0 20px ${color}`, `0 0 0px ${color}`] } : {}}
           transition={{ repeat: Infinity, duration: 1.5 }}
@@ -732,8 +733,8 @@ export const StatusGrid = ({ color }) => (
       { label: 'NEURAL SYNC', status: 'SYNCED', color: '#00d4ff' },
       { label: 'SWARM AGENTS', status: 'IDLE', color: '#ffaa00' },
       { label: 'VAULT LOCK', status: 'SECURE', color: '#b200ff' }
-    ].map((s, i) => (
-      <div key={i} style={getSecurityStatusCardStyle(s.color)}>
+    ].map((s) => (
+      <div key={s.label} style={getSecurityStatusCardStyle(s.color)}>
         <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '4px' }}>{s.label}</div>
         <div style={{ fontSize: '12px', color: s.color, fontWeight: 'bold' }}>{s.status}</div>
       </div>
@@ -764,8 +765,8 @@ export const SemanticMemory = ({ color }) => (
       { dim: 'v_project_scope', val: 0.81 },
       { dim: 'v_coding_style', val: 0.99 },
       { dim: 'v_market_bias', val: 0.42 }
-    ].map((v, i) => (
-      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+    ].map((v) => (
+      <div key={v.dim} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
         <div style={{ width: '80px', fontSize: '12px', color: '#aaa' }}>{v.dim}</div>
         <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
           <div style={{ width: `${v.val * 100}%`, height: '100%', background: color, borderRadius: '2px', opacity: 0.5 + (v.val * 0.5) }}></div>
@@ -787,7 +788,7 @@ export const ModelRouter = ({ color }) => (
     </div>
     {['FAST_CLAUDE', 'DEEP_THINK', 'VISION_PARSER'].map((m, i) => (
       <div
-        key={i}
+        key={m}
         className={`elite-model-switch-row ${i === 1 ? 'active' : ''}`}
         style={{ '--elite-accent': color, '--elite-accent-bg': `${color}22` }}
       >
@@ -805,10 +806,10 @@ export const ModelRouter = ({ color }) => (
 
 export const HabitTracker = ({ color }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', height: '100%' }}>
-    {Array.from({ length: 28 }).map((_, i) => {
-      const active = deterministicUnit(`habit-${i}`) > 0.3;
+    {buildStableSequence('habit', 28).map((cellId) => {
+      const active = deterministicUnit(cellId) > 0.3;
       return (
-        <div key={i} style={{ background: active ? color : 'rgba(255,255,255,0.05)', borderRadius: '2px', opacity: active ? 0.8 : 0.5 }}></div>
+        <div key={cellId} style={{ background: active ? color : 'rgba(255,255,255,0.05)', borderRadius: '2px', opacity: active ? 0.8 : 0.5 }}></div>
       );
     })}
   </div>
@@ -823,8 +824,8 @@ export const VideoTimeline = ({ color }) => (
     <div className="elite-video-track">
       {/* Frames */}
       <div style={{ display: 'flex', width: '100%', height: '100%' }}>
-        {Array.from({ length: 10 }).map((_, i) => (
-          <div key={i} style={{ flex: 1, borderRight: '1px solid rgba(255,255,255,0.1)', background: `rgba(0,0,0,${0.2 + (i%2)*0.1})` }}></div>
+        {buildStableSequence('frame', 10).map((frameId, i) => (
+          <div key={frameId} style={{ flex: 1, borderRight: '1px solid rgba(255,255,255,0.1)', background: `rgba(0,0,0,${0.2 + (i%2)*0.1})` }}></div>
         ))}
       </div>
       {/* Playhead */}
@@ -883,11 +884,11 @@ export const LayoutForge = ({ color }) => (
 
 export const AudioAnalyzer = ({ color }) => (
   <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '100%', gap: '2px', padding: '10px 0' }}>
-    {Array.from({ length: 24 }).map((_, i) => {
-      const height = deterministicRange(`audio-height-${i}`, 10, 90);
-      const duration = deterministicRange(`audio-duration-${i}`, 0.5, 1.5);
+    {buildStableSequence('audio-band', 24).map((bandId) => {
+      const height = deterministicRange(`${bandId}-height`, 10, 90);
+      const duration = deterministicRange(`${bandId}-duration`, 0.5, 1.5);
       return (
-        <div key={i} style={{
+        <div key={bandId} style={{
           width: '100%',
           height: `${height}%`,
           background: `linear-gradient(to top, ${color}33, ${color})`,
@@ -924,8 +925,8 @@ export const TaskQueue = ({ color }) => (
       { task: 'Train LLM Local Weights', prog: 64, stat: 'RUNNING' },
       { task: 'Scrape Competitor Pricing', prog: 22, stat: 'RUNNING' },
       { task: 'Defrag Semantic Memory', prog: 0, stat: 'QUEUED' }
-    ].map((t, i) => (
-      <div key={i} className="elite-task-queue-item">
+    ].map((t) => (
+      <div key={t.task} className="elite-task-queue-item">
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#fff' }}>
           <span>{t.task}</span>
           <span style={{ color: t.prog === 100 ? '#00ff66' : t.prog === 0 ? '#888' : color }}>{t.stat}</span>
@@ -960,8 +961,8 @@ export const AgentFeed = ({ color }) => (
       { agent: 'ResearchBot', act: 'Found 14 papers on arXiv', time: '1m ago' },
       { agent: 'DevBot', act: 'Commited 400 lines to Core', time: '5m ago' },
       { agent: 'SecBot', act: 'Blocked 4 SQLi attempts', time: '12m ago' }
-    ].map((a, i) => (
-      <div key={i} style={{ display: 'flex', gap: '8px', padding: '6px', background: 'rgba(255,255,255,0.02)', borderLeft: `2px solid ${color}` }}>
+    ].map((a) => (
+      <div key={`${a.agent}-${a.time}`} style={{ display: 'flex', gap: '8px', padding: '6px', background: 'rgba(255,255,255,0.02)', borderLeft: `2px solid ${color}` }}>
         <div style={{ fontSize: '14px' }}>🤖</div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>{a.agent}</span>
@@ -980,8 +981,8 @@ export const AgentFeed = ({ color }) => (
 
 export const FileBrowser = ({ color }) => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '6px', overflowY: 'auto' }}>
-    {['agent_daemon.py', 'App.js', 'db_init.js', 'custom_modes.js', 'SettingsModal.js'].map((f, i) => (
-      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', background: 'rgba(255,255,255,0.02)', borderLeft: `2px solid ${color}`, borderRadius: '2px' }}>
+    {['agent_daemon.py', 'App.js', 'db_init.js', 'custom_modes.js', 'SettingsModal.js'].map((f) => (
+      <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', background: 'rgba(255,255,255,0.02)', borderLeft: `2px solid ${color}`, borderRadius: '2px' }}>
         <span style={{ fontSize: '12px' }}>📄</span>
         <span style={{ fontSize: '12px', color: '#fff', flex: 1 }}>{f}</span>
         <span style={{ fontSize: '12px', color: '#888' }}>{Math.floor(deterministicRange(`file-size-${f}`, 10, 110))} KB</span>
@@ -992,11 +993,19 @@ export const FileBrowser = ({ color }) => (
 
 export const CalendarPanel = ({ color }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', height: '100%' }}>
-    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-      <div key={`header-${i}`} style={{ fontSize: '12px', color, textAlign: 'center', fontWeight: 'bold' }}>{d}</div>
+    {[
+      { id: 'day-sun', label: 'S' },
+      { id: 'day-mon', label: 'M' },
+      { id: 'day-tue', label: 'T' },
+      { id: 'day-wed', label: 'W' },
+      { id: 'day-thu', label: 'T' },
+      { id: 'day-fri', label: 'F' },
+      { id: 'day-sat', label: 'S' }
+    ].map((day) => (
+      <div key={day.id} style={{ fontSize: '12px', color, textAlign: 'center', fontWeight: 'bold' }}>{day.label}</div>
     ))}
-    {Array.from({ length: 28 }).map((_, i) => (
-      <div key={i} style={getCalendarDayStyle(i === 18, color)}>
+    {buildStableSequence('calendar-day', 28).map((dayId, i) => (
+      <div key={dayId} style={getCalendarDayStyle(i === 18, color)}>
         {i + 1}
       </div>
     ))}
@@ -1005,8 +1014,8 @@ export const CalendarPanel = ({ color }) => (
 
 export const ChartPanel = ({ color }) => (
   <div style={{ display: 'flex', height: '100%', alignItems: 'flex-end', gap: '8px', padding: '10px 4px' }}>
-    {[40, 75, 50, 90, 60, 80, 100].map((h, i) => (
-      <div key={i} style={{ flex: 1, height: `${h}%`, background: `linear-gradient(to top, ${color}33, ${color})`, borderRadius: '1px 1px 0 0', position: 'relative' }}>
+    {[40, 75, 50, 90, 60, 80, 100].map((h) => (
+      <div key={`chart-bar-${h}`} style={{ flex: 1, height: `${h}%`, background: `linear-gradient(to top, ${color}33, ${color})`, borderRadius: '1px 1px 0 0', position: 'relative' }}>
         <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', fontSize: '12px', color: '#fff' }}>{h}</div>
       </div>
     ))}
@@ -1027,11 +1036,11 @@ export const CameraFeed = ({ color }) => (
 
 export const VoicePanel = ({ color }) => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '4px' }}>
-    {Array.from({ length: 15 }).map((_, i) => {
-      const height = deterministicRange(`voice-height-${i}`, 20, 100);
-      const duration = deterministicRange(`voice-duration-${i}`, 0.5, 1);
+    {buildStableSequence('voice-band', 15).map((bandId) => {
+      const height = deterministicRange(`${bandId}-height`, 20, 100);
+      const duration = deterministicRange(`${bandId}-duration`, 0.5, 1);
       return (
-        <div key={i} style={{ width: '6px', height: `${height}%`, background: color, borderRadius: '3px', animation: `pulse ${duration}s infinite alternate` }}></div>
+        <div key={bandId} style={{ width: '6px', height: `${height}%`, background: color, borderRadius: '3px', animation: `pulse ${duration}s infinite alternate` }}></div>
       );
     })}
   </div>
@@ -1041,7 +1050,7 @@ export const Timeline = ({ color }) => (
   <div className="elite-timeline">
     <div className="elite-timeline-track"></div>
     {['INGESTION', 'EXECUTION', 'AUDITING'].map((step, i) => (
-      <div key={i} className="elite-timeline-step">
+      <div key={step} className="elite-timeline-step">
         <div
           className={`elite-timeline-node ${i < 2 ? 'active' : ''}`}
           style={i < 2 ? { '--elite-accent': color, '--elite-accent-soft': `0 0 10px ${color}` } : undefined}
@@ -1057,8 +1066,8 @@ export const ResearchPanel = ({ color }) => (
     {[
       { src: 'Reuters', time: '05:30', title: 'Global Sovereign AI networks expansion reaches 85% adoption.' },
       { src: 'Bloomberg', time: '03:15', title: 'Venture flow accelerates towards custom agentic interfaces.' }
-    ].map((r, i) => (
-      <div key={i} className="elite-research-item" style={{ '--elite-accent': color }}>
+    ].map((r) => (
+      <div key={`${r.src}-${r.time}`} className="elite-research-item" style={{ '--elite-accent': color }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color, marginBottom: '4px' }}>
           <span>{r.src}</span>
           <span>{r.time}</span>
@@ -1098,10 +1107,10 @@ export const DocumentViewer = ({ color }) => (
 
 export const Moodboard = ({ color }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', height: '100%' }}>
-    {Array.from({ length: 6 }).map((_, i) => {
-      const opacity = Math.floor(deterministicRange(`moodboard-${i}`, 2, 7));
+    {buildStableSequence('moodboard-tile', 6).map((tileId) => {
+      const opacity = Math.floor(deterministicRange(tileId, 2, 7));
       return (
-        <div key={i} style={{ background: `rgba(255,255,255,0.0${opacity})`, border: `1px solid ${color}22`, borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div key={tileId} style={{ background: `rgba(255,255,255,0.0${opacity})`, border: `1px solid ${color}22`, borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ width: '20px', height: '20px', borderRadius: '2px', background: `linear-gradient(45deg, ${color}, transparent)`, opacity: 0.5 }}></div>
         </div>
       );
@@ -1168,10 +1177,10 @@ export const GoalTree = ({ color }) => (
 
 export const WaveformViewer = ({ color }) => (
   <div style={{ display: 'flex', alignItems: 'center', height: '100%', gap: '2px' }}>
-    {Array.from({ length: 40 }).map((_, i) => {
+    {buildStableSequence('wave-bar', 40).map((barId, i) => {
       const height = Math.abs(Math.sin(i * 0.2)) * 80 + 10;
       return (
-        <div key={i} style={{ flex: 1, height: `${height}%`, background: `linear-gradient(to bottom, ${color}, ${color}44)`, borderRadius: '2px' }}></div>
+        <div key={barId} style={{ flex: 1, height: `${height}%`, background: `linear-gradient(to bottom, ${color}, ${color}44)`, borderRadius: '2px' }}></div>
       );
     })}
   </div>
@@ -1183,8 +1192,8 @@ export const TranscriptPanel = ({ color }) => (
       { time: '00:01', text: 'Initiating orbital scan.' },
       { time: '00:05', text: 'Target acquired. Locking on.', highlight: true },
       { time: '00:12', text: 'Commencing data transfer.' }
-    ].map((t, i) => (
-      <div key={i} style={{ display: 'flex', gap: '8px', fontSize: '12px', lineHeight: '1.5' }}>
+    ].map((t) => (
+      <div key={`${t.time}-${t.text}`} style={{ display: 'flex', gap: '8px', fontSize: '12px', lineHeight: '1.5' }}>
         <span style={{ color: '#888' }}>[{t.time}]</span>
         <span style={{ color: t.highlight ? color : '#ccc', fontWeight: t.highlight ? 'bold' : 'normal' }}>{t.text}</span>
       </div>
@@ -1204,8 +1213,8 @@ export const DecisionMatrix = ({ color }) => (
       { opt: 'Deploy Alpha', r: 'HIGH', roi: '150%', s: 92 },
       { opt: 'Hold Position', r: 'LOW', roi: '5%', s: 64 },
       { opt: 'Liquidate', r: 'NONE', roi: '-2%', s: 41 }
-    ].map((d, i) => (
-      <div key={i} style={{ display: 'flex', padding: '4px 0', fontSize: '12px', color: '#fff', alignItems: 'center' }}>
+    ].map((d) => (
+      <div key={d.opt} style={{ display: 'flex', padding: '4px 0', fontSize: '12px', color: '#fff', alignItems: 'center' }}>
         <div style={{ flex: 2 }}>{d.opt}</div>
         <div style={{ flex: 1, textAlign: 'center', color: d.r === 'HIGH' ? '#ff3333' : d.r === 'LOW' ? '#00ff66' : '#888' }}>{d.r}</div>
         <div style={{ flex: 1, textAlign: 'center', color: d.s > 80 ? '#00ff66' : '#fff' }}>{d.roi}</div>
@@ -1223,8 +1232,8 @@ export const RoadmapGenerator = ({ color }) => (
         { step: 'Phase 1: Architecture', status: 'done' },
         { step: 'Phase 2: Core Loop', status: 'active' },
         { step: 'Phase 3: Beta Test', status: 'pending' }
-      ].map((r, i) => (
-        <div key={i} style={{ position: 'relative' }}>
+      ].map((r) => (
+        <div key={r.step} style={{ position: 'relative' }}>
           <div style={getRoadmapNodeDotStyle(r.status, color)}></div>
           <div style={{ fontSize: '12px', color: r.status === 'pending' ? '#888' : '#fff', fontWeight: r.status === 'active' ? 'bold' : 'normal' }}>{r.step}</div>
         </div>
@@ -1241,7 +1250,7 @@ export const ThinkingStream = ({ color }) => (
       'Pruning invalid logic branches...',
       'Synthesizing final response...'
     ].map((t, i) => (
-      <div key={i} style={{ opacity: 1 - (i * 0.2), color: i === 0 ? color : '#888', transform: `translateX(${i * 4}px)` }}>
+      <div key={t} style={{ opacity: 1 - (i * 0.2), color: i === 0 ? color : '#888', transform: `translateX(${i * 4}px)` }}>
         &gt; {t}
       </div>
     ))}

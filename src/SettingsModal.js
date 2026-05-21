@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { ZaireComponentRegistry } from './engine/ComponentRegistry';
 import './SettingsModal.css';
@@ -89,8 +89,8 @@ const renderMiniPreview = (type, color = '#00d4ff') => {
       return (
         <div className="mini-calendar-mock">
           <div className="cal-grid">
-            {[...Array(12)].map((_, i) => (
-              <div key={i} className={`cal-cell ${i === 4 ? 'active' : ''}`} style={i === 4 ? fillStyle : undefined} />
+            {['slot-01', 'slot-02', 'slot-03', 'slot-04', 'slot-05', 'slot-06', 'slot-07', 'slot-08', 'slot-09', 'slot-10', 'slot-11', 'slot-12'].map((cellId, i) => (
+              <div key={cellId} className={`cal-cell ${i === 4 ? 'active' : ''}`} style={i === 4 ? fillStyle : undefined} />
             ))}
           </div>
         </div>
@@ -628,30 +628,32 @@ function SettingsModal({
     }
   }, [customModes]);
 
+  const loadAiProviders = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/llm/providers`);
+      const data = await response.json();
+      const slots = data?.slots;
+      if (Array.isArray(slots) && slots.length > 0) {
+        const normalized = [0, 1, 2].map((i) => ({
+          provider: slots[i]?.provider || 'Empty',
+          apiKey: slots[i]?.apiKey || '',
+          hasKey: Boolean(slots[i]?.hasKey),
+          model: slots[i]?.model || 'Auto',
+          purpose: slots[i]?.purpose || (i === 0 ? 'Primary' : i === 1 ? 'Coding' : 'Fallback'),
+          baseUrl: slots[i]?.baseUrl || '',
+          enabled: Boolean(slots[i]?.enabled ?? true)
+        }));
+        setAiSlots(normalized);
+      }
+    } catch {
+      // Provider discovery is best-effort when the modal opens.
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
-    let isActive = true;
-    fetch(`${API_URL}/llm/providers`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!isActive) return;
-        const slots = data?.slots;
-        if (Array.isArray(slots) && slots.length > 0) {
-          const normalized = [0, 1, 2].map((i) => ({
-            provider: slots[i]?.provider || 'Empty',
-            apiKey: slots[i]?.apiKey || '',
-            hasKey: Boolean(slots[i]?.hasKey),
-            model: slots[i]?.model || 'Auto',
-            purpose: slots[i]?.purpose || (i === 0 ? 'Primary' : i === 1 ? 'Coding' : 'Fallback'),
-            baseUrl: slots[i]?.baseUrl || '',
-            enabled: Boolean(slots[i]?.enabled ?? true)
-          }));
-          setAiSlots(normalized);
-        }
-      })
-      .catch(() => { });
-    return () => { isActive = false; };
-  }, [isOpen]);
+    loadAiProviders();
+  }, [isOpen, loadAiProviders]);
 
   const { getToken } = useAuth();
   const [creatorStep, setCreatorStep] = useState(1);
