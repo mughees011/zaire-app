@@ -479,7 +479,6 @@ function App() {
   });
 
   // ── System State Engine ──
-  const [systemState, setSystemState] = useState('IDLE'); // IDLE, LISTENING, THINKING, ALERT, SUCCESS
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [forgeCode, setForgeCode] = useState('');
   const [professorSubMode, setProfessorSubMode] = useState('LECTURE'); // LECTURE, ROADMAP, LAB
@@ -563,13 +562,13 @@ function App() {
   const handleTextChunks = React.useEffectEvent(async ({ chunks }) => {
     console.log('[SOCKET] Received text_chunks:', chunks.length);
     nextExpectedIndexRef.current = 0;
-    for (const chunk of chunks) {
+    await Promise.all(chunks.map(async (chunk) => {
       const audioData = await fetchTTSAudio(chunk.text);
       if (audioData) {
         audioQueueRef.current[chunk.index] = { index: chunk.index, audio: audioData, isBase64: false };
         playNextAudioChunk();
       }
-    }
+    }));
   });
 
   const handleDeepThinking = React.useEffectEvent((isThinking) => {
@@ -611,6 +610,33 @@ function App() {
   const handleZaireActionFeed = React.useEffectEvent((actions) => {
     setZaireActionFeed(actions);
   });
+
+  const socketHandlerRefs = useRef({});
+  socketHandlerRefs.current = {
+    handleSocketConnect,
+    handleModeSyncEvent,
+    handleSessionStarted,
+    handleSessionRenamed,
+    handleSessionLoaded,
+    handleSocketAiError,
+    handleSocketConnectError,
+    handleTextDelta,
+    handleAudioChunk,
+    handleAiTextComplete,
+    handleTextChunks,
+    handleZaireStatus,
+    handleDeepThinking,
+    handleMemoryStored,
+    handleNeuralLog,
+    handleSpecialistTelemetry,
+    handleDiagnosticAlert,
+    handleNeuralInterrupt,
+    handleIntruderDetected,
+    handleIntruderSnapshots,
+    handleSystemMetrics,
+    handleSpecialistDataPayload,
+    handleZaireActionFeed
+  };
 
   useEffect(() => {
     syncSpecialistVisualState();
@@ -753,17 +779,15 @@ function App() {
 
   const [selectedComponent, setSelectedComponent] = useState('');
 
-  useEffect(() => {
-    setSystemState(getNextSystemState({
-      biometricData,
-      isSecurityAlert,
-      isMicrophoneActive,
-      isTyping,
-      isOmniBoxOpen,
-      zaireStatus,
-      zaireResponseStream
-    }));
-  }, [isSecurityAlert, biometricData, isMicrophoneActive, isTyping, isOmniBoxOpen, zaireStatus, zaireResponseStream]);
+  const systemState = useMemo(() => getNextSystemState({
+    biometricData,
+    isSecurityAlert,
+    isMicrophoneActive,
+    isTyping,
+    isOmniBoxOpen,
+    zaireStatus,
+    zaireResponseStream
+  }), [biometricData, isSecurityAlert, isMicrophoneActive, isTyping, isOmniBoxOpen, zaireStatus, zaireResponseStream]);
 
   const updateComponentNudge = (id, updates) => {
     setComponentNudges(prev => ({
@@ -1173,7 +1197,7 @@ function App() {
     localStorage.setItem('zaire_archive_reactions_v1', JSON.stringify(archiveReactions));
   }, [archiveReactions]);
 
-  const fetchChatSessions = async () => {
+  const fetchChatSessions = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/chats`);
       const data = await res.json();
@@ -1183,7 +1207,7 @@ function App() {
     } catch (e) {
       console.error('Failed to fetch chat sessions:', e);
     }
-  };
+  }, []);
 
   const handleNewChat = () => {
     if (socketRef.current) {
@@ -1477,42 +1501,42 @@ function App() {
       timeout: 10000
     });
 
-    socketRef.current.on('connect', handleSocketConnect);
+    socketRef.current.on('connect', (...args) => socketHandlerRefs.current.handleSocketConnect(...args));
 
-    socketRef.current.on('MODE_SYNC', handleModeSyncEvent);
+    socketRef.current.on('MODE_SYNC', (...args) => socketHandlerRefs.current.handleModeSyncEvent(...args));
 
-    socketRef.current.on('session_started', handleSessionStarted);
+    socketRef.current.on('session_started', (...args) => socketHandlerRefs.current.handleSessionStarted(...args));
 
-    socketRef.current.on('session_renamed', handleSessionRenamed);
+    socketRef.current.on('session_renamed', (...args) => socketHandlerRefs.current.handleSessionRenamed(...args));
 
-    socketRef.current.on('session_loaded', handleSessionLoaded);
+    socketRef.current.on('session_loaded', (...args) => socketHandlerRefs.current.handleSessionLoaded(...args));
 
-    socketRef.current.on('ai_error', handleSocketAiError);
+    socketRef.current.on('ai_error', (...args) => socketHandlerRefs.current.handleSocketAiError(...args));
 
-    socketRef.current.on('connect_error', handleSocketConnectError);
+    socketRef.current.on('connect_error', (...args) => socketHandlerRefs.current.handleSocketConnectError(...args));
 
-    socketRef.current.on('ai_text_delta', handleTextDelta);
+    socketRef.current.on('ai_text_delta', (...args) => socketHandlerRefs.current.handleTextDelta(...args));
 
-    socketRef.current.on('audio_chunk', handleAudioChunk);
+    socketRef.current.on('audio_chunk', (...args) => socketHandlerRefs.current.handleAudioChunk(...args));
 
-    socketRef.current.on('ai_text_complete', handleAiTextComplete);
+    socketRef.current.on('ai_text_complete', (...args) => socketHandlerRefs.current.handleAiTextComplete(...args));
 
     // Handle text chunks - fetch audio via HTTP for each chunk
-    socketRef.current.on('text_chunks', handleTextChunks);
+    socketRef.current.on('text_chunks', (...args) => socketHandlerRefs.current.handleTextChunks(...args));
 
     // Vision status
-    socketRef.current.on('zaire_status', handleZaireStatus);
+    socketRef.current.on('zaire_status', (...args) => socketHandlerRefs.current.handleZaireStatus(...args));
 
     // Deep thinking status
-    socketRef.current.on('deep_thinking', handleDeepThinking);
+    socketRef.current.on('deep_thinking', (...args) => socketHandlerRefs.current.handleDeepThinking(...args));
 
     // Memory stored event
-    socketRef.current.on('memory_stored', handleMemoryStored);
+    socketRef.current.on('memory_stored', (...args) => socketHandlerRefs.current.handleMemoryStored(...args));
 
     // Neural Log events from Agent Daemon
-    socketRef.current.on('neural_log', handleNeuralLog);
+    socketRef.current.on('neural_log', (...args) => socketHandlerRefs.current.handleNeuralLog(...args));
 
-    socketRef.current.on('SPECIALIST_DATA', handleSpecialistTelemetry);
+    socketRef.current.on('SPECIALIST_DATA', (...args) => socketHandlerRefs.current.handleSpecialistTelemetry(...args));
 
 
     // System action events (mouse/keyboard)
@@ -1528,21 +1552,21 @@ function App() {
     });
 
     // Proactive Briefing & Diagnostic Pulse
-    socketRef.current.on('diagnostic_alert', handleDiagnosticAlert);
+    socketRef.current.on('diagnostic_alert', (...args) => socketHandlerRefs.current.handleDiagnosticAlert(...args));
 
-    socketRef.current.on('neural_interrupt', handleNeuralInterrupt);
+    socketRef.current.on('neural_interrupt', (...args) => socketHandlerRefs.current.handleNeuralInterrupt(...args));
 
     // Tier 5: Intruder Detection
-    socketRef.current.on('intruder_detected', handleIntruderDetected);
+    socketRef.current.on('intruder_detected', (...args) => socketHandlerRefs.current.handleIntruderDetected(...args));
 
-    socketRef.current.on('intruder_snapshots', handleIntruderSnapshots);
+    socketRef.current.on('intruder_snapshots', (...args) => socketHandlerRefs.current.handleIntruderSnapshots(...args));
 
     // Tier 7: HUD Live Telemetry
-    socketRef.current.on('system_metrics', handleSystemMetrics);
+    socketRef.current.on('system_metrics', (...args) => socketHandlerRefs.current.handleSystemMetrics(...args));
 
-    socketRef.current.on('SPECIALIST_DATA', handleSpecialistDataPayload);
+    socketRef.current.on('SPECIALIST_DATA', (...args) => socketHandlerRefs.current.handleSpecialistDataPayload(...args));
 
-    socketRef.current.on('zaire_action_feed', handleZaireActionFeed);
+    socketRef.current.on('zaire_action_feed', (...args) => socketHandlerRefs.current.handleZaireActionFeed(...args));
 
     return () => {
       if (socketRef.current) {
@@ -1550,7 +1574,7 @@ function App() {
         socketRef.current.off();
       }
     };
-  }, [fetchChatSessions, handleAiTextComplete, handleAudioChunk, handleDeepThinking, handleDiagnosticAlert, handleIntruderDetected, handleIntruderSnapshots, handleModeSyncEvent, handleNeuralInterrupt, handleNeuralLog, handleSessionLoaded, handleSessionRenamed, handleSessionStarted, handleSocketAiError, handleSocketConnect, handleSocketConnectError, handleSpecialistDataPayload, handleSpecialistTelemetry, handleSystemMetrics, handleTextChunks, handleTextDelta, handleZaireActionFeed, handleZaireStatus, handleMemoryStored]);
+  }, []);
 
   // NOTE: Direct browser camera access is disabled to prevent hardware contention 
   // with the Tier 5 Face Security Daemon (Python). Only one process can hold the camera lock.
@@ -1627,7 +1651,7 @@ function App() {
       window.removeEventListener('ZAIRE_PERSIST_CONFIG', handlePersist);
       delete window.toggleSecuritySystem;
     };
-  }, [activeMode, biometricData.detected, pollBiometrics, toggleSecuritySystem]);
+  }, [toggleSecuritySystem]);
 
   // Poll for specialist data
   useEffect(() => {
@@ -2997,6 +3021,11 @@ function App() {
       }
       case 'Kanban Board': {
         const lanes = ['todo', 'doing', 'done'];
+        const cardsByLane = customKanbanCards.reduce((acc, card) => {
+          if (!acc[card.status]) acc[card.status] = [];
+          acc[card.status].push(card);
+          return acc;
+        }, {});
         icon = "📋";
         statusText = "SPRINT TARGET";
 
@@ -3006,7 +3035,7 @@ function App() {
               <div key={lane} className="kanban-col">
                 <div className="col-label">{lane.toUpperCase()}</div>
                 <div className="col-cards">
-                  {customKanbanCards.filter(c => c.status === lane).map(card => (
+                  {(cardsByLane[lane] || []).map(card => (
                     <button
                       type="button"
                       key={card.id}
@@ -3308,7 +3337,7 @@ function App() {
                   </div>
                   <div className="memory-list">
                     {storedMemories.length === 0 && (
-                      <div className="memory-empty">— NO MEMORIES YET —</div>
+                      <div className="memory-empty">NO MEMORIES YET</div>
                     )}
                     {storedMemories.map((m, i) => (
                       <div key={m.id || i} className="memory-item">
@@ -3370,7 +3399,7 @@ function App() {
                 <div className="panel-section">
                   <div className="section-label" >HALAL FILTER</div>
                   <div style={{ padding: '8px', background: 'rgba(0,255,136,0.04)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '2px' }}>
-                    <div style={{ fontSize: '12px', color: '#00ff88', letterSpacing: '1px' }}>✓ {specialistData?.halal_filter || 'ACTIVE'}</div>
+                    <div style={{ fontSize: '12px', color: '#00ff88', letterSpacing: '0.04em' }}>✓ {specialistData?.halal_filter || 'ACTIVE'}</div>
                     <div style={{ fontSize: '12px', opacity: 0.4, marginTop: '4px' }}>LEVERAGE: BLOCKED</div>
                     <div style={{ fontSize: '12px', opacity: 0.4 }}>MEME COINS: BLOCKED</div>
                   </div>
@@ -3468,7 +3497,7 @@ function App() {
                 <div className="panel-section">
                   <div className="section-label" >ACTIVE PROJECT</div>
                   <div style={{ padding: '8px', background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: '2px' }}>
-                    <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '12px', color: '#f97316', letterSpacing: '1.5px' }}>ZAIRE CORE</div>
+                    <div style={{ fontFamily: 'var(--font-orbitron)', fontSize: '12px', color: '#f97316', letterSpacing: '0.04em' }}>ZAIRE CORE</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', opacity: 0.5, marginTop: '4px' }}>
                       <span>TYPE: NEXT.JS 15</span>
                       <span>BUILD: STABLE</span>
@@ -4692,9 +4721,11 @@ function App() {
 
                     <div className="archives-list-grid">
                       {chatSessions.length === 0 && <div className="session-empty">NO THREADS ARCHIVED</div>}
-                      {chatSessions
-                        .filter(s => s.title.toLowerCase().includes(chatSearch.toLowerCase()))
-                        .map(session => (
+                      {chatSessions.reduce((matches, session) => {
+                        if (!session.title.toLowerCase().includes(chatSearch.toLowerCase())) {
+                          return matches;
+                        }
+                        matches.push(
                           <div
                             key={session.id}
                             className={`archive-card ${selectedArchiveId === session.id ? 'active' : ''}`}
@@ -4726,7 +4757,9 @@ function App() {
                               <button className="session-action-btn delete" onClick={(e) => handleDeleteSession(e, session.id)}>DELETE</button>
                             </div>
                           </div>
-                        ))}
+                        );
+                        return matches;
+                      }, [])}
                     </div>
                   </div>
 
@@ -4736,7 +4769,6 @@ function App() {
                         <div className="archives-detail-head">
                           {editingSessionId === selectedArchiveId ? (
                             <input
-                              autoFocus
                               className="session-rename-input"
                               value={editingTitle}
                               onChange={(e) => setEditingTitle(e.target.value)}

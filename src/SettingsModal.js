@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useReducer, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { ZaireComponentRegistry } from './engine/ComponentRegistry';
 import './SettingsModal.css';
@@ -22,7 +22,36 @@ const formatLicenseTimestamp = (value, fallback) => {
   return Number.isNaN(date.getTime()) ? fallback : date.toLocaleString();
 };
 
-const renderMiniPreview = (type, color = '#00d4ff') => {
+const INITIAL_MODAL_VIEW_STATE = {
+  activePage: 'hud',
+  scanlines: true,
+  adaptiveColor: true,
+  urgentFlash: true,
+  transitionSpeed: 'NORMAL',
+  responseDepth: 'TURBO',
+  voiceWake: 85,
+  faceConfidence: 92,
+  intruderSnapshot: true,
+  memoryDepth: 60,
+  alertLevel: 'TACTICAL',
+  neuralDarwinism: true,
+  ambientNoise: true,
+  privateSession: false,
+  missionDigest: true,
+  selectedTemplateId: 'lawyer',
+  creatorStep: 1
+};
+
+const modalViewReducer = (state, action) => {
+  switch (action.type) {
+    case 'SET_FIELD':
+      return { ...state, [action.field]: action.value };
+    default:
+      return state;
+  }
+};
+
+function MiniPreview({ type, color = '#00d4ff' }) {
   const accentStyle = { color: color };
   const fillStyle = { background: color };
   const borderStyle = { borderColor: color };
@@ -199,7 +228,7 @@ const renderMiniPreview = (type, color = '#00d4ff') => {
     default:
       return null;
   }
-};
+}
 
 const modeTemplates = [
   {
@@ -501,22 +530,26 @@ function SettingsModal({
   customModes,
   onCustomModesChange,
 }) {
-  const [activePage, setActivePage] = useState('hud');
-  const [scanlines, setScanlines] = useState(true);
-  const [adaptiveColor, setAdaptiveColor] = useState(true);
-  const [urgentFlash, setUrgentFlash] = useState(true);
-  const [transitionSpeed, setTransitionSpeed] = useState('NORMAL');
-  const [responseDepth, setResponseDepth] = useState('TURBO');
-  const [voiceWake, setVoiceWake] = useState(85);
-  const [faceConfidence, setFaceConfidence] = useState(92);
-  const [intruderSnapshot, setIntruderSnapshot] = useState(true);
-  const [memoryDepth, setMemoryDepth] = useState(60);
-  const [alertLevel, setAlertLevel] = useState('TACTICAL');
-  const [neuralDarwinism, setNeuralDarwinism] = useState(true);
-  const [ambientNoise, setAmbientNoise] = useState(true);
-  const [privateSession, setPrivateSession] = useState(false);
-  const [missionDigest, setMissionDigest] = useState(true);
-  const [selectedTemplateId, setSelectedTemplateId] = useState(modeTemplates[0].id);
+  const [modalViewState, dispatchModalView] = useReducer(modalViewReducer, INITIAL_MODAL_VIEW_STATE);
+  const {
+    activePage,
+    scanlines,
+    adaptiveColor,
+    urgentFlash,
+    transitionSpeed,
+    responseDepth,
+    voiceWake,
+    faceConfidence,
+    intruderSnapshot,
+    memoryDepth,
+    alertLevel,
+    neuralDarwinism,
+    ambientNoise,
+    privateSession,
+    missionDigest,
+    selectedTemplateId,
+    creatorStep
+  } = modalViewState;
   const [creatorDraft, setCreatorDraft] = useState(blankCreatorDraft);
   const [localModes, setLocalModes] = useState(customModes && customModes.length ? customModes : defaultCustomModes);
   const [aiSlots, setAiSlots] = useState(() => ([
@@ -656,7 +689,26 @@ function SettingsModal({
   }, [isOpen, loadAiProviders]);
 
   const { getToken } = useAuth();
-  const [creatorStep, setCreatorStep] = useState(1);
+  const setModalField = useCallback((field, value) => {
+    dispatchModalView({ type: 'SET_FIELD', field, value });
+  }, []);
+  const setActivePage = useCallback((value) => setModalField('activePage', value), [setModalField]);
+  const setScanlines = useCallback((value) => setModalField('scanlines', value), [setModalField]);
+  const setAdaptiveColor = useCallback((value) => setModalField('adaptiveColor', value), [setModalField]);
+  const setUrgentFlash = useCallback((value) => setModalField('urgentFlash', value), [setModalField]);
+  const setTransitionSpeed = useCallback((value) => setModalField('transitionSpeed', value), [setModalField]);
+  const setResponseDepth = useCallback((value) => setModalField('responseDepth', value), [setModalField]);
+  const setVoiceWake = useCallback((value) => setModalField('voiceWake', value), [setModalField]);
+  const setFaceConfidence = useCallback((value) => setModalField('faceConfidence', value), [setModalField]);
+  const setIntruderSnapshot = useCallback((value) => setModalField('intruderSnapshot', value), [setModalField]);
+  const setMemoryDepth = useCallback((value) => setModalField('memoryDepth', value), [setModalField]);
+  const setAlertLevel = useCallback((value) => setModalField('alertLevel', value), [setModalField]);
+  const setNeuralDarwinism = useCallback((value) => setModalField('neuralDarwinism', value), [setModalField]);
+  const setAmbientNoise = useCallback((value) => setModalField('ambientNoise', value), [setModalField]);
+  const setPrivateSession = useCallback((value) => setModalField('privateSession', value), [setModalField]);
+  const setMissionDigest = useCallback((value) => setModalField('missionDigest', value), [setModalField]);
+  const setSelectedTemplateId = useCallback((value) => setModalField('selectedTemplateId', value), [setModalField]);
+  const setCreatorStep = useCallback((value) => setModalField('creatorStep', value), [setModalField]);
 
   const fetchCustomModes = async () => {
     try {
@@ -1397,7 +1449,7 @@ function SettingsModal({
                                         </div>
                                           
                                         <div className="visual-card-preview-area">
-                                          {renderMiniPreview(c.type, creatorDraft.color)}
+                                          <MiniPreview type={c.type} color={creatorDraft.color} />
                                         </div>
                                       </div>
                                     );

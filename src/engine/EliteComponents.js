@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { LazyMotion, domAnimation, m } from 'framer-motion';
 import './EliteComponents.css';
 
 const deterministicUnit = (seed) => {
@@ -483,8 +483,8 @@ export const CurriculumGraph = ({ color }) => (
 
 export const LectureView = ({ color }) => (
   <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '8px' }}>
-    <div style={{ flex: 2, background: 'rgba(0,0,0,0.5)', border: `1px solid ${color}55`, borderRadius: '4px', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: `${color}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}>▶</div>
+    <div className="elite-lecture-viewport" style={{ '--elite-accent-border': `${color}55` }}>
+      <div className="elite-lecture-play" style={{ '--elite-accent-bg': `${color}33` }}>▶</div>
       <div style={{ position: 'absolute', bottom: 5, right: 10, fontSize: '12px', color: '#aaa' }}>12:45 / 45:00</div>
     </div>
     <div style={{ flex: 1, padding: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
@@ -697,33 +697,36 @@ export const PermissionMatrix = ({ color }) => (
 // ==========================================
 
 export const ExecutionTimeline = ({ color }) => (
-  <div style={{ display: 'flex', alignItems: 'center', height: '100%', padding: '0 10px', position: 'relative' }}>
-    <div style={{ position: 'absolute', top: '50%', left: '10px', right: '10px', height: '2px', background: 'rgba(255,255,255,0.1)', transform: 'translateY(-50%)' }}></div>
-    {['INIT', 'FETCH', 'PARSE', 'RENDER'].map((step, i) => (
-      <div key={step} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, position: 'relative' }}>
-        <motion.div 
-          animate={i === 1 ? { boxShadow: [`0 0 0px ${color}`, `0 0 20px ${color}`, `0 0 0px ${color}`] } : {}}
-          transition={{ repeat: Infinity, duration: 1.5 }}
-          style={{ width: '12px', height: '12px', borderRadius: '50%', background: i < 2 ? color : '#333', border: `2px solid ${i < 2 ? color : '#555'}`, position: 'relative' }}
-        >
-          {i === 1 && (
-            <motion.div
-              initial={{ scale: 1, opacity: 0.8 }}
-              animate={{ scale: 3, opacity: 0 }}
-              transition={{ repeat: Infinity, duration: 1.5, ease: "easeOut" }}
-              style={{ position: 'absolute', top: '-2px', left: '-2px', right: '-2px', bottom: '-2px', borderRadius: '50%', border: `2px solid ${color}` }}
-            />
-          )}
-        </motion.div>
-        <motion.div 
-          animate={i === 1 ? { opacity: [0.5, 1, 0.5] } : {}}
-          transition={{ repeat: Infinity, duration: 1.5 }}
-          style={{ position: 'absolute', top: '20px', fontSize: '12px', color: i < 2 ? '#fff' : '#888', fontWeight: 'bold' }}>
-          {step}
-        </motion.div>
-      </div>
-    ))}
-  </div>
+  <LazyMotion features={domAnimation}>
+    <div style={{ display: 'flex', alignItems: 'center', height: '100%', padding: '0 10px', position: 'relative' }}>
+      <div style={{ position: 'absolute', top: '50%', left: '10px', right: '10px', height: '2px', background: 'rgba(255,255,255,0.1)', transform: 'translateY(-50%)' }}></div>
+      {['INIT', 'FETCH', 'PARSE', 'RENDER'].map((step, i) => (
+        <div key={step} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, position: 'relative' }}>
+          <m.div
+            animate={i === 1 ? { boxShadow: [`0 0 0px ${color}`, `0 0 20px ${color}`, `0 0 0px ${color}`] } : {}}
+            transition={{ repeat: Infinity, duration: 1.5 }}
+            style={{ width: '12px', height: '12px', borderRadius: '50%', background: i < 2 ? color : '#333', border: `2px solid ${i < 2 ? color : '#555'}`, position: 'relative' }}
+          >
+            {i === 1 && (
+              <m.div
+                initial={{ scale: 1, opacity: 0.8 }}
+                animate={{ scale: 3, opacity: 0 }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: "easeOut" }}
+                style={{ position: 'absolute', top: '-2px', left: '-2px', right: '-2px', bottom: '-2px', borderRadius: '50%', border: `2px solid ${color}` }}
+              />
+            )}
+          </m.div>
+          <m.div
+            animate={i === 1 ? { opacity: [0.5, 1, 0.5] } : {}}
+            transition={{ repeat: Infinity, duration: 1.5 }}
+            style={{ position: 'absolute', top: '20px', fontSize: '12px', color: i < 2 ? '#fff' : '#888', fontWeight: 'bold' }}
+          >
+            {step}
+          </m.div>
+        </div>
+      ))}
+    </div>
+  </LazyMotion>
 );
 
 export const StatusGrid = ({ color }) => (
@@ -777,31 +780,33 @@ export const SemanticMemory = ({ color }) => (
 );
 
 export const ModelRouter = ({ color }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-around', position: 'relative' }}>
-    {/* Animated Data Packets Flowing in the background */}
-    <div style={{ position: 'absolute', left: '10px', top: '0', bottom: '0', width: '2px', background: 'rgba(255,255,255,0.05)', zIndex: 0 }}>
-      <motion.div 
-        animate={{ top: ['0%', '100%'] }} 
-        transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-        style={{ position: 'absolute', left: '-1px', width: '4px', height: '15px', background: color, borderRadius: '2px', boxShadow: `0 0 10px ${color}` }}
-      />
-    </div>
-    {['FAST_CLAUDE', 'DEEP_THINK', 'VISION_PARSER'].map((m, i) => (
-      <div
-        key={m}
-        className={`elite-model-switch-row ${i === 1 ? 'active' : ''}`}
-        style={{ '--elite-accent': color, '--elite-accent-bg': `${color}22` }}
-      >
-        <div style={{ fontSize: '12px', color: i === 1 ? '#fff' : '#888', fontWeight: i === 1 ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {i === 1 && <motion.div animate={{ opacity: [0.2, 1, 0.2] }} transition={{ repeat: Infinity, duration: 1 }} style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, boxShadow: `0 0 5px ${color}` }} />}
-          {m}
-        </div>
-        <div style={{ fontSize: '12px', color: i === 1 ? color : '#555', fontFamily: 'monospace' }}>
-          {i === 1 ? 'ACTIVE (14ms)' : 'STANDBY'}
-        </div>
+  <LazyMotion features={domAnimation}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-around', position: 'relative' }}>
+      {/* Animated Data Packets Flowing in the background */}
+      <div style={{ position: 'absolute', left: '10px', top: '0', bottom: '0', width: '2px', background: 'rgba(255,255,255,0.05)', zIndex: 0 }}>
+        <m.div
+          animate={{ top: ['0%', '100%'] }}
+          transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+          style={{ position: 'absolute', left: '-1px', width: '4px', height: '15px', background: color, borderRadius: '2px', boxShadow: `0 0 10px ${color}` }}
+        />
       </div>
-    ))}
-  </div>
+      {['FAST_CLAUDE', 'DEEP_THINK', 'VISION_PARSER'].map((modelName, i) => (
+        <div
+          key={modelName}
+          className={`elite-model-switch-row ${i === 1 ? 'active' : ''}`}
+          style={{ '--elite-accent': color, '--elite-accent-bg': `${color}22` }}
+        >
+          <div style={{ fontSize: '12px', color: i === 1 ? '#fff' : '#888', fontWeight: i === 1 ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {i === 1 && <m.div animate={{ opacity: [0.2, 1, 0.2] }} transition={{ repeat: Infinity, duration: 1 }} style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, boxShadow: `0 0 5px ${color}` }} />}
+            {modelName}
+          </div>
+          <div style={{ fontSize: '12px', color: i === 1 ? color : '#555', fontFamily: 'monospace' }}>
+            {i === 1 ? 'ACTIVE (14ms)' : 'STANDBY'}
+          </div>
+        </div>
+      ))}
+    </div>
+  </LazyMotion>
 );
 
 export const HabitTracker = ({ color }) => (
@@ -845,27 +850,29 @@ export const VaultAccess = ({ color }) => {
     return () => clearInterval(int);
   }, []);
   return (
-    <div className="elite-vault-core-shell">
-      <motion.div 
-        animate={{ rotate: 360 }} 
-        transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
-        style={getVaultOuterRingStyle(color)}
-      >
-        <motion.div 
-          animate={{ rotate: -360 }} 
-          transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
-          style={getVaultInnerRingStyle(color)}
+    <LazyMotion features={domAnimation}>
+      <div className="elite-vault-core-shell">
+        <m.div
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
+          style={getVaultOuterRingStyle(color)}
         >
-          <motion.div 
-            animate={{ scale: [0.8, 1.2, 0.8] }} 
-            transition={{ repeat: Infinity, duration: 2 }}
-            style={{ width: '10px', height: '10px', background: color, borderRadius: '50%', boxShadow: `0 0 15px ${color}` }}
-          />
-        </motion.div>
-      </motion.div>
-      <div style={{ fontSize: '12px', color: '#fff', letterSpacing: '0.04em', fontWeight: 'bold' }}>VAULT SECURE</div>
-      <div style={{ fontSize: '12px', color: color, fontFamily: 'monospace' }}>DECRYPTING: {hex}</div>
-    </div>
+          <m.div
+            animate={{ rotate: -360 }}
+            transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
+            style={getVaultInnerRingStyle(color)}
+          >
+            <m.div
+              animate={{ scale: [0.8, 1.2, 0.8] }}
+              transition={{ repeat: Infinity, duration: 2 }}
+              style={{ width: '10px', height: '10px', background: color, borderRadius: '50%', boxShadow: `0 0 15px ${color}` }}
+            />
+          </m.div>
+        </m.div>
+        <div style={{ fontSize: '12px', color: '#fff', letterSpacing: '0.04em', fontWeight: 'bold' }}>VAULT SECURE</div>
+        <div style={{ fontSize: '12px', color: color, fontFamily: 'monospace' }}>DECRYPTING: {hex}</div>
+      </div>
+    </LazyMotion>
   );
 };
 
@@ -908,7 +915,7 @@ export const FaceVerification = ({ color }) => (
       <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '10px', height: '10px', borderTop: `2px solid ${color}`, borderRight: `2px solid ${color}` }}></div>
       <div style={{ position: 'absolute', bottom: '-2px', left: '-2px', width: '10px', height: '10px', borderBottom: `2px solid ${color}`, borderLeft: `2px solid ${color}` }}></div>
       <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '10px', height: '10px', borderBottom: `2px solid ${color}`, borderRight: `2px solid ${color}` }}></div>
-      <div style={{ width: '100%', height: '2px', background: `${color}88`, position: 'absolute', animation: 'scan 2s infinite linear' }}></div>
+      <div style={{ width: '100%', height: '2px', background: `${color}88`, position: 'absolute', animation: 'scan 0.9s infinite linear' }}></div>
     </div>
     <div style={{ position: 'absolute', bottom: 10, fontSize: '12px', color: color, letterSpacing: '0.04em', fontWeight: 'bold' }}>BIOMETRIC_LOCK: ACTIVE</div>
   </div>
