@@ -270,6 +270,28 @@ const buildCustomModeActivationLine = (modeDef) => {
   return `${cleanName} engaged. ${focusLine}. Ready for execution, sir.`;
 };
 
+const buildCustomModeRuntimeConfig = (modeDef) => {
+  if (!modeDef) return null;
+
+  const cleanText = (value, fallback = '') => {
+    const text = String(value || '').trim();
+    return text || fallback;
+  };
+
+  return {
+    name: cleanText(modeDef.name, 'CUSTOM MODE'),
+    desc: cleanText(modeDef.desc, 'Deliver focused specialist help in this user-defined workspace.'),
+    persona: cleanText(modeDef.persona, 'A disciplined senior specialist.'),
+    goals: cleanText(modeDef.goals, 'Help the user with expert-level precision in this domain.'),
+    neverDo: cleanText(modeDef.neverDo, 'Do not fabricate facts, hidden access, or completed work.'),
+    preferredOutput: cleanText(modeDef.preferredOutput, 'Action Plan'),
+    routingPriority: cleanText(modeDef.routingPriority, 'Balanced'),
+    capabilities: Array.isArray(modeDef.capabilities) ? modeDef.capabilities : [],
+    permissions: modeDef.permissions || {},
+    expertBlueprint: modeDef.expertBlueprint || null
+  };
+};
+
 function normalizeHexColor(value) {
   if (!value || typeof value !== 'string') return DEFAULT_BLOB_COLOR;
   const trimmed = value.trim();
@@ -1117,11 +1139,13 @@ function useAppController() {
     }
     // Also emit custom mode details to backend with permissions!
     if (socketRef.current) {
+      const customModeConfig = buildCustomModeRuntimeConfig(modeDef);
       socketRef.current.emit('MODE_CHANGE', {
         mode: modeDef.name,
         isCustom: true,
         permissions: modeDef.permissions,
-        activationLine
+        activationLine,
+        customModeConfig
       });
     }
   }, [activeMode, customModes, handleModeChange]);

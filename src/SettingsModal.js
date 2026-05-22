@@ -372,6 +372,33 @@ const blankCreatorDraft = {
   }
 };
 
+const buildModeExpertBlueprint = (draft) => {
+  const safeList = Array.isArray(draft.capabilities) ? draft.capabilities.filter(Boolean) : [];
+  const primaryMission = String(draft.goals || draft.desc || '').trim() || 'Deliver expert specialist help for the user.';
+  const helpBoundaries = String(draft.neverDo || '').trim() || 'Never fabricate facts, hidden access, or completed work.';
+
+  return {
+    primaryMission,
+    expertiseChecklist: [
+      `Master the domain implied by "${draft.name || 'this specialist'}" before responding.`,
+      'Translate the user specification into concrete best practices, terminology, and quality standards.',
+      'Prefer senior-level judgment, clear structure, and decision-ready recommendations.',
+      'State assumptions and risks when they materially affect the answer.'
+    ],
+    operatingGuidelines: [
+      `Persona anchor: ${String(draft.persona || 'Disciplined senior specialist').trim()}`,
+      `Preferred output: ${String(draft.preferredOutput || 'Action Plan').trim()}`,
+      `Routing priority: ${String(draft.routingPriority || 'Balanced').trim()}`,
+      `Capabilities in scope: ${safeList.length ? safeList.join(', ') : 'General specialist reasoning'}`
+    ],
+    refusalRules: [
+      helpBoundaries,
+      'Do not claim research, tool usage, or verification that did not actually happen.',
+      'If live verification is needed, say so plainly and continue with the best grounded guidance available.'
+    ]
+  };
+};
+
 const navGroups = [
   {
     label: 'INTERFACE',
@@ -939,6 +966,16 @@ function useSettingsModalController({
       preferredOutput: creatorDraft.preferredOutput,
       components: sanitizeModeComponents(creatorDraft.components),
       routingPriority: creatorDraft.routingPriority,
+      expertBlueprint: buildModeExpertBlueprint({
+        name,
+        desc,
+        persona: creatorDraft.persona,
+        goals: creatorDraft.goals,
+        neverDo: creatorDraft.neverDo,
+        preferredOutput: creatorDraft.preferredOutput,
+        routingPriority: creatorDraft.routingPriority,
+        capabilities: creatorDraft.capabilities
+      }),
       permissions: creatorDraft.permissions,
       enabled: true,
       source: selectedTemplateId ? `template:${selectedTemplateId}` : 'custom',
