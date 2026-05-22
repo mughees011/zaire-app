@@ -292,6 +292,69 @@ const buildCustomModeRuntimeConfig = (modeDef) => {
   };
 };
 
+const getArchiveSessionTitle = (session) => {
+  if (!session) return 'UNTITLED CHAT';
+
+  const explicitTitle = String(session.title || '').trim();
+  if (explicitTitle && explicitTitle !== 'Untitled Chat') {
+    return explicitTitle.length > 40 ? `${explicitTitle.slice(0, 40).trimEnd()}...` : explicitTitle;
+  }
+
+  const messages = Array.isArray(session.messages) ? session.messages : [];
+  const firstUserMessage = messages.find((message) => message.role === 'user' && String(message.content || '').trim());
+  if (!firstUserMessage) {
+    return 'UNTITLED CHAT';
+  }
+
+  const collapsed = String(firstUserMessage.content || '').replace(/\s+/g, ' ').trim();
+  return collapsed.length > 40 ? `${collapsed.slice(0, 40).trimEnd()}...` : collapsed;
+};
+
+const buildArchiveMessageItems = (session) => {
+  const messages = Array.isArray(session?.messages) ? session.messages : [];
+  const signatureCounts = new Map();
+
+  return messages.map((message) => {
+    const signature = [
+      message?.id || '',
+      message?.timestamp || message?.createdAt || '',
+      message?.role || 'assistant',
+      String(message?.content || '').trim()
+    ].join('::');
+    const duplicateCount = (signatureCounts.get(signature) || 0) + 1;
+    signatureCounts.set(signature, duplicateCount);
+
+    return {
+      message,
+      messageKey: `${signature}::${duplicateCount}`
+    };
+  });
+};
+
+const ArchiveConversation = ({ session }) => {
+  const archiveItems = buildArchiveMessageItems(session);
+
+  if (!archiveItems.length) {
+    return <div className="archives-empty-state">Select and load a session to preview full transcript.</div>;
+  }
+
+  return archiveItems.map(({ message, messageKey }, index) => {
+    const isUser = message.role === 'user';
+    return (
+      <div
+        key={messageKey}
+        className={`archive-message ${isUser ? 'user' : 'zaire'}`}
+      >
+        <div className="archive-message-head">
+          <span className="archive-message-role">{isUser ? 'USER' : 'ZAIRE'}</span>
+          <span className="archive-message-index">#{index + 1}</span>
+        </div>
+        <div className="archive-message-body">{message.content}</div>
+      </div>
+    );
+  });
+};
+
 function normalizeHexColor(value) {
   if (!value || typeof value !== 'string') return DEFAULT_BLOB_COLOR;
   const trimmed = value.trim();
@@ -2899,6 +2962,12 @@ function useAppController() {
   }, []);
   const navItems = [...CORE_MODES, ...enabledCustomNavModes.filter((m) => !CORE_MODES.includes(m))];
   const displayedMode = activeCustomMode || activeMode;
+  const customModeMap = customModes.reduce((map, mode) => {
+    if (mode?.enabled && mode?.name) {
+      map[mode.name.toUpperCase()] = mode;
+    }
+    return map;
+  }, {});
 
   const handleUpgradePro = async () => {
     if (!user || isUpgradeLoading) return;
@@ -3413,19 +3482,25 @@ function useAppController() {
             </div>
 
             <div className="nav-links">
-              {navItems.map(item => (
-                <div
-                  key={item}
-                  className={`nav-item ${displayedMode === item ? 'active' : ''}`}
-                  onClick={() => activateNavbarMode(item)}
-                  onKeyDown={(event) => handleAccessibleActivate(event, () => activateNavbarMode(item))}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <span className="nav-arrow">›</span>
-                  {item}
-                </div>
-              ))}
+              {navItems.map(item => {
+                const customMode = customModeMap[item];
+                return (
+                  <div
+                    key={item}
+                    className={`nav-item ${displayedMode === item ? 'active' : ''} ${customMode ? 'custom-nav-item' : ''}`}
+                    onClick={() => activateNavbarMode(item)}
+                    onKeyDown={(event) => handleAccessibleActivate(event, () => activateNavbarMode(item))}
+                    role="button"
+                    tabIndex={0}
+                    title={customMode ? 'Custom Mode · Click to manage' : undefined}
+                    style={customMode ? { '--nav-accent': customMode.color } : undefined}
+                  >
+                    <span className="nav-arrow">›</span>
+                    {customMode && <span className="custom-nav-glyph">◈</span>}
+                    {item}
+                  </div>
+                );
+              })}
             </div>
 
             {activeCustomMode && (
@@ -4927,6 +5002,7 @@ function useAppController() {
 
                 <div className="archives-page-body">
                   <div className="archives-list-pane">
+                    <div className="panel-label archives-panel-label">SESSION INDEX</div>
                     <div className="chat-search-box archives-search">
                       <input
                         type="text"
@@ -4940,7 +5016,8 @@ function useAppController() {
                     <div className="archives-list-grid">
                       {chatSessions.length === 0 && <div className="session-empty">NO THREADS ARCHIVED</div>}
                       {chatSessions.reduce((matches, session) => {
-                        if (!session.title.toLowerCase().includes(chatSearch.toLowerCase())) {
+                        const archiveTitle = getArchiveSessionTitle(session);
+                        if (!archiveTitle.toLowerCase().includes(chatSearch.toLowerCase())) {
                           return matches;
                         }
                         matches.push(
@@ -4958,15 +5035,17 @@ function useAppController() {
                             role="button"
                             tabIndex={0}
                           >
-                            <div className="archive-card-title">{session.title}</div>
+                            <div className="archive-card-corner archive-card-corner-tl" />
+                            <div className="archive-card-corner archive-card-corner-br" />
+                            <div className="archive-card-title">{archiveTitle}</div>
                             <div className="archive-card-meta">
-                              <span>
+                              <span className="archive-card-timestamp">
                                 <ClientLocalTime value={session.timestamp} mode="datetime" />
                               </span>
-                              <span>{session.messageCount} MSGS</span>
+                              <span className="archive-card-count">{session.messageCount} MSGS</span>
                             </div>
                             <div className="archive-card-actions">
-                              <button className="session-action-btn rename" onClick={(e) => { e.stopPropagation(); setEditingSessionId(session.id); setEditingTitle(session.title); }}>RENAME</button>
+                              <button className="session-action-btn rename" onClick={(e) => { e.stopPropagation(); setEditingSessionId(session.id); setEditingTitle(archiveTitle); }}>RENAME</button>
                               <button className="session-action-btn" onClick={(e) => { e.stopPropagation(); handleArchiveCopy(session.id); }}>COPY</button>
                               <button className="session-action-btn" onClick={(e) => { e.stopPropagation(); handleArchiveShare(session.id); }}>SHARE</button>
                               <button className={`session-action-btn ${archiveReactions[session.id] === 'like' ? 'active-like' : ''}`} onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'like'); }}>LIKE</button>
@@ -4985,6 +5064,7 @@ function useAppController() {
                     {selectedArchiveId ? (
                       <>
                         <div className="archives-detail-head">
+                          <div className="panel-label archives-panel-label">CONVERSATION STREAM</div>
                           {editingSessionId === selectedArchiveId ? (
                             <input
                               className="session-rename-input"
@@ -4997,12 +5077,12 @@ function useAppController() {
                               }}
                             />
                           ) : (
-                            <div className="archives-detail-title">{(chatSessions.find(s => s.id === selectedArchiveId)?.title) || 'SESSION'}</div>
+                            <div className="archives-detail-title">{getArchiveSessionTitle(chatSessions.find(s => s.id === selectedArchiveId) || archiveSessionCache[selectedArchiveId])}</div>
                           )}
                         </div>
-                        <pre className="archives-transcript">
-                          {transcriptFromSession(archiveSessionCache[selectedArchiveId]) || 'Select and load a session to preview full transcript.'}
-                        </pre>
+                        <div className="archives-transcript">
+                          <ArchiveConversation session={archiveSessionCache[selectedArchiveId]} />
+                        </div>
                       </>
                     ) : (
                       <div className="archives-empty-state">Select a chat from the left to inspect, export, and open it.</div>
@@ -5064,40 +5144,62 @@ function useAppController() {
                   <button className="uplink-btn" onClick={() => fileInputRef.current.click()} title="Tactical Uplink">
                     <svg className="uplink-icon" viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-2.48-2.02-4.5-4.5-4.5S7 2.52 7 5v12.5c0 3.59 2.91 6.5 6.5 6.5s6.5-2.91 6.5-6.5V6h-1.5z" /></svg>
                   </button>
-                  <div className={`command-input-wrapper ${isMicrophoneActive ? 'voice-mode' : (isTyping ? 'typing-mode' : '')}`}>
-                    <input
-                      type="text"
-                      className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
-                      placeholder={isMicrophoneActive ? 'ZAIRE LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
-                      value={isMicrophoneActive ? (recognizedText || '') : (inputValue || '')}
-                      onChange={(e) => {
-                        if (!isMicrophoneActive) {
-                          setInputValue(e.target.value);
-                          setIsTyping(e.target.value.length > 0);
-                        }
-                      }}
-                      onFocus={() => setIsTyping(true)}
-                      onBlur={() => setIsTyping(false)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && e.target.value.trim()) {
-                          const userText = e.target.value;
-                          lastUserPromptRef.current = userText;
-                          setInputValue('');
-                          setIsTyping(false);
-                          setZaireResponseStream('');
-                          liveCodeStreamRef.current = '';
-                          if (socketRef.current) socketRef.current.emit('user_message', userText, { artifactTokens: [...artifactTokensRef.current, ...pendingArtifactTokensRef.current] });
-                          if (pendingArtifactTokensRef.current.length > 0) {
-                            artifactTokensRef.current = [...artifactTokensRef.current, ...pendingArtifactTokensRef.current];
-                            pendingArtifactTokensRef.current = [];
+                  <div className="command-entry-block">
+                    <div className={`command-input-wrapper ${isMicrophoneActive ? 'voice-mode' : (isTyping ? 'typing-mode' : '')}`}>
+                      <input
+                        type="text"
+                        className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
+                        placeholder={isMicrophoneActive ? 'ZAIRE LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
+                        value={isMicrophoneActive ? (recognizedText || '') : (inputValue || '')}
+                        onChange={(e) => {
+                          if (!isMicrophoneActive) {
+                            setInputValue(e.target.value);
+                            setIsTyping(e.target.value.length > 0);
                           }
-                        }
-                      }}
-                      disabled={isMicrophoneActive}
-                    />
+                        }}
+                        onFocus={() => setIsTyping(true)}
+                        onBlur={() => setIsTyping(false)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && e.target.value.trim()) {
+                            const userText = e.target.value;
+                            lastUserPromptRef.current = userText;
+                            setInputValue('');
+                            setIsTyping(false);
+                            setZaireResponseStream('');
+                            liveCodeStreamRef.current = '';
+                            if (socketRef.current) socketRef.current.emit('user_message', userText, { artifactTokens: [...artifactTokensRef.current, ...pendingArtifactTokensRef.current] });
+                            if (pendingArtifactTokensRef.current.length > 0) {
+                              artifactTokensRef.current = [...artifactTokensRef.current, ...pendingArtifactTokensRef.current];
+                              pendingArtifactTokensRef.current = [];
+                            }
+                          }
+                        }}
+                        disabled={isMicrophoneActive}
+                      />
+                    </div>
+                    <div className={`command-voice-status ${isMicrophoneActive ? 'active' : ''}`}>
+                      {isMicrophoneActive ? 'LISTENING... CLICK TO STOP' : 'CLICK TO TOGGLE VOICE'}
+                    </div>
                   </div>
-                  <button className={`mic-btn ${isMicrophoneActive ? 'active' : ''}`} onClick={toggleMicrophone} title="Toggle Mic">
-                    <svg className="mic-icon" viewBox="0 0 24 24"><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" /></svg>
+                  <button
+                    className={`mic-btn morphing-mic-btn ${isMicrophoneActive ? 'active' : ''}`}
+                    onClick={toggleMicrophone}
+                    title={isMicrophoneActive ? 'Stop listening' : 'Start listening'}
+                    aria-pressed={isMicrophoneActive}
+                  >
+                    <span className="mic-btn-shimmer" aria-hidden="true"></span>
+                    <span className="mic-btn-label">
+                      <span className="mic-btn-label-text">{isMicrophoneActive ? 'LISTENING' : 'LISTEN'}</span>
+                      <span className={`mic-btn-icon-wrap ${isMicrophoneActive ? 'hidden' : ''}`} aria-hidden="true">
+                        <svg className="mic-icon" viewBox="0 0 24 24"><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" /></svg>
+                      </span>
+                      <span className={`mic-waveform ${isMicrophoneActive ? 'active' : ''}`} aria-hidden="true">
+                        <span className="mic-wave-bar"></span>
+                        <span className="mic-wave-bar"></span>
+                        <span className="mic-wave-bar"></span>
+                        <span className="mic-wave-bar"></span>
+                      </span>
+                    </span>
                   </button>
                 </div>
               </div>

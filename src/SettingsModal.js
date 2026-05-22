@@ -33,6 +33,9 @@ const INITIAL_MODAL_VIEW_STATE = {
   faceConfidence: 92,
   intruderSnapshot: true,
   memoryDepth: 60,
+  retentionPeriod: 'Forever',
+  gazeMemoryEnabled: false,
+  crossModeSharing: true,
   alertLevel: 'TACTICAL',
   neuralDarwinism: true,
   ambientNoise: true,
@@ -74,11 +77,51 @@ const buildInitialSettingsLocalState = (customModes) => ({
   licenseKeyInput: '',
   licensingInfo: null,
   licensingError: null,
-  licensingLoading: false
+  licensingLoading: false,
+  memoryDashboard: null,
+  memorySearchQuery: '',
+  memoryDashboardLoading: false,
+  memoryActionStatus: ''
 });
 
 const createReducerFieldSetter = (dispatch, field) => (value) => {
   dispatch({ type: 'SET_FIELD', field, value });
+};
+
+const estimateMemoryStatsLabel = (dashboard) => {
+  if (!dashboard?.stats) return '0 facts · 0 study entries · 0 KB';
+  return dashboard.stats.summary || '0 facts · 0 study entries · 0 KB';
+};
+
+const formatMemoryOldestDate = (value) => {
+  if (!value) return 'No long-term memories stored yet';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Unknown' : parsed.toLocaleDateString();
+};
+
+const formatMemoryEntryDate = (value) => {
+  if (!value) return 'UNKNOWN DATE';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'UNKNOWN DATE' : parsed.toLocaleDateString();
+};
+
+const normalizeMemoryDashboard = (stats, memories) => ({
+  stats: stats || null,
+  memories: Array.isArray(memories)
+    ? memories.map((memory) => ({
+        ...memory,
+        displayDate: formatMemoryEntryDate(memory?.timestamp)
+      }))
+    : []
+});
+
+const getComponentAccentClass = (componentType = '') => {
+  const normalized = String(componentType).toLowerCase();
+  if (normalized.includes('chat') || normalized.includes('voice')) return 'accent-chat';
+  if (normalized.includes('file') || normalized.includes('research') || normalized.includes('memory')) return 'accent-file';
+  if (normalized.includes('task') || normalized.includes('queue')) return 'accent-neural';
+  if (normalized.includes('terminal') || normalized.includes('status') || normalized.includes('camera')) return 'accent-terminal';
+  return 'accent-neural';
 };
 
 function MiniPreview({ type, color = '#00d4ff' }) {
@@ -600,6 +643,9 @@ function useSettingsModalController({
     faceConfidence,
     intruderSnapshot,
     memoryDepth,
+    retentionPeriod,
+    gazeMemoryEnabled,
+    crossModeSharing,
     alertLevel,
     neuralDarwinism,
     ambientNoise,
@@ -620,7 +666,11 @@ function useSettingsModalController({
     licenseKeyInput,
     licensingInfo,
     licensingError,
-    licensingLoading
+    licensingLoading,
+    memoryDashboard,
+    memorySearchQuery,
+    memoryDashboardLoading,
+    memoryActionStatus
   } = settingsLocalState;
   const setCreatorDraft = createReducerFieldSetter(dispatchSettingsLocalState, 'creatorDraft');
   const setLocalModes = createReducerFieldSetter(dispatchSettingsLocalState, 'localModes');
@@ -629,6 +679,10 @@ function useSettingsModalController({
   const setLicensingInfo = createReducerFieldSetter(dispatchSettingsLocalState, 'licensingInfo');
   const setLicensingError = createReducerFieldSetter(dispatchSettingsLocalState, 'licensingError');
   const setLicensingLoading = createReducerFieldSetter(dispatchSettingsLocalState, 'licensingLoading');
+  const setMemoryDashboard = createReducerFieldSetter(dispatchSettingsLocalState, 'memoryDashboard');
+  const setMemorySearchQuery = createReducerFieldSetter(dispatchSettingsLocalState, 'memorySearchQuery');
+  const setMemoryDashboardLoading = createReducerFieldSetter(dispatchSettingsLocalState, 'memoryDashboardLoading');
+  const setMemoryActionStatus = createReducerFieldSetter(dispatchSettingsLocalState, 'memoryActionStatus');
 
   const fetchLicensingInfo = async () => {
     setLicensingLoading(true);
@@ -660,11 +714,70 @@ function useSettingsModalController({
     }
   };
 
+  const fetchMemoryDashboard = async () => {
+    setMemoryDashboardLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/memory/dashboard`);
+      const data = await response.json();
+      if (data.success) {
+        setMemoryDashboard(normalizeMemoryDashboard(data.stats, data.memories));
+      }
+    } catch (err) {
+      console.warn('Memory dashboard fetch failed:', err.message);
+    } finally {
+      setMemoryDashboardLoading(false);
+    }
+  };
+
+  const clearMemoryDomain = async (domain, label) => {
+    if (!window.confirm(`Proceed with ${label.toUpperCase()}?`)) return;
+    setMemoryActionStatus(`Executing ${label.toUpperCase()}...`);
+    try {
+      const response = await fetch(`${API_URL}/memory/clear`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setMemoryDashboard(normalizeMemoryDashboard(data.dashboard?.stats, data.dashboard?.memories));
+        setMemoryActionStatus(`${label.toUpperCase()} complete.`);
+      } else {
+        setMemoryActionStatus(data.error || `${label} failed.`);
+      }
+    } catch (err) {
+      setMemoryActionStatus(`${label} failed: ${err.message}`);
+    }
+  };
+
+  const loadMemorySettingsConfig = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/config`);
+      const data = await response.json();
+      const memorySettings = data?.success ? (data.data?.memorySettings || {}) : {};
+      if (memorySettings.retentionPeriod) {
+        dispatchModalView({ type: 'SET_FIELD', field: 'retentionPeriod', value: memorySettings.retentionPeriod });
+      }
+      if (typeof memorySettings.gazeMemoryEnabled === 'boolean') {
+        dispatchModalView({ type: 'SET_FIELD', field: 'gazeMemoryEnabled', value: memorySettings.gazeMemoryEnabled });
+      }
+      if (typeof memorySettings.crossModeSharing === 'boolean') {
+        dispatchModalView({ type: 'SET_FIELD', field: 'crossModeSharing', value: memorySettings.crossModeSharing });
+      }
+    } catch (_) {}
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       fetchLicensingInfo();
+      fetchMemoryDashboard();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    loadMemorySettingsConfig();
+  }, [isOpen, loadMemorySettingsConfig]);
 
   const activateNewKey = async () => {
     if (!licenseKeyInput.trim()) return;
@@ -769,6 +882,9 @@ function useSettingsModalController({
   const setFaceConfidence = useCallback((value) => setModalField('faceConfidence', value), [setModalField]);
   const setIntruderSnapshot = useCallback((value) => setModalField('intruderSnapshot', value), [setModalField]);
   const setMemoryDepth = useCallback((value) => setModalField('memoryDepth', value), [setModalField]);
+  const setRetentionPeriod = useCallback((value) => setModalField('retentionPeriod', value), [setModalField]);
+  const setGazeMemoryEnabled = useCallback((value) => setModalField('gazeMemoryEnabled', value), [setModalField]);
+  const setCrossModeSharing = useCallback((value) => setModalField('crossModeSharing', value), [setModalField]);
   const setAlertLevel = useCallback((value) => setModalField('alertLevel', value), [setModalField]);
   const setNeuralDarwinism = useCallback((value) => setModalField('neuralDarwinism', value), [setModalField]);
   const setAmbientNoise = useCallback((value) => setModalField('ambientNoise', value), [setModalField]);
@@ -809,6 +925,12 @@ function useSettingsModalController({
   const setHudOpacityPercent = (value) => setHudOpacity(value / 100);
   const selectedTemplate = modeTemplates.find((template) => template.id === selectedTemplateId) || modeTemplates[0];
   const modeCount = localModes.length;
+  const filteredMemoryResults = (memoryDashboard?.memories || []).filter((memory) => {
+    const query = memorySearchQuery.trim().toLowerCase();
+    if (!query) return true;
+    return String(memory.text || '').toLowerCase().includes(query)
+      || (Array.isArray(memory.tags) && memory.tags.some((tag) => String(tag).toLowerCase().includes(query)));
+  }).slice(0, 8);
 
   const saveCustomMode = async (mode) => {
     try {
@@ -1253,11 +1375,18 @@ function useSettingsModalController({
                   ))}
                 </div>
                 <div className="step-indicator">
-                  {[1, 2, 3, 4].map(s => (
-                    <span
-                      key={s}
-                      className={`step-dot ${creatorStep > s ? 'done' : creatorStep === s ? 'current' : ''}`}
-                    />
+                  {[
+                    { step: 1, label: 'IDENTITY' },
+                    { step: 2, label: 'INTEL' },
+                    { step: 3, label: 'INTERFACE' },
+                    { step: 4, label: 'PERMS' }
+                  ].map(({ step, label }) => (
+                    <span key={step} className="step-dot-group">
+                      <span
+                        className={`step-dot ${creatorStep > step ? 'done' : creatorStep === step ? 'current' : ''}`}
+                      />
+                      <span className="step-dot-label">{label}</span>
+                    </span>
                   ))}
                 </div>
               </div>
@@ -1430,7 +1559,7 @@ function useSettingsModalController({
                             return (
                               <div
                                 key={comp.type}
-                                className="library-item"
+                                className={`library-item ${getComponentAccentClass(comp.type)}`}
                                 draggable={!alreadyPlaced}
                                 onDragStart={(e) => {
                                   e.dataTransfer.setData('text/plain', comp.type);
@@ -1504,12 +1633,15 @@ function useSettingsModalController({
                               >
                                 <div className="zone-label">{zone}</div>
                                 <div className="zone-components-list">
+                                  {zoneComponents.length === 0 && (
+                                    <div className="zone-empty-copy">Drop components here</div>
+                                  )}
                                   {zoneComponents.map((c) => {
                                     const matchedLib = COMPONENT_LIBRARY.find(l => l.type === c.type);
                                     return (
                                       <div 
                                         key={c.type} 
-                                        className="zone-component-card-visual" 
+                                        className={`zone-component-card-visual ${getComponentAccentClass(c.type)}`} 
                                         style={{ border: `1px solid ${creatorDraft.color}22`, background: `rgba(0, 0, 0, 0.4)` }}
                                       >
                                         <div className="visual-card-header" style={{ borderBottom: `1px solid ${creatorDraft.color}11` }}>
@@ -1728,14 +1860,94 @@ function useSettingsModalController({
           {activePage === 'memory' && (
             <div className="page active">
               <div className="page-title">MEMORY</div>
-              <div className="page-sub">Manage persistence, recall depth, and privacy boundaries</div>
+              <div className="page-sub">Manage retention, search, selective wipe controls, and privacy boundaries</div>
+              <Section title="MEMORY STATS">
+                <div className="memory-stats-grid">
+                  <div className="memory-stat-card">
+                    <div className="memory-stat-label">TOTAL MEMORY OBJECTS</div>
+                    <div className="memory-stat-value">
+                      {memoryDashboardLoading ? 'SYNCING...' : `${memoryDashboard?.stats?.factsCount || 0} FACTS`}
+                    </div>
+                    <div className="memory-stat-meta">{estimateMemoryStatsLabel(memoryDashboard)}</div>
+                  </div>
+                  <div className="memory-stat-card">
+                    <div className="memory-stat-label">OLDEST MEMORY</div>
+                    <div className="memory-stat-value memory-stat-value-small">
+                      {memoryDashboardLoading ? 'SYNCING...' : formatMemoryOldestDate(memoryDashboard?.stats?.oldestMemoryDate)}
+                    </div>
+                    <div className="memory-stat-meta">
+                      {memoryDashboard?.stats?.studyCount || 0} STUDY · {memoryDashboard?.stats?.tradeCount || 0} TRADE · {memoryDashboard?.stats?.visualEchoCount || 0} GAZE
+                    </div>
+                  </div>
+                  <div className="memory-stat-card">
+                    <div className="memory-stat-label">STORAGE USED</div>
+                    <div className="memory-stat-value">{memoryDashboardLoading ? 'SYNCING...' : (memoryDashboard?.stats?.storageUsedLabel || '0 KB')}</div>
+                    <div className="memory-stat-meta">Disk-backed long-term memory footprint</div>
+                  </div>
+                </div>
+              </Section>
               <Section title="RECALL CONFIGURATION">
                 <SettingRow name="CONTEXT RETENTION" desc="How much session context ZAIRE keeps active">
                   <Slider min={10} max={100} step={5} value={memoryDepth} onChange={setMemoryDepth} />
                 </SettingRow>
+                <SettingRow name="RETENTION PERIOD" desc="How long stored memory remains eligible for recall">
+                  <select className="hud-select" value={retentionPeriod} onChange={(e) => setRetentionPeriod(e.target.value)}>
+                    <option>7 days</option>
+                    <option>30 days</option>
+                    <option>90 days</option>
+                    <option>Forever</option>
+                  </select>
+                </SettingRow>
+                <SettingRow name="GAZE MEMORY" desc="Store screenshot summaries every 5 minutes when active">
+                  <Toggle checked={gazeMemoryEnabled} onChange={setGazeMemoryEnabled} />
+                </SettingRow>
+                <SettingRow name="CROSS-MODE SHARING" desc="Allow all modes to draw from one shared memory pool">
+                  <Toggle checked={crossModeSharing} onChange={setCrossModeSharing} />
+                </SettingRow>
                 <SettingRow name="PRIVATE SESSION MODE" desc="Temporarily disable persistent memory writes">
                   <Toggle checked={privateSession} onChange={setPrivateSession} />
                 </SettingRow>
+              </Section>
+              <Section title="MEMORY SEARCH">
+                <div className="memory-search-stack">
+                  <input
+                    className="custom-api-input memory-search-input"
+                    placeholder="Query stored memories, tags, or facts..."
+                    value={memorySearchQuery}
+                    onChange={(e) => setMemorySearchQuery(e.target.value)}
+                  />
+                  <div className="memory-search-results">
+                    {filteredMemoryResults.length === 0 ? (
+                      <div className="memory-empty-copy">
+                        {memoryDashboardLoading ? 'Synchronizing memory core...' : 'No matching stored memories found.'}
+                      </div>
+                    ) : (
+                      filteredMemoryResults.map((memory) => (
+                        <div className="memory-result-card" key={memory.id}>
+                          <div className="memory-result-meta">
+                            <span>{memory.displayDate || 'UNKNOWN DATE'}</span>
+                            <span>{(memory.tags || []).slice(0, 3).join(' · ') || 'GENERAL'}</span>
+                          </div>
+                          <div className="memory-result-text">{memory.text}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </Section>
+              <Section title="SELECTIVE FORGET">
+                <div className="memory-wipe-actions">
+                  <button type="button" className="footer-btn footer-btn-dismiss memory-action-btn" onClick={() => clearMemoryDomain('study', 'Clear Study History')}>
+                    CLEAR STUDY HISTORY
+                  </button>
+                  <button type="button" className="footer-btn footer-btn-dismiss memory-action-btn" onClick={() => clearMemoryDomain('trade', 'Clear Trade History')}>
+                    CLEAR TRADE HISTORY
+                  </button>
+                  <button type="button" className="footer-btn footer-btn-reset memory-action-btn" onClick={() => clearMemoryDomain('full', 'Full Neural Wipe')}>
+                    FULL NEURAL WIPE
+                  </button>
+                </div>
+                <div className="memory-action-status">{memoryActionStatus || 'Selective wipe controls target study, trade, and full long-term memory domains.'}</div>
               </Section>
             </div>
           )}
@@ -1863,6 +2075,13 @@ function useSettingsModalController({
                   detail: {
                     aiVault: {
                       slots: aiSlots.slice(0, 3)
+                    },
+                    memorySettings: {
+                      memoryDepth,
+                      retentionPeriod,
+                      gazeMemoryEnabled,
+                      crossModeSharing,
+                      privateSession
                     }
                   }
                 }));
