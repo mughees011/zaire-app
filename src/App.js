@@ -7,8 +7,9 @@ import { io } from 'socket.io-client';
 import './App.css';
 import ShadowAssistant from './components/ShadowAssistant';
 import { SignedIn, SignedOut, SignIn, SignUp, UserButton, useUser, useAuth } from '@clerk/clerk-react';
-import { ZaireComponentRegistry } from './engine/ComponentRegistry';
+import { ZaireComponentRegistry, getComponentBlueprintByType } from './engine/ComponentRegistry';
 import * as EliteComponents from './engine/EliteComponents';
+import EliteHUDWrapper from './engine/EliteHUDWrapper';
 const DEFAULT_BLOB_COLOR = '#00b4ff';
 const API_BASE_URL = process.env.REACT_APP_API_URL || `https://zaire-backend.onrender.com`;
 const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
@@ -3101,64 +3102,76 @@ function useAppController() {
       .sort((a, b) => (a.index || 0) - (b.index || 0));
   };
 
-  const wrapPremiumWorkspaceCard = (compType, key, content, statusText = "SECURE LINK", icon = "⚡") => {
+  const getEliteComponentRuntimeState = (compType, blueprint) => {
+    const normalized = String(compType || '').toLowerCase();
+
+    if (normalized.includes('chat')) {
+      if (['thinking', 'deep_thinking', 'agent_thinking'].includes(zaireStatus)) return 'thinking';
+      if (zaireStatus === 'speaking') return 'streaming';
+      return 'active';
+    }
+
+    if (normalized.includes('task') || normalized.includes('timeline')) {
+      return customTasks.length > 0 ? 'syncing' : 'idle';
+    }
+
+    if (normalized.includes('candlestick') || normalized.includes('signal') || normalized.includes('scanner') || normalized.includes('risk')) {
+      return activeMode === 'TRADER' ? 'streaming' : 'idle';
+    }
+
+    if (normalized.includes('lecture') || normalized.includes('quiz') || normalized.includes('notes') || normalized.includes('flashcard')) {
+      return activeMode === 'PROFESSOR' ? 'syncing' : 'idle';
+    }
+
+    if (normalized.includes('terminal') || normalized.includes('code') || normalized.includes('diff') || normalized.includes('preview')) {
+      return activeMode === 'ENGINEER' ? 'active' : 'idle';
+    }
+
+    if (normalized.includes('camera') || normalized.includes('face')) {
+      if (cameraStatus === 'authorized') return 'active';
+      if (cameraStatus === 'denied') return 'locked';
+      return 'loading';
+    }
+
+    if (blueprint?.behavior?.realtime) {
+      return 'syncing';
+    }
+
+    return 'idle';
+  };
+
+  const wrapPremiumWorkspaceCard = (compType, key, content, statusText = "SECURE LINK", icon = "⚡", blueprint = null, componentState = 'idle') => {
     const cardColor = activeModeObj?.color || 'var(--primary)';
     return (
-      <div 
+      <EliteHUDWrapper
         key={key}
-        className="premium-workspace-card"
-        onMouseMove={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          e.currentTarget.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
-          e.currentTarget.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
-        }}
-        style={{
-          '--card-theme': cardColor,
-          borderColor: `${cardColor}25`,
-        }}
+        componentKey={key}
+        blueprint={blueprint}
+        accentColor={cardColor}
+        componentState={componentState}
+        statusText={statusText}
+        icon={icon}
+        title={compType}
       >
-        {/* HUD Corners */}
-        <div className="card-hud-bracket top-left" style={{ borderColor: `${cardColor}66` }}></div>
-        <div className="card-hud-bracket top-right" style={{ borderColor: `${cardColor}66` }}></div>
-        <div className="card-hud-bracket bottom-left" style={{ borderColor: `${cardColor}66` }}></div>
-        <div className="card-hud-bracket bottom-right" style={{ borderColor: `${cardColor}66` }}></div>
-        
-        {/* Scanline overlay */}
-        <div className="card-scanline"></div>
-
-        {/* Header Tab */}
-        <div className="premium-card-header" style={{ borderBottom: `1px solid ${cardColor}18` }}>
-          <div className="header-title-wrap">
-            <span className="header-status-dot pulse" style={{ background: cardColor, boxShadow: `0 0 6px ${cardColor}` }}></span>
-            <span className="header-icon" style={{ marginRight: '4px' }}>{icon}</span>
-            <span className="header-title">{compType.toUpperCase()}</span>
-          </div>
-          <div className="header-status-text" style={{ color: `${cardColor}b3` }}>
-            {statusText}
-          </div>
-        </div>
-
-        {/* Inner Content Area */}
-        <div className="premium-card-body">
-          {content}
-        </div>
-      </div>
+        {content}
+      </EliteHUDWrapper>
     );
   };
 
   const renderCustomComponent = (comp) => {
     const key = `${comp.type}-${comp.index}`;
     let innerJSX = null;
-    let icon = "⚡";
-    let statusText = "SECURE LINK";
+    let icon = '⚡';
+    let statusText = 'SECURE LINK';
+    const blueprint = getComponentBlueprintByType(comp.type);
 
     switch (comp.type) {
       case 'Chat Panel': {
         const activeSession = chatSessions.find(s => s.id === currentSessionId);
         const currentMessages = activeSession ? activeSession.messages : [];
         const isAIActive = ['thinking', 'speaking', 'deep_thinking', 'agent_thinking'].includes(zaireStatus);
-        icon = "💬";
-        statusText = "UPLINK: ACTIVE";
+        icon = '💬';
+        statusText = 'UPLINK: ACTIVE';
 
         innerJSX = (
           <div className="chat-panel-custom" style={{ height: '100%' }}>
@@ -3424,12 +3437,14 @@ function useAppController() {
         break;
       }
       default: {
-        const componentName = comp.type.replace(/\s+/g, '');
+        const componentName = blueprint?.renderKey || comp.type.replace(/\s+/g, '');
         const EliteComp = EliteComponents[componentName];
         const matchedRegistry = ZaireComponentRegistry.find(c => c.type === comp.type);
         if (matchedRegistry) {
           icon = matchedRegistry.icon;
-          statusText = matchedRegistry.desc.toUpperCase();
+          statusText = matchedRegistry.blueprint?.behavior?.realtime
+            ? `SYNC ${matchedRegistry.blueprint.behavior.polling}MS`
+            : matchedRegistry.desc.toUpperCase();
         }
         
         if (EliteComp) {
@@ -3446,7 +3461,15 @@ function useAppController() {
       }
     }
 
-    return wrapPremiumWorkspaceCard(comp.type, key, innerJSX, statusText, icon);
+    return wrapPremiumWorkspaceCard(
+      comp.type,
+      key,
+      innerJSX,
+      statusText,
+      icon,
+      blueprint,
+      getEliteComponentRuntimeState(comp.type, blueprint)
+    );
   };
 
   useEffect(() => {
@@ -3699,13 +3722,6 @@ function useAppController() {
                         <span className="memory-text">{m.text}</span>
                       </div>
                     ))}
-                  </div>
-                </div>
-
-                <div className="panel-section">
-                  <div className="section-label">LAST COMMAND</div>
-                  <div className="last-command" style={{ minHeight: '60px' }}>
-                    <div className="command-content">{finalRecognizedText || recognizedText || lastCommand || '— AWAITING INPUT —'}</div>
                   </div>
                 </div>
 
@@ -4565,7 +4581,7 @@ function useAppController() {
                   </div>
                 </div>
 
-                <div className="panel-section" style={getComponentStyle('SLEEP_AWAKE')}>
+                {/* <div className="panel-section" style={getComponentStyle('SLEEP_AWAKE')}>
                   <div className="section-label">SLEEP / AWAKE</div>
                   <div className="sleep-hud">
                     <div className="sleep-main">
@@ -4589,7 +4605,7 @@ function useAppController() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </div> */}
 
                 <div className="panel-section" style={getComponentStyle('SYSTEM_METRICS')}>
                   <div className="section-label">SYSTEM METRICS</div>
@@ -5111,20 +5127,11 @@ function useAppController() {
                               <button className="session-action-btn rename" title="Rename chat" aria-label="Rename chat" onClick={(e) => { e.stopPropagation(); setEditingSessionId(session.id); setEditingTitle(archiveTitle); }}>
                                 <ArchiveActionIcon type="rename" />
                               </button>
-                              <button className="session-action-btn" title="Copy chat" aria-label="Copy chat" onClick={(e) => { e.stopPropagation(); handleArchiveCopy(session.id); }}>
-                                <ArchiveActionIcon type="copy" />
-                              </button>
-                              <button className="session-action-btn" title="Share chat" aria-label="Share chat" onClick={(e) => { e.stopPropagation(); handleArchiveShare(session.id); }}>
-                                <ArchiveActionIcon type="share" />
-                              </button>
                               <button className={`session-action-btn ${archiveReactions[session.id] === 'like' ? 'active-like' : ''}`} title="Like chat" aria-label="Like chat" onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'like'); }}>
                                 <ArchiveActionIcon type="like" />
                               </button>
                               <button className={`session-action-btn ${archiveReactions[session.id] === 'dislike' ? 'active-dislike' : ''}`} title="Dislike chat" aria-label="Dislike chat" onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'dislike'); }}>
                                 <ArchiveActionIcon type="dislike" />
-                              </button>
-                              <button className="session-action-btn open" title="Open chat" aria-label="Open chat" onClick={(e) => { e.stopPropagation(); handleLoadSession(session.id); }}>
-                                <ArchiveActionIcon type="open" />
                               </button>
                               <button className="session-action-btn delete" title="Delete chat" aria-label="Delete chat" onClick={(e) => handleDeleteSession(e, session.id)}>
                                 <ArchiveActionIcon type="delete" />
@@ -5305,8 +5312,8 @@ function useAppController() {
                         <div className="targeting-bracket bl"></div>
                         <div className="targeting-bracket br"></div>
                         <div className="bio-readout-hud">
-                          <div className="bio-stat">ID: {biometricData.name || 'SCANNING'}</div>
-                          <div className="bio-stat">CONF: {biometricData.confidence || 0}%</div>
+                          {/* <div className="bio-stat">ID: {biometricData.name || 'SCANNING'}</div> */}
+                          {/* <div className="bio-stat">CONF: {biometricData.confidence || 0}%</div> */}
                         </div>
                       </div>
                     </div>
@@ -5330,11 +5337,11 @@ function useAppController() {
                   <div className={`biometric-status-flash ${biometricData.detected ? 'confirmed' : (isSecurityAlert ? 'threat' : '')}`}></div>
                   <div className="hud-telemetry-top">
                     <span className="telemetry-item">REC ●</span>
-                    <span className="telemetry-item blink">SYNC_[88%]</span>
+                    {/* <span className="telemetry-item blink">SYNC_[88%]</span> */}
                   </div>
                   <div className="hud-telemetry-bottom">
-                    <span className="telemetry-item">60 FPS</span>
-                    <span className="telemetry-item">4.2 Mbps</span>
+                    {/* <span className="telemetry-item">60 FPS</span>
+                    <span className="telemetry-item">4.2 Mbps</span> */}
                   </div>
                 </div>
               </div>
