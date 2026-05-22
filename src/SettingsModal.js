@@ -3,10 +3,27 @@ import { useAuth } from '@clerk/clerk-react';
 import { ZaireComponentRegistry } from './engine/ComponentRegistry';
 import './SettingsModal.css';
 
-const API_URL = process.env.REACT_APP_API_URL;
+const API_URL = process.env.REACT_APP_API_URL || 'https://zaire-backend.onrender.com';
 const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
 const COMPONENT_LIBRARY = ZaireComponentRegistry;
 const CUSTOM_MODE_LOCKED_ZONES = ['Bottom Console'];
+
+const fetchJsonOrThrow = async (url, options) => {
+  const response = await fetch(url, options);
+  const contentType = response.headers.get('content-type') || '';
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  if (!contentType.includes('application/json')) {
+    const text = await response.text();
+    const preview = text.slice(0, 40).replace(/\s+/g, ' ');
+    throw new Error(`Expected JSON but received: ${preview || 'unknown response'}`);
+  }
+
+  return response.json();
+};
 
 const sanitizeModeComponents = (components = []) =>
   components.filter((component) => !CUSTOM_MODE_LOCKED_ZONES.includes(component.zone));
@@ -690,7 +707,7 @@ function useSettingsModalController({
       const storedLicense = localStorage.getItem('zaire_license_key') || '';
       if (storedLicense) {
         setLicenseKeyInput(storedLicense);
-        const response = await fetch(`${API_URL}/api/license/validate`, {
+        const data = await fetchJsonOrThrow(`${API_URL}/api/license/validate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -698,7 +715,6 @@ function useSettingsModalController({
             machine_id: 'BROWSER_HUD'
           })
         });
-        const data = await response.json();
         if (data.valid) {
           setLicensingInfo(data);
           setLicensingError(null);
@@ -717,8 +733,7 @@ function useSettingsModalController({
   const fetchMemoryDashboard = async () => {
     setMemoryDashboardLoading(true);
     try {
-      const response = await fetch(`${API_URL}/memory/dashboard`);
-      const data = await response.json();
+      const data = await fetchJsonOrThrow(`${API_URL}/memory/dashboard`);
       if (data.success) {
         setMemoryDashboard(normalizeMemoryDashboard(data.stats, data.memories));
       }
@@ -733,12 +748,11 @@ function useSettingsModalController({
     if (!window.confirm(`Proceed with ${label.toUpperCase()}?`)) return;
     setMemoryActionStatus(`Executing ${label.toUpperCase()}...`);
     try {
-      const response = await fetch(`${API_URL}/memory/clear`, {
+      const data = await fetchJsonOrThrow(`${API_URL}/memory/clear`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain })
       });
-      const data = await response.json();
       if (data.success) {
         setMemoryDashboard(normalizeMemoryDashboard(data.dashboard?.stats, data.dashboard?.memories));
         setMemoryActionStatus(`${label.toUpperCase()} complete.`);
@@ -752,8 +766,7 @@ function useSettingsModalController({
 
   const loadMemorySettingsConfig = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/config`);
-      const data = await response.json();
+      const data = await fetchJsonOrThrow(`${API_URL}/config`);
       const memorySettings = data?.success ? (data.data?.memorySettings || {}) : {};
       if (memorySettings.retentionPeriod) {
         dispatchModalView({ type: 'SET_FIELD', field: 'retentionPeriod', value: memorySettings.retentionPeriod });
@@ -784,7 +797,7 @@ function useSettingsModalController({
     setLicensingLoading(true);
     setLicensingError(null);
     try {
-      const response = await fetch(`${API_URL}/api/license/validate`, {
+      const data = await fetchJsonOrThrow(`${API_URL}/api/license/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -794,7 +807,6 @@ function useSettingsModalController({
           os_version: 'Web Client'
         })
       });
-      const data = await response.json();
       if (data.valid) {
         localStorage.setItem('zaire_license_key', licenseKeyInput.trim());
         setLicensingInfo(data);
@@ -814,7 +826,7 @@ function useSettingsModalController({
     if (!licensingInfo?.license_key) return;
     setLicensingLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/license/deactivate`, {
+      const data = await fetchJsonOrThrow(`${API_URL}/api/license/deactivate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -822,7 +834,6 @@ function useSettingsModalController({
           machine_id: machineId
         })
       });
-      const data = await response.json();
       if (data.success) {
         fetchLicensingInfo();
       } else {
@@ -843,8 +854,7 @@ function useSettingsModalController({
 
   const loadAiProviders = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/llm/providers`);
-      const data = await response.json();
+      const data = await fetchJsonOrThrow(`${API_URL}/llm/providers`);
       const slots = data?.slots;
       if (Array.isArray(slots) && slots.length > 0) {
         const normalized = [0, 1, 2].map((i) => ({
@@ -896,12 +906,11 @@ function useSettingsModalController({
   const fetchCustomModes = async () => {
     try {
       const token = await getToken();
-      const response = await fetch(`${API_URL}/api/custom_modes`, {
+      const data = await fetchJsonOrThrow(`${API_URL}/api/custom_modes`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      const data = await response.json();
       if (data.success && Array.isArray(data.modes)) {
         const sanitizedModes = data.modes.map(sanitizeModeRecord);
         setLocalModes(sanitizedModes);
@@ -951,13 +960,12 @@ function useSettingsModalController({
   const duplicateCustomMode = async (modeId) => {
     try {
       const token = await getToken();
-      const response = await fetch(`${API_URL}/api/custom_modes/${modeId}/duplicate`, {
+      const data = await fetchJsonOrThrow(`${API_URL}/api/custom_modes/${modeId}/duplicate`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      const data = await response.json();
       if (data.success) {
         fetchCustomModes();
       }

@@ -19,6 +19,23 @@ const BLOB_POSITION_STORAGE_KEY = 'blobPosition:v1';
 const CORE_MODES = ['ZAIRE', 'TRADER', 'PROFESSOR', 'ENGINEER', 'SWARM'];
 const CUSTOM_MODE_LOCKED_ZONES = ['Bottom Console'];
 
+const fetchJsonOrThrow = async (url, options) => {
+  const response = await fetch(url, options);
+  const contentType = response.headers.get('content-type') || '';
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  if (!contentType.includes('application/json')) {
+    const text = await response.text();
+    const preview = text.slice(0, 40).replace(/\s+/g, ' ');
+    throw new Error(`Expected JSON but received: ${preview || 'unknown response'}`);
+  }
+
+  return response.json();
+};
+
 const sanitizeCustomModeComponents = (components = []) =>
   components.filter((component) => !CUSTOM_MODE_LOCKED_ZONES.includes(component.zone));
 
@@ -1516,13 +1533,12 @@ function useAppController() {
 
   const fetchChatSessions = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/chats`);
-      const data = await res.json();
+      const data = await fetchJsonOrThrow(`${API_BASE_URL}/chats`);
       if (data.success) {
         setChatSessions(data.sessions);
       }
     } catch (e) {
-      console.error('Failed to fetch chat sessions:', e);
+      console.warn('Failed to fetch chat sessions:', e.message);
     }
   }, []);
 
@@ -1543,14 +1559,13 @@ function useAppController() {
   const loadArchiveSessionDetail = React.useCallback(async (sessionId) => {
     if (!sessionId || archiveSessionCache[sessionId]) return archiveSessionCache[sessionId];
     try {
-      const res = await fetch(`${API_BASE_URL}/chats/${sessionId}`);
-      const data = await res.json();
+      const data = await fetchJsonOrThrow(`${API_BASE_URL}/chats/${sessionId}`);
       if (data.success && data.session) {
         setArchiveSessionCache(prev => ({ ...prev, [sessionId]: data.session }));
         return data.session;
       }
     } catch (e) {
-      console.error('Failed to load archive session detail:', e);
+      console.warn('Failed to load archive session detail:', e.message);
     }
     return null;
   }, [archiveSessionCache]);
@@ -1635,15 +1650,13 @@ function useAppController() {
   };
 
   const loadInitialSystemData = React.useCallback(() => {
-    fetch(`${API_BASE_URL}/memories`)
-      .then(r => r.json())
+    fetchJsonOrThrow(`${API_BASE_URL}/memories`)
       .then(data => {
         if (Array.isArray(data)) setStoredMemories(data.slice(0, 5));
       })
       .catch(() => { });
 
-    fetch(`${API_BASE_URL}/config`)
-      .then(r => r.json())
+    fetchJsonOrThrow(`${API_BASE_URL}/config`)
       .then(res => {
         if (res.success && res.data) {
           console.log('[SYSTEM] Restored HUD config from core.');
