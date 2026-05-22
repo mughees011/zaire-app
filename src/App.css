@@ -8153,7 +8153,7 @@ input[type=range]::-webkit-slider-thumb {
 .archive-card {
   border: 1px solid rgba(168, 226, 255, 0.16);
   background: linear-gradient(155deg, rgba(255, 255, 255, 0.03), rgba(0, 212, 255, 0.02));
-  padding: 16px 16px 14px;
+  padding: 14px 108px 14px 16px;
   cursor: pointer;
   transition: 0.18s ease;
   position: relative;
@@ -8192,6 +8192,10 @@ input[type=range]::-webkit-slider-thumb {
   border-bottom: 1px solid rgba(0, 212, 255, 0.55);
 }
 
+.archive-card-main {
+  min-width: 0;
+}
+
 .archive-card-title {
   color: #f6fcff;
   font-family: var(--font-share);
@@ -8221,31 +8225,39 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 .archive-card-actions {
-  display: flex;
-  flex-wrap: wrap;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, 24px);
   gap: 6px;
+  z-index: 2;
 }
 
 .archive-card-actions .session-action-btn {
   width: 24px;
   height: 24px;
-  font-size: 12px;
+  padding: 0;
   color: rgba(232, 251, 255, 0.68);
   border-color: rgba(0, 212, 255, 0.22);
   background: rgba(0, 8, 18, 0.62);
   box-shadow: inset 0 0 0 1px rgba(0, 212, 255, 0.04);
 }
 
-.archive-card-actions .session-action-btn span {
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.archive-action-icon {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .archive-card-actions .session-action-btn:hover {
   background: rgba(0, 212, 255, 0.14);
   border-color: rgba(0, 212, 255, 0.48);
+  color: rgba(240, 252, 255, 0.98);
 }
 
 .session-action-btn.active-like {

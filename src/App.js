@@ -355,14 +355,65 @@ const ArchiveConversation = ({ session }) => {
   });
 };
 
-const ARCHIVE_ACTION_ICONS = {
-  rename: '✎',
-  copy: '⧉',
-  share: '↗',
-  like: '+',
-  dislike: '−',
-  open: '⌂',
-  delete: '×'
+const ArchiveActionIcon = ({ type }) => {
+  switch (type) {
+    case 'rename':
+      return (
+        <svg viewBox="0 0 16 16" className="archive-action-icon">
+          <path d="M3 11.5 11.9 2.6l1.5 1.5L4.5 13H3z" />
+          <path d="M10.9 3.6 12.4 2.1 13.9 3.6 12.4 5.1z" />
+        </svg>
+      );
+    case 'copy':
+      return (
+        <svg viewBox="0 0 16 16" className="archive-action-icon">
+          <rect x="5" y="3" width="7" height="9" rx="1" />
+          <path d="M3.5 5.5V13h7.5" />
+        </svg>
+      );
+    case 'share':
+      return (
+        <svg viewBox="0 0 16 16" className="archive-action-icon">
+          <path d="M6 10 11.5 4.5" />
+          <path d="M8.5 4.5h3v3" />
+          <path d="M4 6.5v5h5" />
+        </svg>
+      );
+    case 'like':
+      return (
+        <svg viewBox="0 0 16 16" className="archive-action-icon">
+          <path d="M6.5 6V3.8c0-.8.5-1.5 1.2-1.8l.8 2.2-.7 2.3H12l-.8 5H5V6z" />
+          <rect x="3" y="6" width="2" height="6" rx=".5" />
+        </svg>
+      );
+    case 'dislike':
+      return (
+        <svg viewBox="0 0 16 16" className="archive-action-icon">
+          <path d="M6.5 10V12.2c0 .8.5 1.5 1.2 1.8l.8-2.2-.7-2.3H12l-.8-5H5v5z" />
+          <rect x="3" y="4" width="2" height="6" rx=".5" />
+        </svg>
+      );
+    case 'open':
+      return (
+        <svg viewBox="0 0 16 16" className="archive-action-icon">
+          <path d="M3 12.5h10" />
+          <path d="M8 11V3.5" />
+          <path d="M5.5 6 8 3.5 10.5 6" />
+        </svg>
+      );
+    case 'delete':
+      return (
+        <svg viewBox="0 0 16 16" className="archive-action-icon">
+          <path d="M3.5 4.5h9" />
+          <path d="M6 4.5V3h4v1.5" />
+          <path d="M5 6.5v5.5" />
+          <path d="M8 6.5v5.5" />
+          <path d="M11 6.5v5.5" />
+        </svg>
+      );
+    default:
+      return null;
+  }
 };
 
 function normalizeHexColor(value) {
@@ -5047,34 +5098,36 @@ function useAppController() {
                           >
                             <div className="archive-card-corner archive-card-corner-tl" />
                             <div className="archive-card-corner archive-card-corner-br" />
-                            <div className="archive-card-title">{archiveTitle}</div>
-                            <div className="archive-card-meta">
-                              <span className="archive-card-timestamp">
-                                <ClientLocalTime value={session.timestamp} mode="datetime" />
-                              </span>
-                              <span className="archive-card-count">{session.messageCount} MSGS</span>
+                            <div className="archive-card-main">
+                              <div className="archive-card-title">{archiveTitle}</div>
+                              <div className="archive-card-meta">
+                                <span className="archive-card-timestamp">
+                                  <ClientLocalTime value={session.timestamp} mode="datetime" />
+                                </span>
+                                <span className="archive-card-count">{session.messageCount} MSGS</span>
+                              </div>
                             </div>
                             <div className="archive-card-actions">
                               <button className="session-action-btn rename" title="Rename chat" aria-label="Rename chat" onClick={(e) => { e.stopPropagation(); setEditingSessionId(session.id); setEditingTitle(archiveTitle); }}>
-                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.rename}</span>
+                                <ArchiveActionIcon type="rename" />
                               </button>
                               <button className="session-action-btn" title="Copy chat" aria-label="Copy chat" onClick={(e) => { e.stopPropagation(); handleArchiveCopy(session.id); }}>
-                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.copy}</span>
+                                <ArchiveActionIcon type="copy" />
                               </button>
                               <button className="session-action-btn" title="Share chat" aria-label="Share chat" onClick={(e) => { e.stopPropagation(); handleArchiveShare(session.id); }}>
-                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.share}</span>
+                                <ArchiveActionIcon type="share" />
                               </button>
                               <button className={`session-action-btn ${archiveReactions[session.id] === 'like' ? 'active-like' : ''}`} title="Like chat" aria-label="Like chat" onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'like'); }}>
-                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.like}</span>
+                                <ArchiveActionIcon type="like" />
                               </button>
                               <button className={`session-action-btn ${archiveReactions[session.id] === 'dislike' ? 'active-dislike' : ''}`} title="Dislike chat" aria-label="Dislike chat" onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'dislike'); }}>
-                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.dislike}</span>
+                                <ArchiveActionIcon type="dislike" />
                               </button>
                               <button className="session-action-btn open" title="Open chat" aria-label="Open chat" onClick={(e) => { e.stopPropagation(); handleLoadSession(session.id); }}>
-                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.open}</span>
+                                <ArchiveActionIcon type="open" />
                               </button>
                               <button className="session-action-btn delete" title="Delete chat" aria-label="Delete chat" onClick={(e) => handleDeleteSession(e, session.id)}>
-                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.delete}</span>
+                                <ArchiveActionIcon type="delete" />
                               </button>
                             </div>
                           </div>
