@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import SettingsModal from './SettingsModal';
@@ -276,7 +276,183 @@ function normalizeHexColor(value) {
   return /^#[0-9a-f]{6}$/i.test(trimmed) ? trimmed.toLowerCase() : DEFAULT_BLOB_COLOR;
 }
 
-function App() {
+const DEFAULT_ZAIRE_ACTION_FEED = [
+  { time: '15:47', message: 'System boot complete' },
+  { time: '15:46', message: 'Neural core initialized' },
+  { time: '15:45', message: 'Voice synthesis online' },
+  { time: '15:44', message: 'Loading ZAIRE protocol' },
+  { time: '15:43', message: 'Mounting file system' },
+];
+
+const DEFAULT_CUSTOM_TASKS = [
+  { id: 1, title: 'Diagnostic System Sync', status: 'completed', progress: 100 },
+  { id: 2, title: 'Neural Pathway Calibration', status: 'in_progress', progress: 45 },
+  { id: 3, title: 'Security Protocol Audit', status: 'pending', progress: 0 }
+];
+
+const DEFAULT_CUSTOM_NOTES = [
+  { id: 1, time: '14:20', text: 'ZAIRE Mode Studio fully initialized with 4-layer schema.' }
+];
+
+const DEFAULT_CUSTOM_TERMINAL_LINES = [
+  'ZAIRE Terminal Core [Version 2.0.0]',
+  '(c) 2026 ZAIRE Sovereign Intelligence. All rights reserved.',
+  '',
+  'Type "help" for a list of available commands.',
+  'Ready.'
+];
+
+const DEFAULT_CUSTOM_KANBAN_CARDS = [
+  { id: 1, title: 'Draft Spec Sheet', status: 'todo' },
+  { id: 2, title: 'Model Gating Logic', status: 'doing' },
+  { id: 3, title: 'Database Migration', status: 'done' }
+];
+
+const DEFAULT_ACTIVITY_FEED = [
+  { time: '15:47', message: 'System boot complete' },
+  { time: '15:46', message: 'Neural core initialized' },
+  { time: '15:45', message: 'Voice synthesis online' },
+  { time: '15:44', message: 'Loading ZAIRE protocol' },
+  { time: '15:43', message: 'Mounting file system' },
+];
+
+const PROFESSOR_SLIDES = [
+  { title: 'Neural Architectures', content: 'Understanding multi-head attention mechanisms in Transformers.', image: null },
+  { title: 'Latent Space', content: 'Visualizing high-dimensional embeddings in vector databases.', image: null },
+  { title: 'Optimization', content: 'Stochastic Gradient Descent vs Adam: A comparative analysis.', image: null }
+];
+
+const DEFAULT_MODE_LAYOUTS = {
+  'ZAIRE': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+  'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+  'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
+  'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
+};
+
+const DEFAULT_SPECIALIST_DATA = {
+  active_persona: 'STARK_GRADE',
+  forge_telemetry: { neural_alignment: 0, thermal_hud: false },
+  active_projects: [],
+  forge_build_log: [],
+  portfolio_value: '0.00',
+  risk_level: 'LOW',
+  alpha_feed: []
+};
+
+const appStateReducer = (state, action) => {
+  switch (action.type) {
+    case 'SET_FIELD':
+      return {
+        ...state,
+        [action.field]: typeof action.value === 'function' ? action.value(state[action.field]) : action.value
+      };
+    default:
+      return state;
+  }
+};
+
+const readJsonFromStorage = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const buildInitialAppState = () => {
+  const storedModes = readJsonFromStorage(MODE_STORAGE_KEY, []);
+  return {
+    hudOpacity: parseFloat(localStorage.getItem('zaire_hud_opacity')) || 0.85,
+    neuralGlowEnabled: localStorage.getItem('zaire_neural_glow') !== 'false',
+    holographicTiltEnabled: localStorage.getItem('zaire_holographic_tilt') !== 'false',
+    halalFilterEnabled: true,
+    autoLintEnabled: true,
+    authView: window.location.hash.includes('sign-up') ? 'signup' : 'signin',
+    zaireResponseStream: '',
+    showResponsePanel: false,
+    isNeuralInterruptActive: false,
+    zaireActionFeed: DEFAULT_ZAIRE_ACTION_FEED,
+    isUpgradeLoading: false,
+    liveMetrics: { cpu: 0, ram: 0, gpu: 0, latency: 4 },
+    isOmniBoxOpen: false,
+    omniInput: '',
+    isSystemEngaged: false,
+    activeMode: 'ZAIRE',
+    customModes: Array.isArray(storedModes) ? storedModes.map(sanitizeCustomModeRecord) : [],
+    activeCustomMode: null,
+    customTasks: DEFAULT_CUSTOM_TASKS,
+    customNotes: DEFAULT_CUSTOM_NOTES,
+    customChatInput: '',
+    customTerminalInput: '',
+    customTerminalLines: DEFAULT_CUSTOM_TERMINAL_LINES,
+    customEditorText: '// ZAIRE Code Engine v2.0\nfunction initWorkspace() {\n  console.log("Workspace initialized successfully.");\n}',
+    customKanbanCards: DEFAULT_CUSTOM_KANBAN_CARDS,
+    zaireStatus: 'online',
+    timeStr: '00:00:00',
+    navItem: 'HOME',
+    isSettingsOpen: false,
+    isDragging: false,
+    isMicrophoneActive: false,
+    audioFrequency: 0,
+    blobColor: normalizeHexColor(localStorage.getItem(BLOB_COLOR_STORAGE_KEY) || DEFAULT_BLOB_COLOR),
+    blobSize: parseFloat(localStorage.getItem(BLOB_SIZE_STORAGE_KEY)) || 1.0,
+    lastCommand: '',
+    recognizedText: '',
+    finalRecognizedText: '',
+    inputValue: '',
+    isTyping: false,
+    useGroqSpeech: false,
+    groqStatus: '',
+    isVisionScanning: false,
+    storedMemories: [],
+    memoryFlash: false,
+    isDiagnosticActive: false,
+    chatSessions: [],
+    currentSessionId: null,
+    isChatHistoryLoading: false,
+    chatSearch: '',
+    editingSessionId: null,
+    editingTitle: '',
+    isArchivesPageOpen: false,
+    selectedArchiveId: null,
+    archiveSessionCache: {},
+    archiveReactions: readJsonFromStorage('zaire_archive_reactions_v1', {}),
+    isTransitioning: false,
+    forgeCode: '',
+    professorSubMode: 'LECTURE',
+    professorTopic: 'Neural Networks',
+    professorNoteInput: '',
+    traderSubMode: 'CHART',
+    specialistData: DEFAULT_SPECIALIST_DATA,
+    previewUrl: 'http://localhost:3005',
+    showDiff: false,
+    diffData: null,
+    showMatrix: false,
+    activeTab: 0,
+    manifestedFiles: [],
+    darwinResults: null,
+    thermalActive: false,
+    modeLayouts: readJsonFromStorage('zaire_mode_layouts_v1', DEFAULT_MODE_LAYOUTS),
+    componentNudges: readJsonFromStorage('zaire_component_nudges_v1', {}),
+    selectedComponent: '',
+    isMinigameActive: false,
+    minigameScore: 0,
+    gameNodes: [],
+    neuralVideoData: null,
+    isVideoPlaying: false,
+    currentVideoScene: null,
+    isNeuralPulseActive: false,
+    particles: [],
+    cameraStatus: 'pending'
+  };
+};
+
+const createAppFieldSetter = (dispatch, field) => (value) => {
+  dispatch({ type: 'SET_FIELD', field, value });
+};
+
+function useAppController() {
   const { user } = useUser();
   const { getToken } = useAuth();
   const threeCanvasRef = useRef(null);
@@ -284,17 +460,177 @@ function App() {
   const containerRef = useRef(null);
   const cameraRef = useRef(null);
   const dragStateRef = useRef({ isPointerDown: false, tempPosition: { x: 0, y: 0 } });
+  const [appState, dispatchAppState] = useReducer(appStateReducer, undefined, buildInitialAppState);
+  const {
+    hudOpacity,
+    neuralGlowEnabled,
+    holographicTiltEnabled,
+    halalFilterEnabled,
+    autoLintEnabled,
+    authView,
+    zaireResponseStream,
+    showResponsePanel,
+    isNeuralInterruptActive,
+    zaireActionFeed,
+    isUpgradeLoading,
+    liveMetrics,
+    isOmniBoxOpen,
+    omniInput,
+    isSystemEngaged,
+    activeMode,
+    customModes,
+    activeCustomMode,
+    customTasks,
+    customNotes,
+    customChatInput,
+    customTerminalInput,
+    customTerminalLines,
+    customEditorText,
+    customKanbanCards,
+    zaireStatus,
+    timeStr,
+    navItem,
+    isSettingsOpen,
+    isDragging,
+    isMicrophoneActive,
+    audioFrequency,
+    blobColor,
+    blobSize,
+    lastCommand,
+    recognizedText,
+    finalRecognizedText,
+    inputValue,
+    isTyping,
+    useGroqSpeech,
+    groqStatus,
+    isVisionScanning,
+    storedMemories,
+    memoryFlash,
+    isDiagnosticActive,
+    chatSessions,
+    currentSessionId,
+    isChatHistoryLoading,
+    chatSearch,
+    editingSessionId,
+    editingTitle,
+    isArchivesPageOpen,
+    selectedArchiveId,
+    archiveSessionCache,
+    archiveReactions,
+    isTransitioning,
+    forgeCode,
+    professorSubMode,
+    professorTopic,
+    professorNoteInput,
+    traderSubMode,
+    specialistData,
+    previewUrl,
+    showDiff,
+    diffData,
+    showMatrix,
+    activeTab,
+    manifestedFiles,
+    darwinResults,
+    thermalActive,
+    modeLayouts,
+    componentNudges,
+    selectedComponent,
+    isMinigameActive,
+    minigameScore,
+    gameNodes,
+    neuralVideoData,
+    isVideoPlaying,
+    currentVideoScene,
+    isNeuralPulseActive,
+    particles,
+    cameraStatus
+  } = appState;
+  const setHudOpacity = createAppFieldSetter(dispatchAppState, 'hudOpacity');
+  const setNeuralGlowEnabled = createAppFieldSetter(dispatchAppState, 'neuralGlowEnabled');
+  const setHolographicTiltEnabled = createAppFieldSetter(dispatchAppState, 'holographicTiltEnabled');
+  const setHalalFilterEnabled = createAppFieldSetter(dispatchAppState, 'halalFilterEnabled');
+  const setAutoLintEnabled = createAppFieldSetter(dispatchAppState, 'autoLintEnabled');
+  const setAuthView = createAppFieldSetter(dispatchAppState, 'authView');
+  const setZaireResponseStream = createAppFieldSetter(dispatchAppState, 'zaireResponseStream');
+  const setShowResponsePanel = createAppFieldSetter(dispatchAppState, 'showResponsePanel');
+  const setIsNeuralInterruptActive = createAppFieldSetter(dispatchAppState, 'isNeuralInterruptActive');
+  const setZaireActionFeed = createAppFieldSetter(dispatchAppState, 'zaireActionFeed');
+  const setIsUpgradeLoading = createAppFieldSetter(dispatchAppState, 'isUpgradeLoading');
+  const setLiveMetrics = createAppFieldSetter(dispatchAppState, 'liveMetrics');
+  const setIsOmniBoxOpen = createAppFieldSetter(dispatchAppState, 'isOmniBoxOpen');
+  const setOmniInput = createAppFieldSetter(dispatchAppState, 'omniInput');
+  const setIsSystemEngaged = createAppFieldSetter(dispatchAppState, 'isSystemEngaged');
+  const setActiveMode = createAppFieldSetter(dispatchAppState, 'activeMode');
+  const setCustomModes = createAppFieldSetter(dispatchAppState, 'customModes');
+  const setActiveCustomMode = createAppFieldSetter(dispatchAppState, 'activeCustomMode');
+  const setCustomTasks = createAppFieldSetter(dispatchAppState, 'customTasks');
+  const setCustomNotes = createAppFieldSetter(dispatchAppState, 'customNotes');
+  const setCustomChatInput = createAppFieldSetter(dispatchAppState, 'customChatInput');
+  const setCustomTerminalInput = createAppFieldSetter(dispatchAppState, 'customTerminalInput');
+  const setCustomTerminalLines = createAppFieldSetter(dispatchAppState, 'customTerminalLines');
+  const setCustomEditorText = createAppFieldSetter(dispatchAppState, 'customEditorText');
+  const setCustomKanbanCards = createAppFieldSetter(dispatchAppState, 'customKanbanCards');
+  const setZaireStatus = createAppFieldSetter(dispatchAppState, 'zaireStatus');
+  const setTimeStr = createAppFieldSetter(dispatchAppState, 'timeStr');
+  const setNavItem = createAppFieldSetter(dispatchAppState, 'navItem');
+  const setIsSettingsOpen = createAppFieldSetter(dispatchAppState, 'isSettingsOpen');
+  const setIsDragging = createAppFieldSetter(dispatchAppState, 'isDragging');
+  const setIsMicrophoneActive = createAppFieldSetter(dispatchAppState, 'isMicrophoneActive');
+  const setAudioFrequency = createAppFieldSetter(dispatchAppState, 'audioFrequency');
+  const setBlobColor = createAppFieldSetter(dispatchAppState, 'blobColor');
+  const setBlobSize = createAppFieldSetter(dispatchAppState, 'blobSize');
+  const setLastCommand = createAppFieldSetter(dispatchAppState, 'lastCommand');
+  const setRecognizedText = createAppFieldSetter(dispatchAppState, 'recognizedText');
+  const setFinalRecognizedText = createAppFieldSetter(dispatchAppState, 'finalRecognizedText');
+  const setInputValue = createAppFieldSetter(dispatchAppState, 'inputValue');
+  const setIsTyping = createAppFieldSetter(dispatchAppState, 'isTyping');
+  const setUseGroqSpeech = createAppFieldSetter(dispatchAppState, 'useGroqSpeech');
+  const setGroqStatus = createAppFieldSetter(dispatchAppState, 'groqStatus');
+  const setIsVisionScanning = createAppFieldSetter(dispatchAppState, 'isVisionScanning');
+  const setStoredMemories = createAppFieldSetter(dispatchAppState, 'storedMemories');
+  const setMemoryFlash = createAppFieldSetter(dispatchAppState, 'memoryFlash');
+  const setIsDiagnosticActive = createAppFieldSetter(dispatchAppState, 'isDiagnosticActive');
+  const setChatSessions = createAppFieldSetter(dispatchAppState, 'chatSessions');
+  const setCurrentSessionId = createAppFieldSetter(dispatchAppState, 'currentSessionId');
+  const setIsChatHistoryLoading = createAppFieldSetter(dispatchAppState, 'isChatHistoryLoading');
+  const setChatSearch = createAppFieldSetter(dispatchAppState, 'chatSearch');
+  const setEditingSessionId = createAppFieldSetter(dispatchAppState, 'editingSessionId');
+  const setEditingTitle = createAppFieldSetter(dispatchAppState, 'editingTitle');
+  const setIsArchivesPageOpen = createAppFieldSetter(dispatchAppState, 'isArchivesPageOpen');
+  const setSelectedArchiveId = createAppFieldSetter(dispatchAppState, 'selectedArchiveId');
+  const setArchiveSessionCache = createAppFieldSetter(dispatchAppState, 'archiveSessionCache');
+  const setArchiveReactions = createAppFieldSetter(dispatchAppState, 'archiveReactions');
+  const setIsTransitioning = createAppFieldSetter(dispatchAppState, 'isTransitioning');
+  const setForgeCode = createAppFieldSetter(dispatchAppState, 'forgeCode');
+  const setProfessorSubMode = createAppFieldSetter(dispatchAppState, 'professorSubMode');
+  const setProfessorTopic = createAppFieldSetter(dispatchAppState, 'professorTopic');
+  const setProfessorNoteInput = createAppFieldSetter(dispatchAppState, 'professorNoteInput');
+  const setTraderSubMode = createAppFieldSetter(dispatchAppState, 'traderSubMode');
+  const setSpecialistData = createAppFieldSetter(dispatchAppState, 'specialistData');
+  const setPreviewUrl = createAppFieldSetter(dispatchAppState, 'previewUrl');
+  const setShowDiff = createAppFieldSetter(dispatchAppState, 'showDiff');
+  const setDiffData = createAppFieldSetter(dispatchAppState, 'diffData');
+  const setShowMatrix = createAppFieldSetter(dispatchAppState, 'showMatrix');
+  const setActiveTab = createAppFieldSetter(dispatchAppState, 'activeTab');
+  const setManifestedFiles = createAppFieldSetter(dispatchAppState, 'manifestedFiles');
+  const setDarwinResults = createAppFieldSetter(dispatchAppState, 'darwinResults');
+  const setThermalActive = createAppFieldSetter(dispatchAppState, 'thermalActive');
+  const setModeLayouts = createAppFieldSetter(dispatchAppState, 'modeLayouts');
+  const setComponentNudges = createAppFieldSetter(dispatchAppState, 'componentNudges');
+  const setSelectedComponent = createAppFieldSetter(dispatchAppState, 'selectedComponent');
+  const setIsMinigameActive = createAppFieldSetter(dispatchAppState, 'isMinigameActive');
+  const setMinigameScore = createAppFieldSetter(dispatchAppState, 'minigameScore');
+  const setGameNodes = createAppFieldSetter(dispatchAppState, 'gameNodes');
+  const setNeuralVideoData = createAppFieldSetter(dispatchAppState, 'neuralVideoData');
+  const setIsVideoPlaying = createAppFieldSetter(dispatchAppState, 'isVideoPlaying');
+  const setCurrentVideoScene = createAppFieldSetter(dispatchAppState, 'currentVideoScene');
+  const setIsNeuralPulseActive = createAppFieldSetter(dispatchAppState, 'isNeuralPulseActive');
+  const setParticles = createAppFieldSetter(dispatchAppState, 'particles');
+  const setCameraStatus = createAppFieldSetter(dispatchAppState, 'cameraStatus');
 
   // ── HUD Customization States ──
-  const [hudOpacity, setHudOpacity] = useState(() => parseFloat(localStorage.getItem('zaire_hud_opacity')) || 0.85);
-  const [neuralGlowEnabled, setNeuralGlowEnabled] = useState(() => localStorage.getItem('zaire_neural_glow') !== 'false');
-  const [holographicTiltEnabled, setHolographicTiltEnabled] = useState(() => localStorage.getItem('zaire_holographic_tilt') !== 'false');
 
   // ── Mode-Specific Advanced Toggles ──
-  const [halalFilterEnabled, setHalalFilterEnabled] = useState(true);
-  const [autoLintEnabled, setAutoLintEnabled] = useState(true);
-
-  const [authView, setAuthView] = useState(() => window.location.hash.includes('sign-up') ? 'signup' : 'signin');
 
   useEffect(() => {
     const handleHash = () => {
@@ -307,73 +643,19 @@ function App() {
 
   // Real-time Socket states
   const socketRef = useRef(null);
-  const [zaireResponseStream, setZaireResponseStream] = useState('');
-  const [showResponsePanel, setShowResponsePanel] = useState(false);
-  const [isNeuralInterruptActive, setIsNeuralInterruptActive] = useState(false);
   const responseTimeoutRef = useRef(null);
   const pendingActivationLineRef = useRef(null);
 
-  const [zaireActionFeed, setZaireActionFeed] = useState([
-    { time: '15:47', message: 'System boot complete' },
-    { time: '15:46', message: 'Neural core initialized' },
-    { time: '15:45', message: 'Voice synthesis online' },
-    { time: '15:44', message: 'Loading ZAIRE protocol' },
-    { time: '15:43', message: 'Mounting file system' },
-  ]);
 
   // Biometric State
   const [securityState, dispatchSecurityState] = useReducer(securityStateReducer, INITIAL_SECURITY_STATE);
   const { biometricData, isSecurityAlert, showSecurityOverlay, activeIntruder } = securityState;
   const intruderSnapshotsRef = useRef([]);
-  const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
-
-  const [liveMetrics, setLiveMetrics] = useState({ cpu: 0, ram: 0, gpu: 0, latency: 4 });
-  const [isOmniBoxOpen, setIsOmniBoxOpen] = useState(false);
-  const [omniInput, setOmniInput] = useState('');
-  const [isSystemEngaged, setIsSystemEngaged] = useState(false);
 
 
 
-  const [activeMode, setActiveMode] = useState('ZAIRE');
-  const [customModes, setCustomModes] = useState(() => {
-    try {
-      const storedModes = JSON.parse(localStorage.getItem(MODE_STORAGE_KEY) || '[]');
-      return Array.isArray(storedModes) ? storedModes.map(sanitizeCustomModeRecord) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [activeCustomMode, setActiveCustomMode] = useState(null);
-  const [customTasks, setCustomTasks] = useState([
-    { id: 1, title: 'Diagnostic System Sync', status: 'completed', progress: 100 },
-    { id: 2, title: 'Neural Pathway Calibration', status: 'in_progress', progress: 45 },
-    { id: 3, title: 'Security Protocol Audit', status: 'pending', progress: 0 }
-  ]);
-  const [customNotes, setCustomNotes] = useState([
-    { id: 1, time: '14:20', text: 'ZAIRE Mode Studio fully initialized with 4-layer schema.' }
-  ]);
-  const [customChatInput, setCustomChatInput] = useState('');
-  const [customTerminalInput, setCustomTerminalInput] = useState('');
-  const [customTerminalLines, setCustomTerminalLines] = useState([
-    'ZAIRE Terminal Core [Version 2.0.0]',
-    '(c) 2026 ZAIRE Sovereign Intelligence. All rights reserved.',
-    '',
-    'Type "help" for a list of available commands.',
-    'Ready.'
-  ]);
-  const [customEditorText, setCustomEditorText] = useState('// ZAIRE Code Engine v2.0\nfunction initWorkspace() {\n  console.log("Workspace initialized successfully.");\n}');
-  const [customKanbanCards, setCustomKanbanCards] = useState([
-    { id: 1, title: 'Draft Spec Sheet', status: 'todo' },
-    { id: 2, title: 'Model Gating Logic', status: 'doing' },
-    { id: 3, title: 'Database Migration', status: 'done' }
-  ]);
-  const [zaireStatus, setZaireStatus] = useState('online');
+
   const isDeepThinkingRef = useRef(false);
-  const [timeStr, setTimeStr] = useState('00:00:00');
-  const [navItem, setNavItem] = useState('HOME');
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isMicrophoneActive, setIsMicrophoneActive] = useState(false);
   const isMicrophoneActiveRef = useRef(false);
 
   // Sync state to Ref for persistent event handlers
@@ -408,26 +690,17 @@ function App() {
     }
   }, [user, fetchCustomModes]);
 
-  const [audioFrequency, setAudioFrequency] = useState(0);
   const plasmaMatRef = useRef(null);
   const pMatRef = useRef(null);
   const frequencyBandsRef = useRef([0, 0, 0, 0, 0]);
 
-  const [blobColor, setBlobColor] = useState(() => normalizeHexColor(localStorage.getItem(BLOB_COLOR_STORAGE_KEY) || DEFAULT_BLOB_COLOR));
-  const [blobSize, setBlobSize] = useState(() => parseFloat(localStorage.getItem(BLOB_SIZE_STORAGE_KEY)) || 1.0);
   const blobPositionRef = useRef(null);
   if (!blobPositionRef.current) {
     const savedBlobPosition = localStorage.getItem(BLOB_POSITION_STORAGE_KEY);
     blobPositionRef.current = savedBlobPosition ? JSON.parse(savedBlobPosition) : { x: 0, y: 0 };
   }
 
-  const [activityFeed] = useState([
-    { time: '15:47', message: 'System boot complete' },
-    { time: '15:46', message: 'Neural core initialized' },
-    { time: '15:45', message: 'Voice synthesis online' },
-    { time: '15:44', message: 'Loading ZAIRE protocol' },
-    { time: '15:43', message: 'Mounting file system' },
-  ]);
+  const activityFeed = DEFAULT_ACTIVITY_FEED;
 
   const mainGroupRef = useRef(null);
   const blobSizeRef = useRef(blobSize);
@@ -444,59 +717,17 @@ function App() {
   const outputDataArrayRef = useRef(null);
   const audioStreamRef = useRef(null);
   const recognitionRef = useRef(null);
-  const [lastCommand, setLastCommand] = useState('');
   const sessionUptimeRef = useRef(0);
-  const [recognizedText, setRecognizedText] = useState('');
-  const [finalRecognizedText, setFinalRecognizedText] = useState('');
-  const [inputValue, setInputValue] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [useGroqSpeech, setUseGroqSpeech] = useState(false);
-  const [groqStatus, setGroqStatus] = useState('');
   const groqSpeechRef = useRef(null);
 
   // ── New: Vision, Memory, System Actions ──
-  const [isVisionScanning, setIsVisionScanning] = useState(false);
-  const [storedMemories, setStoredMemories] = useState([]);
-  const [memoryFlash, setMemoryFlash] = useState(false);
   const lastSystemActionRef = useRef(null);
   const systemActionLogRef = useRef([]);
-  const [isDiagnosticActive, setIsDiagnosticActive] = useState(false);
-  const [chatSessions, setChatSessions] = useState([]);
-  const [currentSessionId, setCurrentSessionId] = useState(null);
-  const [isChatHistoryLoading, setIsChatHistoryLoading] = useState(false);
-  const [chatSearch, setChatSearch] = useState('');
-  const [editingSessionId, setEditingSessionId] = useState(null);
-  const [editingTitle, setEditingTitle] = useState('');
-  const [isArchivesPageOpen, setIsArchivesPageOpen] = useState(false);
-  const [selectedArchiveId, setSelectedArchiveId] = useState(null);
-  const [archiveSessionCache, setArchiveSessionCache] = useState({});
-  const [archiveReactions, setArchiveReactions] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('zaire_archive_reactions_v1') || '{}');
-    } catch {
-      return {};
-    }
-  });
 
   // ── System State Engine ──
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [forgeCode, setForgeCode] = useState('');
-  const [professorSubMode, setProfessorSubMode] = useState('LECTURE'); // LECTURE, ROADMAP, LAB
-  const [professorTopic, setProfessorTopic] = useState('Neural Networks');
-  const [professorNoteInput, setProfessorNoteInput] = useState('');
-  const [traderSubMode, setTraderSubMode] = useState('CHART'); // CHART, STRATEGY, ALPHA
   const [specialistVisualState, dispatchSpecialistVisualState] = useReducer(specialistVisualReducer, INITIAL_SPECIALIST_VISUAL_STATE);
   const { engineerPhase, forgeProgress, professorPhase, learningProgress, traderPhase, traderProgress, liveTrades, swarmPhase, swarmMessages } = specialistVisualState;
 
-  const [specialistData, setSpecialistData] = useState({
-    active_persona: 'STARK_GRADE',
-    forge_telemetry: { neural_alignment: 0, thermal_hud: false },
-    active_projects: [],
-    forge_build_log: [],
-    portfolio_value: '0.00',
-    risk_level: 'LOW',
-    alpha_feed: []
-  });
 
 
 
@@ -612,31 +843,6 @@ function App() {
   });
 
   const socketHandlerRefs = useRef({});
-  socketHandlerRefs.current = {
-    handleSocketConnect,
-    handleModeSyncEvent,
-    handleSessionStarted,
-    handleSessionRenamed,
-    handleSessionLoaded,
-    handleSocketAiError,
-    handleSocketConnectError,
-    handleTextDelta,
-    handleAudioChunk,
-    handleAiTextComplete,
-    handleTextChunks,
-    handleZaireStatus,
-    handleDeepThinking,
-    handleMemoryStored,
-    handleNeuralLog,
-    handleSpecialistTelemetry,
-    handleDiagnosticAlert,
-    handleNeuralInterrupt,
-    handleIntruderDetected,
-    handleIntruderSnapshots,
-    handleSystemMetrics,
-    handleSpecialistDataPayload,
-    handleZaireActionFeed
-  };
 
   useEffect(() => {
     syncSpecialistVisualState();
@@ -647,14 +853,6 @@ function App() {
 
 
 
-  const [previewUrl, setPreviewUrl] = useState('http://localhost:3005');
-  const [showDiff, setShowDiff] = useState(false);
-  const [diffData, setDiffData] = useState(null);
-  const [showMatrix, setShowMatrix] = useState(false);
-  const [activeTab, setActiveTab] = useState(0);
-  const [manifestedFiles, setManifestedFiles] = useState([]); // [{name, code}]
-  const [darwinResults, setDarwinResults] = useState(null); // {v1: score, v2: score, v3: score}
-  const [thermalActive, setThermalActive] = useState(false);
   const showHallOfFameRef = useRef(false);
   const darwinResetTimeoutRef = useRef(null);
   const customIdRef = useRef(1);
@@ -702,22 +900,7 @@ function App() {
   }, [specialistData, activeMode, forgeCode]);
 
   const liveCodeStreamRef = useRef('');
-  const [professorSlides] = useState([
-    { title: 'Neural Architectures', content: 'Understanding multi-head attention mechanisms in Transformers.', image: null },
-    { title: 'Latent Space', content: 'Visualizing high-dimensional embeddings in vector databases.', image: null },
-    { title: 'Optimization', content: 'Stochastic Gradient Descent vs Adam: A comparative analysis.', image: null }
-  ]);
-  const [currentSlideIndex] = useState(0);
-  const [modeLayouts, setModeLayouts] = useState(() => {
-    const saved = localStorage.getItem('zaire_mode_layouts_v1');
-    if (saved) return JSON.parse(saved);
-    return {
-      'ZAIRE': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-      'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-      'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-      'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
-    };
-  });
+  const professorSlides = PROFESSOR_SLIDES;
 
   useEffect(() => {
     localStorage.setItem('zaire_mode_layouts_v1', JSON.stringify(modeLayouts));
@@ -732,14 +915,20 @@ function App() {
     }));
   };
 
-  const [componentNudges, setComponentNudges] = useState(() => {
-    const saved = localStorage.getItem('zaire_component_nudges_v1');
-    return saved ? JSON.parse(saved) : {};
-  });
 
   useEffect(() => {
     localStorage.setItem('zaire_component_nudges_v1', JSON.stringify(componentNudges));
   }, [componentNudges]);
+
+  const systemState = useMemo(() => getNextSystemState({
+    biometricData,
+    isSecurityAlert,
+    isMicrophoneActive,
+    isTyping,
+    isOmniBoxOpen,
+    zaireStatus,
+    zaireResponseStream
+  }), [biometricData, isSecurityAlert, isMicrophoneActive, isTyping, isOmniBoxOpen, zaireStatus, zaireResponseStream]);
 
   useEffect(() => {
     localStorage.setItem('zaire_hud_opacity', hudOpacity);
@@ -777,18 +966,6 @@ function App() {
     document.documentElement.style.setProperty('--tilt-multiplier', holographicTiltEnabled ? '1' : '0');
   }, [hudOpacity, neuralGlowEnabled, holographicTiltEnabled, systemState]);
 
-  const [selectedComponent, setSelectedComponent] = useState('');
-
-  const systemState = useMemo(() => getNextSystemState({
-    biometricData,
-    isSecurityAlert,
-    isMicrophoneActive,
-    isTyping,
-    isOmniBoxOpen,
-    zaireStatus,
-    zaireResponseStream
-  }), [biometricData, isSecurityAlert, isMicrophoneActive, isTyping, isOmniBoxOpen, zaireStatus, zaireResponseStream]);
-
   const updateComponentNudge = (id, updates) => {
     setComponentNudges(prev => ({
       ...prev,
@@ -806,23 +983,14 @@ function App() {
 
   const artifactTokensRef = useRef([]);
   const pendingArtifactTokensRef = useRef([]);
-  const [isMinigameActive, setIsMinigameActive] = useState(false);
-  const [minigameScore, setMinigameScore] = useState(0);
-  const [gameNodes, setGameNodes] = useState([]);
 
 
   // Neural Video State
-  const [neuralVideoData, setNeuralVideoData] = useState(null);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const [currentVideoScene, setCurrentVideoScene] = useState(null);
-  const [isNeuralPulseActive, setIsNeuralPulseActive] = useState(false);
-  const [particles, setParticles] = useState([]);
   const fileInputRef = useRef(null);
 
 
   const audioQueueRef = useRef({}); // Using object keyed by index for O(1) lookups
   const isPlayingAudioRef = useRef(false);
-  const [cameraStatus, setCameraStatus] = useState('pending'); // 'pending', 'authorized', 'denied'
   const nextExpectedIndexRef = useRef(0);
 
   const getNextCustomId = React.useCallback(() => {
@@ -1491,6 +1659,32 @@ function App() {
       dispatchSecurityState({ type: 'HIDE_SECURITY_OVERLAY' });
     }, 10000);
   });
+
+  socketHandlerRefs.current = {
+    handleSocketConnect,
+    handleModeSyncEvent,
+    handleSessionStarted,
+    handleSessionRenamed,
+    handleSessionLoaded,
+    handleSocketAiError,
+    handleSocketConnectError,
+    handleTextDelta,
+    handleAudioChunk,
+    handleAiTextComplete,
+    handleTextChunks,
+    handleZaireStatus,
+    handleDeepThinking,
+    handleMemoryStored,
+    handleNeuralLog,
+    handleSpecialistTelemetry,
+    handleDiagnosticAlert,
+    handleNeuralInterrupt,
+    handleIntruderDetected,
+    handleIntruderSnapshots,
+    handleSystemMetrics,
+    handleSpecialistDataPayload,
+    handleZaireActionFeed
+  };
 
   useEffect(() => {
     socketRef.current = io(`${API_BASE_URL}`, {
@@ -3122,7 +3316,7 @@ function App() {
     });
   }, [layoutOffsets]);
 
-  return (
+  const renderView = () => (
     <div
       ref={containerRef}
       className={`
@@ -5140,6 +5334,13 @@ function App() {
       )}
     </div>
   );
+
+  return renderView;
+}
+
+function App() {
+  const renderView = useAppController();
+  return renderView();
 }
 
 export default App;

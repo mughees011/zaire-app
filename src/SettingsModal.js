@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useReducer, useState } from 'react';
+import React, { useCallback, useEffect, useReducer } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { ZaireComponentRegistry } from './engine/ComponentRegistry';
 import './SettingsModal.css';
@@ -49,6 +49,36 @@ const modalViewReducer = (state, action) => {
     default:
       return state;
   }
+};
+
+const settingsLocalStateReducer = (state, action) => {
+  switch (action.type) {
+    case 'SET_FIELD':
+      return {
+        ...state,
+        [action.field]: typeof action.value === 'function' ? action.value(state[action.field]) : action.value
+      };
+    default:
+      return state;
+  }
+};
+
+const buildInitialSettingsLocalState = (customModes) => ({
+  creatorDraft: blankCreatorDraft,
+  localModes: customModes && customModes.length ? customModes : defaultCustomModes,
+  aiSlots: [
+    { provider: 'Groq', apiKey: '', hasKey: false, model: '', purpose: 'Primary', baseUrl: '', enabled: true },
+    { provider: 'OpenAI', apiKey: '', hasKey: false, model: '', purpose: 'Coding', baseUrl: '', enabled: true },
+    { provider: 'Empty', apiKey: '', hasKey: false, model: '', purpose: 'Fallback', baseUrl: '', enabled: false }
+  ],
+  licenseKeyInput: '',
+  licensingInfo: null,
+  licensingError: null,
+  licensingLoading: false
+});
+
+const createReducerFieldSetter = (dispatch, field) => (value) => {
+  dispatch({ type: 'SET_FIELD', field, value });
 };
 
 function MiniPreview({ type, color = '#00d4ff' }) {
@@ -487,13 +517,14 @@ function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empt
         onChange={(e) => onChange({ baseUrl: e.target.value })}
         placeholder="Optional custom base URL (OpenAI-compatible)"
       />
+      <input
+        className="api-key-input"
+        type="text"
+        value={model || ''}
+        onChange={(e) => onChange({ model: e.target.value })}
+        placeholder="Optional exact model ID from your provider account"
+      />
       <div className="api-row">
-        <select className="api-model-select" value={model || 'Auto'} onChange={(e) => onChange({ model: e.target.value })}>
-          <option>Auto</option>
-          <option>Fast</option>
-          <option>Deep Reasoning</option>
-          <option>Code Specialist</option>
-        </select>
         <select className="api-purpose" value={purpose} onChange={(e) => onChange({ purpose: e.target.value })}>
           <option>Primary</option>
           <option>Coding</option>
@@ -507,7 +538,7 @@ function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empt
   );
 }
 
-function SettingsModal({
+function useSettingsModalController({
   isOpen,
   onClose,
   activeMode,
@@ -550,18 +581,27 @@ function SettingsModal({
     selectedTemplateId,
     creatorStep
   } = modalViewState;
-  const [creatorDraft, setCreatorDraft] = useState(blankCreatorDraft);
-  const [localModes, setLocalModes] = useState(customModes && customModes.length ? customModes : defaultCustomModes);
-  const [aiSlots, setAiSlots] = useState(() => ([
-    { provider: 'Groq', apiKey: '', hasKey: false, model: 'Auto', purpose: 'Primary', baseUrl: '', enabled: true },
-    { provider: 'OpenAI', apiKey: '', hasKey: false, model: 'Auto', purpose: 'Coding', baseUrl: '', enabled: true },
-    { provider: 'Empty', apiKey: '', hasKey: false, model: 'Auto', purpose: 'Fallback', baseUrl: '', enabled: false }
-  ]));
-
-  const [licenseKeyInput, setLicenseKeyInput] = useState('');
-  const [licensingInfo, setLicensingInfo] = useState(null);
-  const [licensingError, setLicensingError] = useState(null);
-  const [licensingLoading, setLicensingLoading] = useState(false);
+  const [settingsLocalState, dispatchSettingsLocalState] = useReducer(
+    settingsLocalStateReducer,
+    customModes,
+    buildInitialSettingsLocalState
+  );
+  const {
+    creatorDraft,
+    localModes,
+    aiSlots,
+    licenseKeyInput,
+    licensingInfo,
+    licensingError,
+    licensingLoading
+  } = settingsLocalState;
+  const setCreatorDraft = createReducerFieldSetter(dispatchSettingsLocalState, 'creatorDraft');
+  const setLocalModes = createReducerFieldSetter(dispatchSettingsLocalState, 'localModes');
+  const setAiSlots = createReducerFieldSetter(dispatchSettingsLocalState, 'aiSlots');
+  const setLicenseKeyInput = createReducerFieldSetter(dispatchSettingsLocalState, 'licenseKeyInput');
+  const setLicensingInfo = createReducerFieldSetter(dispatchSettingsLocalState, 'licensingInfo');
+  const setLicensingError = createReducerFieldSetter(dispatchSettingsLocalState, 'licensingError');
+  const setLicensingLoading = createReducerFieldSetter(dispatchSettingsLocalState, 'licensingLoading');
 
   const fetchLicensingInfo = async () => {
     setLicensingLoading(true);
@@ -671,7 +711,7 @@ function SettingsModal({
           provider: slots[i]?.provider || 'Empty',
           apiKey: slots[i]?.apiKey || '',
           hasKey: Boolean(slots[i]?.hasKey),
-          model: slots[i]?.model || 'Auto',
+          model: slots[i]?.model || '',
           purpose: slots[i]?.purpose || (i === 0 ? 'Primary' : i === 1 ? 'Coding' : 'Fallback'),
           baseUrl: slots[i]?.baseUrl || '',
           enabled: Boolean(slots[i]?.enabled ?? true)
@@ -736,7 +776,7 @@ function SettingsModal({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen) return () => null;
 
   const hudOpacityPercent = Math.round(hudOpacity * 100);
   const setHudOpacityPercent = (value) => setHudOpacity(value / 100);
@@ -936,7 +976,7 @@ function SettingsModal({
     }
   };
 
-  return (
+  const renderView = () => (
     <>
       <button type="button" className="hud-settings-overlay" onClick={onClose} aria-label="Close settings overlay" />
       <div className="settings-wrap" role="dialog" aria-modal="true" aria-label="ZAIRE system control">
@@ -1077,14 +1117,14 @@ function SettingsModal({
           {activePage === 'ai' && (
             <div className="page active">
               <div className="page-title">AI VAULT</div>
-              <div className="page-sub">Connect up to 3 AI providers. ZAIRE routes tasks to the optimal model automatically.</div>
+              <div className="page-sub">Connect up to 3 AI providers. Use your own keys and, if needed, your exact provider model IDs.</div>
               <Section title="PRIMARY INTELLIGENCE SLOTS (MAX 3)">
                 <ApiSlot
                   slot="1 - PRIMARY"
                   status={(aiSlots[0]?.apiKey || aiSlots[0]?.hasKey) ? 'CONNECTED' : 'PENDING'}
                   provider={aiSlots[0]?.provider || 'Empty'}
                   purpose={aiSlots[0]?.purpose || 'Primary'}
-                  model={aiSlots[0]?.model || 'Auto'}
+                  model={aiSlots[0]?.model || ''}
                   apiKey={aiSlots[0]?.apiKey || ''}
                   baseUrl={aiSlots[0]?.baseUrl || ''}
                   empty={(aiSlots[0]?.provider || 'Empty') === 'Empty'}
@@ -1095,7 +1135,7 @@ function SettingsModal({
                   status={(aiSlots[1]?.apiKey || aiSlots[1]?.hasKey) ? 'CONNECTED' : 'PENDING'}
                   provider={aiSlots[1]?.provider || 'Empty'}
                   purpose={aiSlots[1]?.purpose || 'Coding'}
-                  model={aiSlots[1]?.model || 'Auto'}
+                  model={aiSlots[1]?.model || ''}
                   apiKey={aiSlots[1]?.apiKey || ''}
                   baseUrl={aiSlots[1]?.baseUrl || ''}
                   empty={(aiSlots[1]?.provider || 'Empty') === 'Empty'}
@@ -1106,7 +1146,7 @@ function SettingsModal({
                   status={(aiSlots[2]?.apiKey || aiSlots[2]?.hasKey) ? 'CONNECTED' : 'EMPTY'}
                   provider={aiSlots[2]?.provider || 'Empty'}
                   purpose={aiSlots[2]?.purpose || 'Fallback'}
-                  model={aiSlots[2]?.model || 'Auto'}
+                  model={aiSlots[2]?.model || ''}
                   apiKey={aiSlots[2]?.apiKey || ''}
                   baseUrl={aiSlots[2]?.baseUrl || ''}
                   empty={(aiSlots[2]?.provider || 'Empty') === 'Empty'}
@@ -1799,6 +1839,12 @@ function SettingsModal({
       </div>
     </>
   );
+  return renderView;
+}
+
+function SettingsModal(props) {
+  const renderView = useSettingsModalController(props);
+  return renderView();
 }
 
 export default SettingsModal;
