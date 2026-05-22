@@ -355,6 +355,16 @@ const ArchiveConversation = ({ session }) => {
   });
 };
 
+const ARCHIVE_ACTION_ICONS = {
+  rename: '✎',
+  copy: '⧉',
+  share: '↗',
+  like: '+',
+  dislike: '−',
+  open: '⌂',
+  delete: '×'
+};
+
 function normalizeHexColor(value) {
   if (!value || typeof value !== 'string') return DEFAULT_BLOB_COLOR;
   const trimmed = value.trim();
@@ -380,7 +390,7 @@ const DEFAULT_CUSTOM_NOTES = [
 ];
 
 const DEFAULT_CUSTOM_TERMINAL_LINES = [
-  'ZAIRE Terminal Core [Version 2.0.0]',
+  'ZAIRE Terminal Core [Version 1.0]',
   '(c) 2026 ZAIRE Sovereign Intelligence. All rights reserved.',
   '',
   'Type "help" for a list of available commands.',
@@ -471,7 +481,7 @@ const buildInitialAppState = () => {
     customChatInput: '',
     customTerminalInput: '',
     customTerminalLines: DEFAULT_CUSTOM_TERMINAL_LINES,
-    customEditorText: '// ZAIRE Code Engine v2.0\nfunction initWorkspace() {\n  console.log("Workspace initialized successfully.");\n}',
+    customEditorText: '// ZAIRE Code Engine v1.0\nfunction initWorkspace() {\n  console.log("Workspace initialized successfully.");\n}',
     customKanbanCards: DEFAULT_CUSTOM_KANBAN_CARDS,
     zaireStatus: 'online',
     timeStr: '00:00:00',
@@ -3478,7 +3488,7 @@ function useAppController() {
           <div className="grid-navbar">
             <div className="nav-logo">
               <span className="logo-text">Z.A.I.R.E</span>
-              <span className="logo-sub">ARTIFICIAL INTELLIGENCE · v2.0</span>
+              <span className="logo-sub">ARTIFICIAL INTELLIGENCE · v1.0</span>
             </div>
 
             <div className="nav-links">
@@ -5045,13 +5055,27 @@ function useAppController() {
                               <span className="archive-card-count">{session.messageCount} MSGS</span>
                             </div>
                             <div className="archive-card-actions">
-                              <button className="session-action-btn rename" onClick={(e) => { e.stopPropagation(); setEditingSessionId(session.id); setEditingTitle(archiveTitle); }}>RENAME</button>
-                              <button className="session-action-btn" onClick={(e) => { e.stopPropagation(); handleArchiveCopy(session.id); }}>COPY</button>
-                              <button className="session-action-btn" onClick={(e) => { e.stopPropagation(); handleArchiveShare(session.id); }}>SHARE</button>
-                              <button className={`session-action-btn ${archiveReactions[session.id] === 'like' ? 'active-like' : ''}`} onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'like'); }}>LIKE</button>
-                              <button className={`session-action-btn ${archiveReactions[session.id] === 'dislike' ? 'active-dislike' : ''}`} onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'dislike'); }}>DISLIKE</button>
-                              <button className="session-action-btn open" onClick={(e) => { e.stopPropagation(); handleLoadSession(session.id); }}>OPEN</button>
-                              <button className="session-action-btn delete" onClick={(e) => handleDeleteSession(e, session.id)}>DELETE</button>
+                              <button className="session-action-btn rename" title="Rename chat" aria-label="Rename chat" onClick={(e) => { e.stopPropagation(); setEditingSessionId(session.id); setEditingTitle(archiveTitle); }}>
+                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.rename}</span>
+                              </button>
+                              <button className="session-action-btn" title="Copy chat" aria-label="Copy chat" onClick={(e) => { e.stopPropagation(); handleArchiveCopy(session.id); }}>
+                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.copy}</span>
+                              </button>
+                              <button className="session-action-btn" title="Share chat" aria-label="Share chat" onClick={(e) => { e.stopPropagation(); handleArchiveShare(session.id); }}>
+                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.share}</span>
+                              </button>
+                              <button className={`session-action-btn ${archiveReactions[session.id] === 'like' ? 'active-like' : ''}`} title="Like chat" aria-label="Like chat" onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'like'); }}>
+                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.like}</span>
+                              </button>
+                              <button className={`session-action-btn ${archiveReactions[session.id] === 'dislike' ? 'active-dislike' : ''}`} title="Dislike chat" aria-label="Dislike chat" onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'dislike'); }}>
+                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.dislike}</span>
+                              </button>
+                              <button className="session-action-btn open" title="Open chat" aria-label="Open chat" onClick={(e) => { e.stopPropagation(); handleLoadSession(session.id); }}>
+                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.open}</span>
+                              </button>
+                              <button className="session-action-btn delete" title="Delete chat" aria-label="Delete chat" onClick={(e) => handleDeleteSession(e, session.id)}>
+                                <span aria-hidden="true">{ARCHIVE_ACTION_ICONS.delete}</span>
+                              </button>
                             </div>
                           </div>
                         );
@@ -5113,7 +5137,7 @@ function useAppController() {
               )}
 
               <div className="version-info">
-                <span className="version-row">ZAIRE CORE: v2.0.0</span>
+                <span className="version-row">ZAIRE CORE: v1.0</span>
                 <span className="version-row verified">AUTH: MUGHEES [VERIFIED]</span>
               </div>
             </div>
@@ -5144,42 +5168,37 @@ function useAppController() {
                   <button className="uplink-btn" onClick={() => fileInputRef.current.click()} title="Tactical Uplink">
                     <svg className="uplink-icon" viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-2.48-2.02-4.5-4.5-4.5S7 2.52 7 5v12.5c0 3.59 2.91 6.5 6.5 6.5s6.5-2.91 6.5-6.5V6h-1.5z" /></svg>
                   </button>
-                  <div className="command-entry-block">
-                    <div className={`command-input-wrapper ${isMicrophoneActive ? 'voice-mode' : (isTyping ? 'typing-mode' : '')}`}>
-                      <input
-                        type="text"
-                        className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
-                        placeholder={isMicrophoneActive ? 'ZAIRE LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
-                        value={isMicrophoneActive ? (recognizedText || '') : (inputValue || '')}
-                        onChange={(e) => {
-                          if (!isMicrophoneActive) {
-                            setInputValue(e.target.value);
-                            setIsTyping(e.target.value.length > 0);
+                  <div className={`command-input-wrapper ${isMicrophoneActive ? 'voice-mode' : (isTyping ? 'typing-mode' : '')}`}>
+                    <input
+                      type="text"
+                      className={`command-input ${isMicrophoneActive ? 'voice-active' : (isTyping ? 'typing-active' : '')}`}
+                      placeholder={isMicrophoneActive ? 'ZAIRE LISTENING...' : 'TYPE OR SPEAK COMMAND...'}
+                      value={isMicrophoneActive ? (recognizedText || '') : (inputValue || '')}
+                      onChange={(e) => {
+                        if (!isMicrophoneActive) {
+                          setInputValue(e.target.value);
+                          setIsTyping(e.target.value.length > 0);
+                        }
+                      }}
+                      onFocus={() => setIsTyping(true)}
+                      onBlur={() => setIsTyping(false)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.target.value.trim()) {
+                          const userText = e.target.value;
+                          lastUserPromptRef.current = userText;
+                          setInputValue('');
+                          setIsTyping(false);
+                          setZaireResponseStream('');
+                          liveCodeStreamRef.current = '';
+                          if (socketRef.current) socketRef.current.emit('user_message', userText, { artifactTokens: [...artifactTokensRef.current, ...pendingArtifactTokensRef.current] });
+                          if (pendingArtifactTokensRef.current.length > 0) {
+                            artifactTokensRef.current = [...artifactTokensRef.current, ...pendingArtifactTokensRef.current];
+                            pendingArtifactTokensRef.current = [];
                           }
-                        }}
-                        onFocus={() => setIsTyping(true)}
-                        onBlur={() => setIsTyping(false)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && e.target.value.trim()) {
-                            const userText = e.target.value;
-                            lastUserPromptRef.current = userText;
-                            setInputValue('');
-                            setIsTyping(false);
-                            setZaireResponseStream('');
-                            liveCodeStreamRef.current = '';
-                            if (socketRef.current) socketRef.current.emit('user_message', userText, { artifactTokens: [...artifactTokensRef.current, ...pendingArtifactTokensRef.current] });
-                            if (pendingArtifactTokensRef.current.length > 0) {
-                              artifactTokensRef.current = [...artifactTokensRef.current, ...pendingArtifactTokensRef.current];
-                              pendingArtifactTokensRef.current = [];
-                            }
-                          }
-                        }}
-                        disabled={isMicrophoneActive}
-                      />
-                    </div>
-                    <div className={`command-voice-status ${isMicrophoneActive ? 'active' : ''}`}>
-                      {isMicrophoneActive ? 'LISTENING... CLICK TO STOP' : 'CLICK TO TOGGLE VOICE'}
-                    </div>
+                        }
+                      }}
+                      disabled={isMicrophoneActive}
+                    />
                   </div>
                   <button
                     className={`mic-btn morphing-mic-btn ${isMicrophoneActive ? 'active' : ''}`}
@@ -5188,17 +5207,26 @@ function useAppController() {
                     aria-pressed={isMicrophoneActive}
                   >
                     <span className="mic-btn-shimmer" aria-hidden="true"></span>
-                    <span className="mic-btn-label">
-                      <span className="mic-btn-label-text">{isMicrophoneActive ? 'LISTENING' : 'LISTEN'}</span>
-                      <span className={`mic-btn-icon-wrap ${isMicrophoneActive ? 'hidden' : ''}`} aria-hidden="true">
-                        <svg className="mic-icon" viewBox="0 0 24 24"><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" /></svg>
-                      </span>
-                      <span className={`mic-waveform ${isMicrophoneActive ? 'active' : ''}`} aria-hidden="true">
-                        <span className="mic-wave-bar"></span>
+                    <span className="mic-btn-label" aria-hidden="true">
+                      <span className={`mic-waveform mic-waveform-left ${isMicrophoneActive ? 'active' : ''}`} aria-hidden="true">
                         <span className="mic-wave-bar"></span>
                         <span className="mic-wave-bar"></span>
                         <span className="mic-wave-bar"></span>
                       </span>
+                      <span className="mic-btn-icon-wrap" aria-hidden="true">
+                        <svg className="mic-icon" viewBox="0 0 24 24">
+                          <path d="M12 15.5a3.5 3.5 0 0 0 3.5-3.5V7a3.5 3.5 0 1 0-7 0v5a3.5 3.5 0 0 0 3.5 3.5Z" />
+                          <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0" />
+                          <path d="M12 15.5v4" />
+                          <path d="M9 19.5h6" />
+                        </svg>
+                      </span>
+                      <span className={`mic-waveform mic-waveform-right ${isMicrophoneActive ? 'active' : ''}`} aria-hidden="true">
+                        <span className="mic-wave-bar"></span>
+                        <span className="mic-wave-bar"></span>
+                        <span className="mic-wave-bar"></span>
+                      </span>
+                      <span className={`mic-listening-ring ${isMicrophoneActive ? 'active' : ''}`}></span>
                     </span>
                   </button>
                 </div>

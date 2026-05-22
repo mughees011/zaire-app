@@ -1882,13 +1882,6 @@ html {
   align-items: stretch;
 }
 
-.command-entry-block {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
 .command-input-wrapper {
   flex: 1;
   display: flex;
@@ -1978,9 +1971,9 @@ html {
 }
 
 .morphing-mic-btn {
-  width: 150px;
+  width: 86px;
   min-height: 52px;
-  padding: 0 18px;
+  padding: 0 14px;
   position: relative;
   overflow: hidden;
   border-width: 1px;
@@ -2005,23 +1998,8 @@ html {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 6px;
   width: 100%;
-}
-
-.mic-btn-label-text {
-  font-family: var(--font-share);
-  font-size: 11px;
-  letter-spacing: 1.8px;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.morphing-mic-btn:not(.active) .mic-btn-label-text {
-  color: rgba(0, 212, 255, 0.95);
-}
-
-.morphing-mic-btn.active .mic-btn-label-text {
-  color: rgba(255, 120, 120, 0.96);
 }
 
 .mic-btn-icon-wrap {
@@ -2030,21 +2008,18 @@ html {
   justify-content: center;
   opacity: 1;
   transform: scale(1);
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.mic-btn-icon-wrap.hidden {
-  opacity: 0;
-  transform: scale(0.7);
-  width: 0;
-  overflow: hidden;
+  transition: transform 0.22s ease, filter 0.22s ease;
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 0 10px rgba(0, 212, 255, 0.2));
 }
 
 .mic-waveform {
   display: inline-flex;
   align-items: flex-end;
   gap: 3px;
-  height: 16px;
+  justify-content: center;
+  height: 18px;
   opacity: 0;
   width: 0;
   overflow: hidden;
@@ -2054,8 +2029,49 @@ html {
 
 .mic-waveform.active {
   opacity: 1;
-  width: 26px;
+  width: 16px;
   transform: scale(1);
+}
+
+.mic-waveform-left,
+.mic-waveform-right {
+  transform-origin: center;
+}
+
+.mic-listening-ring {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 0;
+  height: 0;
+  border-radius: 999px;
+  border: 0 solid rgba(255, 90, 95, 0.85);
+  box-shadow: 0 0 0 rgba(255, 90, 95, 0);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.6);
+  transition: opacity 0.2s ease, transform 0.2s ease, width 0.2s ease, height 0.2s ease;
+}
+
+.mic-listening-ring.active {
+  width: 34px;
+  height: 34px;
+  border-width: 1px;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  box-shadow: 0 0 18px rgba(255, 90, 95, 0.3);
+  animation: listeningRingPulse 1s ease-in-out infinite;
+}
+
+@keyframes listeningRingPulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.92);
+    opacity: 0.45;
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1.06);
+    opacity: 0.9;
+  }
 }
 
 .mic-wave-bar {
@@ -2079,10 +2095,6 @@ html {
   animation: micWave 0.75s ease-in-out infinite 0.2s;
 }
 
-.mic-waveform.active .mic-wave-bar:nth-child(4) {
-  animation: micWave 0.6s ease-in-out infinite 0.08s;
-}
-
 @keyframes micWave {
   0%,
   100% {
@@ -2091,35 +2103,28 @@ html {
   }
 
   50% {
-    height: 16px;
+    height: 18px;
     opacity: 1;
   }
 }
 
 .mic-icon {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   stroke: rgba(0, 212, 255, 0.8);
   fill: none;
-  stroke-width: 1.5;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .mic-btn.active .mic-icon {
   stroke: #ff6b6b;
 }
 
-.command-voice-status {
-  font-family: var(--font-share);
-  font-size: 9px;
-  letter-spacing: 1.8px;
-  color: rgba(0, 212, 255, 0.58);
-  padding-left: 2px;
-  text-transform: uppercase;
-}
-
-.command-voice-status.active {
-  color: rgba(255, 107, 107, 0.92);
-  text-shadow: 0 0 10px rgba(255, 107, 107, 0.22);
+.morphing-mic-btn.active .mic-btn-icon-wrap {
+  transform: scale(1.06);
+  filter: drop-shadow(0 0 12px rgba(255, 90, 95, 0.35));
 }
 
 .command-bar-header {
@@ -2508,7 +2513,7 @@ html {
   box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
 }
 
-.mic-btn {
+.legacy-mic-btn {
   width: 32px;
   height: 32px;
   border: 1px solid rgba(0, 212, 255, 0.3);
@@ -2518,7 +2523,7 @@ html {
   position: relative;
 }
 
-.mic-btn::before {
+.legacy-mic-btn::before {
   content: '';
   position: absolute;
   top: 50%;
@@ -2530,11 +2535,11 @@ html {
   border-radius: 5px;
 }
 
-.mic-btn:hover {
+.legacy-mic-btn:hover {
   background: rgba(0, 212, 255, 0.1);
 }
 
-.mic-btn.active {
+.legacy-mic-btn.active {
   border-color: var(--primary);
   animation: micPulse 1.5s ease-in-out infinite;
 }
@@ -8219,6 +8224,28 @@ input[type=range]::-webkit-slider-thumb {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.archive-card-actions .session-action-btn {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  color: rgba(232, 251, 255, 0.68);
+  border-color: rgba(0, 212, 255, 0.22);
+  background: rgba(0, 8, 18, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(0, 212, 255, 0.04);
+}
+
+.archive-card-actions .session-action-btn span {
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.archive-card-actions .session-action-btn:hover {
+  background: rgba(0, 212, 255, 0.14);
+  border-color: rgba(0, 212, 255, 0.48);
 }
 
 .session-action-btn.active-like {

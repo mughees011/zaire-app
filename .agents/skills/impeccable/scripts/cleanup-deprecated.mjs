@@ -21,14 +21,13 @@
 import { existsSync, readFileSync, writeFileSync, rmSync, readdirSync, statSync, lstatSync, unlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-// Skills that were renamed, merged, or folded in v2.0 and v2.1.
 const DEPRECATED_NAMES = [
-  'frontend-design',    // renamed to impeccable (v2.0)
-  'teach-impeccable',   // folded into /impeccable teach (v2.0)
-  'arrange',            // renamed to layout (v2.1)
-  'normalize',          // merged into polish (v2.1)
-  'onboard',            // merged into harden (v2.1)
-  'extract',            // merged into /impeccable extract (v2.1)
+  'frontend-design',
+  'teach-impeccable',
+  'arrange',
+  'normalize',
+  'onboard',
+  'extract',
 ];
 
 // All known harness directories that may contain a skills/ subfolder.

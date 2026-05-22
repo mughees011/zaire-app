@@ -1142,7 +1142,7 @@ function useSettingsModalController({
         <aside className="sidebar">
           <div className="sidebar-header">
             <div className="sidebar-brand">Z.A.I.R.E</div>
-            <div className="sidebar-ver">SYSTEM CONTROL - VER 2.0.0</div>
+            <div className="sidebar-ver">SYSTEM CONTROL</div>
           </div>
 
           {navGroups.map((group) => (
@@ -2055,7 +2055,7 @@ function useSettingsModalController({
         </main>
 
         <footer className="settings-footer">
-          <div className="footer-status">CORE_SYNC: ACTIVE // VER: 2.0.0</div>
+          <div className="footer-status">CORE_SYNC: ACTIVE // VER: 1.0</div>
           <div className="footer-btns">
             <button
               type="button"
