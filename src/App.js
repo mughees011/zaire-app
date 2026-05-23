@@ -1953,7 +1953,7 @@ function useAppController() {
 
   const toggleSecuritySystem = useCallback(async (disabled) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/security/toggle_system`, {
+      const res = await fetch(`${API_BASE_URL}/api/security/status/toggle_system`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ disabled })
@@ -5314,7 +5314,7 @@ function useAppController() {
                   {cameraStatus === 'authorized' ? (
                     <div className="hud-video-wrapper">
                       <img
-                        src={API_BASE_URL + '/api/security/video_feed'}
+                        src={API_BASE_URL + '/api/security/status/video_feed'}
                         alt="Camera Feed"
                         className="hud-video-feed"
                       />
