@@ -2,25 +2,58 @@ import React, { useCallback, useEffect, useMemo, useReducer, useRef } from 'reac
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import SettingsModal from './SettingsModal';
+import ZaireSplash from './ZaireSplash';
 import GroqSpeechService from './groqSpeechService';
 import { io } from 'socket.io-client';
 import './App.css';
 import ShadowAssistant from './components/ShadowAssistant';
-import { SignedIn, SignedOut, SignIn, SignUp, UserButton, useUser, useAuth } from '@clerk/clerk-react';
+import GoalExecutionHUD from './components/GoalExecutionHUD';
+import EngineerModeV2 from './components/modes/EngineerModeV2';
+import ProfessorModeV2 from './components/modes/ProfessorModeV2';
+import TraderModeV2 from './components/modes/TraderModeV2';
+import SwarmModeV2 from './components/modes/SwarmModeV2';
+import CustomModeRenderer from './components/CustomModeRenderer';
+import { GhostTranscript, GhostTranscriptionService } from './GhostTranscript';
+import { ClerkProvider, SignedIn, SignedOut, UserButton, useUser, useAuth, SignIn, SignUp } from '@clerk/clerk-react';
 import { ZaireComponentRegistry, getComponentBlueprintByType } from './engine/ComponentRegistry';
 import * as EliteComponents from './engine/EliteComponents';
 import EliteHUDWrapper from './engine/EliteHUDWrapper';
+import { resolveApiBase } from './apiBase';
 const DEFAULT_BLOB_COLOR = '#00b4ff';
-const API_BASE_URL = process.env.REACT_APP_API_URL || `https://zaire-backend.onrender.com`;
+const API_BASE_URL = resolveApiBase();
 const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
+const CORE_MODE_VISIBILITY_STORAGE_KEY = 'zaire_core_mode_visibility_v1';
 const BLOB_COLOR_STORAGE_KEY = 'blobColor:v1';
 const BLOB_SIZE_STORAGE_KEY = 'blobSize:v1';
 const BLOB_POSITION_STORAGE_KEY = 'blobPosition:v1';
+const FOCUS_MODE_STORAGE_KEY = 'zaire_focus_mode_v1';
 const CORE_MODES = ['ZAIRE', 'TRADER', 'PROFESSOR', 'ENGINEER', 'SWARM'];
+const LAUNCH_MODE_ORDER = ['ZAIRE', 'ENGINEER', 'TRADER', 'PROFESSOR', 'SWARM'];
+const DEFAULT_CORE_MODE_VISIBILITY = {
+  ZAIRE: true,
+  ENGINEER: true,
+  TRADER: false,
+  PROFESSOR: false,
+  SWARM: false
+};
+const MODE_LAUNCH_LABELS = {
+  ZAIRE: 'ZAIRE CORE',
+  ENGINEER: 'ENGINEER Mode',
+  SWARM: 'SWARM LAB',
+  TRADER: 'TRADER LAB',
+  PROFESSOR: 'PROFESSOR LAB'
+};
 const CUSTOM_MODE_LOCKED_ZONES = ['Bottom Console'];
 
-const fetchJsonOrThrow = async (url, options) => {
-  const response = await fetch(url, options);
+const fetchJsonOrThrow = async (url, options = {}) => {
+  const opts = { ...options };
+  opts.headers = { ...opts.headers };
+  const licenseKey = localStorage.getItem('zaire_license_key');
+  if (licenseKey) {
+    opts.headers['x-zaire-license'] = licenseKey;
+    opts.headers['x-zaire-machine-id'] = 'BROWSER_HUD';
+  }
+  const response = await fetch(url, opts);
   const contentType = response.headers.get('content-type') || '';
 
   if (!response.ok) {
@@ -36,6 +69,45 @@ const fetchJsonOrThrow = async (url, options) => {
   return response.json();
 };
 
+const isNetworkFetchError = (error) =>
+  error instanceof TypeError ||
+  /failed to fetch|networkerror|load failed/i.test(error?.message || '');
+
+const getFallbackSpecialistData = (mode) => {
+  const base = {
+    active_persona: 'STARK_GRADE',
+    forge_telemetry: {},
+    active_projects: [],
+    phase: 'IDLE',
+    progress: 0
+  };
+
+  if (mode === 'ENGINEER') {
+    return {
+      ...base,
+      active_persona: 'ENGINEER_CORE',
+      forge_telemetry: {
+        phase: 'IDLE',
+        status: 'OFFLINE_FALLBACK'
+      }
+    };
+  }
+
+  if (mode === 'TRADER') {
+    return { ...base, active_persona: 'TRADER_LAB' };
+  }
+
+  if (mode === 'PROFESSOR') {
+    return { ...base, active_persona: 'PROFESSOR_LAB' };
+  }
+
+  if (mode === 'SWARM') {
+    return { ...base, active_persona: 'SWARM_LAB', messages: [] };
+  }
+
+  return base;
+};
+
 const sanitizeCustomModeComponents = (components = []) =>
   components.filter((component) => !CUSTOM_MODE_LOCKED_ZONES.includes(component.zone));
 
@@ -43,6 +115,9 @@ const sanitizeCustomModeRecord = (mode) => ({
   ...mode,
   components: sanitizeCustomModeComponents(mode.components || [])
 });
+
+const normalizeDesktopCustomModes = (modes) =>
+  Array.isArray(modes) ? modes.map(sanitizeCustomModeRecord) : [];
 
 const handleAccessibleActivate = (event, action) => {
   if (event.key === 'Enter' || event.key === ' ') {
@@ -60,6 +135,12 @@ const mapWithStableKeys = (items, getBaseKey, renderItem) => {
     const stableKey = occurrence === 0 ? baseKey : `${baseKey}-${occurrence}`;
     return renderItem(item, stableKey, itemIndex);
   });
+};
+
+const getPerformanceCadenceMs = (profile) => {
+  if (profile === 'hidden') return 1000;
+  if (profile === 'idle') return 220;
+  return 0;
 };
 
 function ClientLocalTime({ value, mode = 'time', options }) {
@@ -524,8 +605,17 @@ const readJsonFromStorage = (key, fallback) => {
   }
 };
 
+const normalizeCoreModeVisibility = (value) => ({
+  ...DEFAULT_CORE_MODE_VISIBILITY,
+  ...(value && typeof value === 'object' ? value : {})
+});
+
 const buildInitialAppState = () => {
   const storedModes = readJsonFromStorage(MODE_STORAGE_KEY, []);
+  const storedCoreModeVisibility = readJsonFromStorage(
+    CORE_MODE_VISIBILITY_STORAGE_KEY,
+    DEFAULT_CORE_MODE_VISIBILITY
+  );
   return {
     hudOpacity: parseFloat(localStorage.getItem('zaire_hud_opacity')) || 0.85,
     neuralGlowEnabled: localStorage.getItem('zaire_neural_glow') !== 'false',
@@ -542,7 +632,8 @@ const buildInitialAppState = () => {
     isOmniBoxOpen: false,
     omniInput: '',
     isSystemEngaged: false,
-    activeMode: 'ZAIRE',
+    activeMode: 'ENGINEER',
+    coreModeVisibility: normalizeCoreModeVisibility(storedCoreModeVisibility),
     customModes: Array.isArray(storedModes) ? storedModes.map(sanitizeCustomModeRecord) : [],
     activeCustomMode: null,
     customTasks: DEFAULT_CUSTOM_TASKS,
@@ -558,6 +649,8 @@ const buildInitialAppState = () => {
     isSettingsOpen: false,
     isDragging: false,
     isMicrophoneActive: false,
+    focusModeEnabled: localStorage.getItem(FOCUS_MODE_STORAGE_KEY) === 'true',
+    performanceProfile: document.visibilityState === 'hidden' ? 'hidden' : 'active',
     audioFrequency: 0,
     blobColor: normalizeHexColor(localStorage.getItem(BLOB_COLOR_STORAGE_KEY) || DEFAULT_BLOB_COLOR),
     blobSize: parseFloat(localStorage.getItem(BLOB_SIZE_STORAGE_KEY)) || 1.0,
@@ -569,6 +662,8 @@ const buildInitialAppState = () => {
     useGroqSpeech: false,
     groqStatus: '',
     isVisionScanning: false,
+    visionTaskStatus: null,
+    visionTaskPrompt: '',
     storedMemories: [],
     memoryFlash: false,
     isDiagnosticActive: false,
@@ -608,7 +703,8 @@ const buildInitialAppState = () => {
     currentVideoScene: null,
     isNeuralPulseActive: false,
     particles: [],
-    cameraStatus: 'pending'
+    cameraStatus: 'pending',
+    billingStatus: null
   };
 };
 
@@ -642,6 +738,7 @@ function useAppController() {
     omniInput,
     isSystemEngaged,
     activeMode,
+    coreModeVisibility,
     customModes,
     activeCustomMode,
     customTasks,
@@ -657,6 +754,8 @@ function useAppController() {
     isSettingsOpen,
     isDragging,
     isMicrophoneActive,
+    focusModeEnabled,
+    performanceProfile,
     audioFrequency,
     blobColor,
     blobSize,
@@ -668,6 +767,8 @@ function useAppController() {
     useGroqSpeech,
     groqStatus,
     isVisionScanning,
+    visionTaskStatus,
+    visionTaskPrompt,
     storedMemories,
     memoryFlash,
     isDiagnosticActive,
@@ -707,8 +808,10 @@ function useAppController() {
     currentVideoScene,
     isNeuralPulseActive,
     particles,
-    cameraStatus
+    cameraStatus,
+    billingStatus
   } = appState;
+  const setBillingStatus = createAppFieldSetter(dispatchAppState, 'billingStatus');
   const setHudOpacity = createAppFieldSetter(dispatchAppState, 'hudOpacity');
   const setNeuralGlowEnabled = createAppFieldSetter(dispatchAppState, 'neuralGlowEnabled');
   const setHolographicTiltEnabled = createAppFieldSetter(dispatchAppState, 'holographicTiltEnabled');
@@ -725,6 +828,7 @@ function useAppController() {
   const setOmniInput = createAppFieldSetter(dispatchAppState, 'omniInput');
   const setIsSystemEngaged = createAppFieldSetter(dispatchAppState, 'isSystemEngaged');
   const setActiveMode = createAppFieldSetter(dispatchAppState, 'activeMode');
+  const setCoreModeVisibility = createAppFieldSetter(dispatchAppState, 'coreModeVisibility');
   const setCustomModes = createAppFieldSetter(dispatchAppState, 'customModes');
   const setActiveCustomMode = createAppFieldSetter(dispatchAppState, 'activeCustomMode');
   const setCustomTasks = createAppFieldSetter(dispatchAppState, 'customTasks');
@@ -740,6 +844,8 @@ function useAppController() {
   const setIsSettingsOpen = createAppFieldSetter(dispatchAppState, 'isSettingsOpen');
   const setIsDragging = createAppFieldSetter(dispatchAppState, 'isDragging');
   const setIsMicrophoneActive = createAppFieldSetter(dispatchAppState, 'isMicrophoneActive');
+  const setFocusModeEnabled = createAppFieldSetter(dispatchAppState, 'focusModeEnabled');
+  const setPerformanceProfile = createAppFieldSetter(dispatchAppState, 'performanceProfile');
   const setAudioFrequency = createAppFieldSetter(dispatchAppState, 'audioFrequency');
   const setBlobColor = createAppFieldSetter(dispatchAppState, 'blobColor');
   const setBlobSize = createAppFieldSetter(dispatchAppState, 'blobSize');
@@ -751,6 +857,8 @@ function useAppController() {
   const setUseGroqSpeech = createAppFieldSetter(dispatchAppState, 'useGroqSpeech');
   const setGroqStatus = createAppFieldSetter(dispatchAppState, 'groqStatus');
   const setIsVisionScanning = createAppFieldSetter(dispatchAppState, 'isVisionScanning');
+  const setVisionTaskStatus = createAppFieldSetter(dispatchAppState, 'visionTaskStatus');
+  const setVisionTaskPrompt = createAppFieldSetter(dispatchAppState, 'visionTaskPrompt');
   const setStoredMemories = createAppFieldSetter(dispatchAppState, 'storedMemories');
   const setMemoryFlash = createAppFieldSetter(dispatchAppState, 'memoryFlash');
   const setIsDiagnosticActive = createAppFieldSetter(dispatchAppState, 'isDiagnosticActive');
@@ -809,6 +917,10 @@ function useAppController() {
   const socketRef = useRef(null);
   const responseTimeoutRef = useRef(null);
   const pendingActivationLineRef = useRef(null);
+  const backendWarningStateRef = useRef({
+    chatsLogged: false,
+    specialistLogged: false
+  });
 
 
   // Biometric State
@@ -821,17 +933,261 @@ function useAppController() {
 
   const isDeepThinkingRef = useRef(false);
   const isMicrophoneActiveRef = useRef(false);
+  const performanceProfileRef = useRef(performanceProfile);
+  const activityHeartbeatRef = useRef(Date.now());
+  const threeFrameClockRef = useRef(0);
+  const waveformFrameClockRef = useRef(0);
+  const gaugeFrameClockRef = useRef(0);
+  const faceMeshFrameClockRef = useRef(0);
 
   // Sync state to Ref for persistent event handlers
   useEffect(() => {
     isMicrophoneActiveRef.current = isMicrophoneActive;
   }, [isMicrophoneActive]);
 
+  useEffect(() => {
+    performanceProfileRef.current = performanceProfile;
+  }, [performanceProfile]);
+
+  useEffect(() => {
+    localStorage.setItem(FOCUS_MODE_STORAGE_KEY, String(focusModeEnabled));
+  }, [focusModeEnabled]);
+
+  useEffect(() => {
+    const computeProfile = () => {
+      if (document.visibilityState === 'hidden') return 'hidden';
+      if (focusModeEnabled) return 'idle';
+      const isActivelyEngaged = isMicrophoneActiveRef.current || isTyping || isOmniBoxOpen || zaireStatus === 'processing';
+      const msSinceActivity = Date.now() - activityHeartbeatRef.current;
+      if (!isActivelyEngaged && msSinceActivity > 45000) return 'idle';
+      return 'active';
+    };
+
+    let syncTimeout = null;
+    const syncProfile = (nextProfile) => {
+      performanceProfileRef.current = nextProfile;
+      setPerformanceProfile(nextProfile);
+      if (syncTimeout) clearTimeout(syncTimeout);
+      syncTimeout = setTimeout(() => {
+        fetch('/api/system/power', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: nextProfile, focusMode: focusModeEnabled })
+        }).catch((err) => {
+          if (!isNetworkFetchError(err)) {
+            console.warn('Power optimization signal failed', err);
+          }
+        });
+      }, 120);
+    };
+
+    const refreshProfile = () => {
+      const nextProfile = computeProfile();
+      if (nextProfile !== performanceProfileRef.current) {
+        syncProfile(nextProfile);
+      }
+    };
+
+    const markActive = () => {
+      activityHeartbeatRef.current = Date.now();
+      if (performanceProfileRef.current !== 'active' && document.visibilityState !== 'hidden' && !focusModeEnabled) {
+        syncProfile('active');
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      refreshProfile();
+    };
+
+    const activityEvents = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'];
+    activityEvents.forEach((eventName) => window.addEventListener(eventName, markActive, { passive: true }));
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    const idleInterval = window.setInterval(refreshProfile, 10000);
+    refreshProfile();
+
+    return () => {
+      if (syncTimeout) clearTimeout(syncTimeout);
+      window.clearInterval(idleInterval);
+      activityEvents.forEach((eventName) => window.removeEventListener(eventName, markActive));
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [focusModeEnabled, isOmniBoxOpen, isTyping, zaireStatus]);
+
+  const shouldAnimateHeavyEffects = isSystemEngaged && performanceProfile !== 'hidden';
+
+  const shouldRunFrame = (frameClockRef) => {
+    if (!shouldAnimateHeavyEffects) {
+      return false;
+    }
+
+    const cadenceMs = getPerformanceCadenceMs(performanceProfileRef.current);
+    if (cadenceMs <= 0) {
+      return true;
+    }
+
+    const now = performance.now();
+    if (now - frameClockRef.current < cadenceMs) {
+      return false;
+    }
+
+    frameClockRef.current = now;
+    return true;
+  };
+
+  useEffect(() => {
+    if (!isSystemEngaged) return;
+    const nextProfile = document.visibilityState === 'hidden' ? 'hidden' : (focusModeEnabled ? 'idle' : 'active');
+    if (nextProfile !== performanceProfileRef.current) {
+      setPerformanceProfile(nextProfile);
+    }
+  }, [focusModeEnabled, isSystemEngaged]);
+
+  useEffect(() => {
+    if (!isSystemEngaged) return;
+    if (performanceProfile !== 'active') {
+      setParticles([]);
+      setGameNodes([]);
+    }
+  }, [isSystemEngaged, performanceProfile]);
+
+  useEffect(() => {
+    if (!isSystemEngaged) return;
+    if (!focusModeEnabled) return;
+    if (navItem === 'HOME') return;
+    setNavItem('HOME');
+  }, [focusModeEnabled, isSystemEngaged, navItem]);
+
+  const persistConfigPayload = React.useEffectEvent(async (payload) => {
+    try {
+      await fetch(`${API_BASE_URL}/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (_) { }
+
+    if (user?.id) {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        if (payload?.theme || payload?.voice || payload?.agent) {
+          await fetch(`${API_BASE_URL}/api/settings`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              theme: payload.theme,
+              voice: payload.voice,
+              agent: payload.agent
+            })
+          });
+        }
+      } catch (_) { }
+    }
+  });
+
+  const syncDesktopProfile = React.useEffectEvent(async (overrides = {}) => {
+    if (!desktopProfileReadyRef.current) return;
+
+    const payload = {
+      desktopProfile: {
+        customModes,
+        coreModeVisibility: normalizeCoreModeVisibility(coreModeVisibility),
+        focusModeEnabled,
+        modeLayouts,
+        componentNudges,
+        archiveReactions,
+        theme: {
+          hudOpacity,
+          neuralGlowEnabled,
+          holographicTiltEnabled,
+          blobColor,
+          blobSize,
+          blobPosition: blobPositionRef.current
+        },
+        licensing: {
+          cachedLicenseKey: localStorage.getItem('zaire_license_key') || ''
+        }
+      },
+      ...overrides
+    };
+
+    await persistConfigPayload(payload);
+  });
+
+  const applyDesktopProfile = React.useEffectEvent((configData = {}) => {
+    const theme = configData?.theme || {};
+    const desktopProfile = configData?.desktopProfile || {};
+    const profileTheme = desktopProfile?.theme || {};
+    const mergedTheme = { ...theme, ...profileTheme };
+
+    if (mergedTheme.hudOpacity !== undefined) setHudOpacity(mergedTheme.hudOpacity);
+    if (mergedTheme.neuralGlowEnabled !== undefined) setNeuralGlowEnabled(mergedTheme.neuralGlowEnabled);
+    if (mergedTheme.holographicTiltEnabled !== undefined) setHolographicTiltEnabled(mergedTheme.holographicTiltEnabled);
+    if (mergedTheme.blobColor !== undefined) setBlobColor(mergedTheme.blobColor);
+    if (mergedTheme.blobSize !== undefined) setBlobSize(mergedTheme.blobSize);
+    if (mergedTheme.blobPosition) syncBlobPosition(blobPositionRef, mergedTheme.blobPosition, mainGroupRef);
+
+    if (desktopProfile.focusModeEnabled !== undefined) {
+      setFocusModeEnabled(Boolean(desktopProfile.focusModeEnabled));
+    }
+    if (desktopProfile.coreModeVisibility) {
+      setCoreModeVisibility(normalizeCoreModeVisibility(desktopProfile.coreModeVisibility));
+    }
+    if (Array.isArray(desktopProfile.customModes)) {
+      const sanitizedModes = normalizeDesktopCustomModes(desktopProfile.customModes);
+      setCustomModes(sanitizedModes);
+      localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(sanitizedModes));
+    }
+    if (desktopProfile.modeLayouts && typeof desktopProfile.modeLayouts === 'object') {
+      setModeLayouts(desktopProfile.modeLayouts);
+      localStorage.setItem('zaire_mode_layouts_v1', JSON.stringify(desktopProfile.modeLayouts));
+    }
+    if (desktopProfile.componentNudges && typeof desktopProfile.componentNudges === 'object') {
+      setComponentNudges(desktopProfile.componentNudges);
+      localStorage.setItem('zaire_component_nudges_v1', JSON.stringify(desktopProfile.componentNudges));
+    }
+    if (desktopProfile.archiveReactions && typeof desktopProfile.archiveReactions === 'object') {
+      setArchiveReactions(desktopProfile.archiveReactions);
+      localStorage.setItem('zaire_archive_reactions_v1', JSON.stringify(desktopProfile.archiveReactions));
+    }
+
+    const cachedLicenseKey = desktopProfile?.licensing?.cachedLicenseKey;
+    if (cachedLicenseKey) {
+      localStorage.setItem('zaire_license_key', cachedLicenseKey);
+    }
+  });
+
+  useEffect(() => {
+    if (user?.id) {
+      fetch(`${API_BASE_URL}/billing/status/${user.id}`)
+        .then(r => r.json())
+        .then(data => {
+          setBillingStatus(data);
+        })
+        .catch(err => console.error('Failed to fetch billing status:', err));
+    }
+  }, [user?.id, getToken]);
+
+  useEffect(() => {
+    window.zaireSaveSettings = persistConfigPayload;
+    return () => {
+      delete window.zaireSaveSettings;
+    };
+  }, [persistConfigPayload]);
+
   // Fetch custom modes from PostgreSQL backend on user login
   const fetchCustomModes = React.useCallback(async () => {
     try {
       const token = await getToken();
-      if (!token) return;
+      if (!token) {
+        const configData = await fetchJsonOrThrow(`${API_BASE_URL}/config`);
+        const desktopModes = normalizeDesktopCustomModes(configData?.data?.desktopProfile?.customModes || []);
+        if (desktopModes.length > 0) {
+          setCustomModes(desktopModes);
+          localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(desktopModes));
+        }
+        return;
+      }
       const response = await fetch(`${API_BASE_URL}/api/custom_modes`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -842,11 +1198,18 @@ function useAppController() {
         const sanitizedModes = data.modes.map(sanitizeCustomModeRecord);
         setCustomModes(sanitizedModes);
         localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(sanitizedModes));
+        await persistConfigPayload({
+          desktopProfile: {
+            customModes: sanitizedModes
+          }
+        });
       }
     } catch (err) {
-      console.warn('Failed to fetch custom modes from backend:', err.message);
+      if (!isNetworkFetchError(err)) {
+        console.warn('Failed to fetch custom modes from backend:', err.message);
+      }
     }
-  }, [getToken]);
+  }, [getToken, persistConfigPayload]);
 
   useEffect(() => {
     if (user) {
@@ -901,6 +1264,51 @@ function useAppController() {
   });
 
   const lastUserPromptRef = useRef('');
+
+  const startVisionTask = async (taskText) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/task/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task: taskText })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setVisionTaskPrompt(taskText);
+        setVisionTaskStatus({ running: true, status: 'started', steps: [] });
+      } else {
+        alert(data.error);
+      }
+    } catch (err) {
+      console.error("Start vision task failed:", err);
+    }
+  };
+
+  const stopVisionTask = async () => {
+    try {
+      await fetch(`${API_BASE_URL}/task/stop`, { method: 'POST' });
+    } catch (err) {
+      console.error("Stop vision task failed:", err);
+    }
+  };
+
+  useEffect(() => {
+    let interval;
+    if (visionTaskStatus?.running) {
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/task/status`);
+          const data = await res.json();
+          if (data.success) {
+            setVisionTaskStatus(data.task);
+          }
+        } catch (e) {
+          console.error("Task status error", e);
+        }
+      }, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [visionTaskStatus?.running]);
 
   const handleSpecialistAction = async (mode, action, payload = {}) => {
     try {
@@ -1098,6 +1506,11 @@ function useAppController() {
     localStorage.setItem('zaire_hud_opacity', hudOpacity);
     localStorage.setItem('zaire_neural_glow', neuralGlowEnabled);
     localStorage.setItem('zaire_holographic_tilt', holographicTiltEnabled);
+    if (window.zaireSaveSettings) {
+      window.zaireSaveSettings({
+        theme: { hudOpacity, neuralGlowEnabled, holographicTiltEnabled, blobColor, blobSize }
+      });
+    }
     // Dynamic Color Mapping based on System State
     let stateColor = '#00d4ff'; // Default IDLE (Cyan)
     let stateGlow = 'rgba(0, 212, 255, 0.03)';
@@ -1156,6 +1569,8 @@ function useAppController() {
   const audioQueueRef = useRef({}); // Using object keyed by index for O(1) lookups
   const isPlayingAudioRef = useRef(false);
   const nextExpectedIndexRef = useRef(0);
+  const ttsWarningLoggedRef = useRef(false);
+  const desktopProfileReadyRef = useRef(false);
 
   const getNextCustomId = React.useCallback(() => {
     const nextId = customIdRef.current;
@@ -1259,6 +1674,9 @@ function useAppController() {
 
   const activateNavbarMode = React.useCallback((modeName) => {
     if (CORE_MODES.includes(modeName)) {
+      if (!normalizeCoreModeVisibility(coreModeVisibility)[modeName]) {
+        return;
+      }
       setActiveCustomMode(null);
       handleModeChange(modeName);
       return;
@@ -1290,7 +1708,13 @@ function useAppController() {
         customModeConfig
       });
     }
-  }, [activeMode, customModes, handleModeChange]);
+  }, [activeMode, coreModeVisibility, customModes, handleModeChange]);
+
+  useEffect(() => {
+    if (!CORE_MODES.includes(activeMode)) return;
+    if (normalizeCoreModeVisibility(coreModeVisibility)[activeMode]) return;
+    handleModeChange('ENGINEER');
+  }, [activeMode, coreModeVisibility, handleModeChange]);
 
   const handleModeSync = React.useCallback((newMode) => {
     setActiveMode(newMode);
@@ -1323,6 +1747,7 @@ function useAppController() {
   }, []);
 
   const spawnKnowledgeParticles = React.useCallback(() => {
+    if (performanceProfileRef.current !== 'active' || focusModeEnabled) return;
     const newParticles = [];
     for (let i = 0; i < 15; i++) {
       const startX = Math.random() * window.innerWidth;
@@ -1342,9 +1767,10 @@ function useAppController() {
     setTimeout(() => {
       setParticles(prev => prev.filter(p => !newParticles.find(np => np.id === p.id)));
     }, 2000);
-  }, []);
+  }, [focusModeEnabled]);
 
   const spawnGameNodes = () => {
+    if (performanceProfileRef.current !== 'active' || focusModeEnabled) return;
     const nodes = [];
     for (let i = 0; i < 5; i++) {
       nodes.push({
@@ -1381,6 +1807,11 @@ function useAppController() {
   useEffect(() => {
     localStorage.setItem(BLOB_COLOR_STORAGE_KEY, blobColor);
     localStorage.setItem(BLOB_SIZE_STORAGE_KEY, blobSize);
+    if (window.zaireSaveSettings) {
+      window.zaireSaveSettings({
+        theme: { hudOpacity, neuralGlowEnabled, holographicTiltEnabled, blobColor, blobSize }
+      });
+    }
   }, [blobColor, blobSize]);
 
   // ── PHASE 3: NEURAL THEME SYNC ─────────────────────
@@ -1417,7 +1848,7 @@ function useAppController() {
   // Function to fetch TTS audio via HTTP
   const fetchTTSAudio = React.useEffectEvent(async (text) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/tts`, {
+      const response = await fetch('/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, pitch: '+0Hz', rate: '+5%' })
@@ -1428,9 +1859,13 @@ function useAppController() {
       }
 
       const arrayBuffer = await response.arrayBuffer();
+      ttsWarningLoggedRef.current = false;
       return new Uint8Array(arrayBuffer);
     } catch (err) {
-      console.error('[TTS HTTP] Failed:', err);
+      if (!isNetworkFetchError(err) && !ttsWarningLoggedRef.current) {
+        console.warn('[TTS HTTP] Voice synthesis unavailable, continuing with text only.', err?.message || err);
+        ttsWarningLoggedRef.current = true;
+      }
       return null;
     }
   });
@@ -1528,6 +1963,13 @@ function useAppController() {
   }, [customModes]);
 
   useEffect(() => {
+    localStorage.setItem(
+      CORE_MODE_VISIBILITY_STORAGE_KEY,
+      JSON.stringify(normalizeCoreModeVisibility(coreModeVisibility))
+    );
+  }, [coreModeVisibility]);
+
+  useEffect(() => {
     localStorage.setItem('zaire_archive_reactions_v1', JSON.stringify(archiveReactions));
   }, [archiveReactions]);
 
@@ -1535,10 +1977,16 @@ function useAppController() {
     try {
       const data = await fetchJsonOrThrow(`${API_BASE_URL}/chats`);
       if (data.success) {
-        setChatSessions(data.sessions);
+        const activeSessionsOnly = data.sessions.filter(s => s.messageCount > 0 || (s.messages && s.messages.length > 0));
+        setChatSessions(activeSessionsOnly);
       }
+      backendWarningStateRef.current.chatsLogged = false;
     } catch (e) {
-      console.warn('Failed to fetch chat sessions:', e.message);
+      setChatSessions([]);
+      if (!isNetworkFetchError(e) && !backendWarningStateRef.current.chatsLogged) {
+        console.warn('Failed to fetch chat sessions:', e.message);
+        backendWarningStateRef.current.chatsLogged = true;
+      }
     }
   }, []);
 
@@ -1660,18 +2108,37 @@ function useAppController() {
       .then(res => {
         if (res.success && res.data) {
           console.log('[SYSTEM] Restored HUD config from core.');
-          if (res.data.blobColor) setBlobColor(res.data.blobColor);
-          if (res.data.blobSize) setBlobSize(res.data.blobSize);
-          if (res.data.blobPosition) syncBlobPosition(blobPositionRef, res.data.blobPosition, mainGroupRef);
+          applyDesktopProfile(res.data);
         }
       })
-      .catch(() => { });
-  }, []);
+      .catch(() => { })
+      .finally(() => {
+        desktopProfileReadyRef.current = true;
+      });
+  }, [applyDesktopProfile]);
 
   // Load memories and system config from backend on startup
   useEffect(() => {
     loadInitialSystemData();
   }, [loadInitialSystemData]);
+
+  useEffect(() => {
+    if (!desktopProfileReadyRef.current) return;
+    syncDesktopProfile();
+  }, [
+    customModes,
+    coreModeVisibility,
+    focusModeEnabled,
+    modeLayouts,
+    componentNudges,
+    archiveReactions,
+    hudOpacity,
+    neuralGlowEnabled,
+    holographicTiltEnabled,
+    blobColor,
+    blobSize,
+    syncDesktopProfile
+  ]);
 
   const handleSocketConnect = React.useEffectEvent(() => {
     console.log('[SOCKET] Connected to backend');
@@ -1969,13 +2436,17 @@ function useAppController() {
 
   const fetchSpecialistData = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/agent/specialist_data?mode=${activeMode}`);
-      const data = await res.json();
+      const data = await fetchJsonOrThrow(`${API_BASE_URL}/agent/specialist_data?mode=${activeMode}`);
       if (data.success) {
         setSpecialistData(data.data || { active_persona: 'STARK_GRADE', forge_telemetry: {}, active_projects: [] });
       }
+      backendWarningStateRef.current.specialistLogged = false;
     } catch (e) {
-      console.error('Failed to fetch specialist data:', e);
+      setSpecialistData(getFallbackSpecialistData(activeMode));
+      if (!isNetworkFetchError(e) && !backendWarningStateRef.current.specialistLogged) {
+        console.warn('Failed to fetch specialist data:', e.message || e);
+        backendWarningStateRef.current.specialistLogged = true;
+      }
     }
   }, [activeMode]);
 
@@ -1991,14 +2462,16 @@ function useAppController() {
       const storedBlobColor = localStorage.getItem(BLOB_COLOR_STORAGE_KEY);
       const storedBlobSize = localStorage.getItem(BLOB_SIZE_STORAGE_KEY);
       const storedBlobPosition = localStorage.getItem(BLOB_POSITION_STORAGE_KEY);
+      const configPayload = {
+        blobColor: normalizeHexColor(storedBlobColor),
+        blobSize: parseFloat(storedBlobSize || '1.0'),
+        blobPosition: JSON.parse(storedBlobPosition || '{"x":0,"y":0}'),
+        ...incoming
+      };
       if (socketRef.current) {
-        socketRef.current.emit('SAVE_CONFIG', {
-          blobColor: normalizeHexColor(storedBlobColor),
-          blobSize: parseFloat(storedBlobSize || '1.0'),
-          blobPosition: JSON.parse(storedBlobPosition || '{"x":0,"y":0}'),
-          ...incoming
-        });
+        socketRef.current.emit('SAVE_CONFIG', configPayload);
       }
+      persistConfigPayload(configPayload);
     };
     window.addEventListener('ZAIRE_PERSIST_CONFIG', handlePersist);
 
@@ -2007,7 +2480,7 @@ function useAppController() {
       window.removeEventListener('ZAIRE_PERSIST_CONFIG', handlePersist);
       delete window.toggleSecuritySystem;
     };
-  }, [toggleSecuritySystem]);
+  }, [toggleSecuritySystem, persistConfigPayload]);
 
   // Poll for specialist data
   useEffect(() => {
@@ -2027,6 +2500,11 @@ function useAppController() {
     blobColorRef.current = blobColor;
     localStorage.setItem(BLOB_COLOR_STORAGE_KEY, blobColor);
     localStorage.setItem(BLOB_SIZE_STORAGE_KEY, blobSize.toString());
+    if (window.zaireSaveSettings) {
+      window.zaireSaveSettings({
+        theme: { hudOpacity, neuralGlowEnabled, holographicTiltEnabled, blobColor, blobSize }
+      });
+    }
 
     if (uniformsRef.current && blobColor) {
       const baseColor = new THREE.Color(blobColor);
@@ -2040,7 +2518,7 @@ function useAppController() {
       uniformsRef.current.uColorMid.value = mid;
       uniformsRef.current.uColorDeep.value = deep;
     }
-  }, [blobColor, blobSize]);
+  }, [blobColor, blobSize, isSystemEngaged]);
 
   const updateBlobPositionFromPointer = (clientX, clientY) => {
     const camera = cameraRef.current;
@@ -2356,6 +2834,10 @@ function useAppController() {
   };
 
   useEffect(() => {
+    // Don't create the WebGL renderer while the splash screen is active.
+    // Two simultaneous WebGL contexts exceed the browser limit and crash.
+    if (!isSystemEngaged) return;
+
     const params = {
       timeScale: 0.78,
       rotationSpeedX: 0.0012,
@@ -2758,6 +3240,7 @@ function useAppController() {
 
     const animate = () => {
       animationId = requestAnimationFrame(animate);
+      if (!shouldRunFrame(threeFrameClockRef)) return;
       const t = (performance.now() - startTime) * 0.001;
 
       // Get audio frequency data if microphone is active
@@ -2852,7 +3335,7 @@ function useAppController() {
       cameraRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isSystemEngaged, performanceProfile, focusModeEnabled]);
 
   // Boot sequence handled elsewhere
 
@@ -2887,6 +3370,10 @@ function useAppController() {
     let phase = 0;
 
     const drawWaveform = () => {
+      if (!shouldRunFrame(waveformFrameClockRef)) {
+        animationId = requestAnimationFrame(drawWaveform);
+        return;
+      }
       const width = canvas.width = canvas.offsetWidth;
       const height = canvas.height = canvas.offsetHeight;
 
@@ -2920,7 +3407,7 @@ function useAppController() {
 
     drawWaveform();
     return () => cancelAnimationFrame(animationId);
-  }, [activeMode]);
+  }, [activeMode, isSystemEngaged, performanceProfile]);
 
   useEffect(() => {
     const canvas = neuralGaugeRef.current;
@@ -2931,6 +3418,10 @@ function useAppController() {
     const targetLoad = 74;
 
     const drawGauge = () => {
+      if (!shouldRunFrame(gaugeFrameClockRef)) {
+        animationId = requestAnimationFrame(drawGauge);
+        return;
+      }
       const width = canvas.width;
       const height = canvas.height;
       const centerX = width / 2;
@@ -2972,7 +3463,7 @@ function useAppController() {
 
     drawGauge();
     return () => cancelAnimationFrame(animationId);
-  }, [activeMode]);
+  }, [activeMode, isSystemEngaged, performanceProfile]);
 
   useEffect(() => {
     const canvas = faceMeshCanvasRef.current;
@@ -2982,6 +3473,10 @@ function useAppController() {
     let t = 0;
 
     const drawMesh = () => {
+      if (!shouldRunFrame(faceMeshFrameClockRef)) {
+        animationId = requestAnimationFrame(drawMesh);
+        return;
+      }
       const w = canvas.width = canvas.offsetWidth;
       const h = canvas.height = canvas.offsetHeight;
       ctx.clearRect(0, 0, w, h);
@@ -3027,7 +3522,7 @@ function useAppController() {
     };
     drawMesh();
     return () => cancelAnimationFrame(animationId);
-  }, [biometricData?.detected]);
+  }, [biometricData?.detected, isSystemEngaged, performanceProfile]);
 
   const enabledCustomNavModes = customModes.reduce((modes, mode) => {
     if (mode.enabled && mode.name) {
@@ -3035,8 +3530,12 @@ function useAppController() {
     }
     return modes;
   }, []);
-  const navItems = [...CORE_MODES, ...enabledCustomNavModes.filter((m) => !CORE_MODES.includes(m))];
+  const visibleCoreNavModes = LAUNCH_MODE_ORDER.filter(
+    (modeName) => normalizeCoreModeVisibility(coreModeVisibility)[modeName]
+  );
+  const navItems = [...visibleCoreNavModes, ...enabledCustomNavModes.filter((m) => !CORE_MODES.includes(m))];
   const displayedMode = activeCustomMode || activeMode;
+  const displayedModeLabel = MODE_LAUNCH_LABELS[displayedMode] || displayedMode;
   const customModeMap = customModes.reduce((map, mode) => {
     if (mode?.enabled && mode?.name) {
       map[mode.name.toUpperCase()] = mode;
@@ -3046,6 +3545,12 @@ function useAppController() {
 
   const handleUpgradePro = async () => {
     if (!user || isUpgradeLoading) return;
+    
+    if (billingStatus && billingStatus.plan !== 'free' && billingStatus.details?.customer_portal_url) {
+      window.open(billingStatus.details.customer_portal_url, '_blank');
+      return;
+    }
+    
     const checkoutWindow = window.open('', '_blank');
 
     try {
@@ -3575,7 +4080,7 @@ function useAppController() {
           <div className="grid-navbar">
             <div className="nav-logo">
               <span className="logo-text">Z.A.I.R.E</span>
-              <span className="logo-sub">ARTIFICIAL INTELLIGENCE · v1.0</span>
+              <span className="logo-sub">AI OPERATING SYSTEM</span>
             </div>
 
             <div className="nav-links">
@@ -3594,7 +4099,7 @@ function useAppController() {
                   >
                     <span className="nav-arrow">›</span>
                     {customMode && <span className="custom-nav-glyph">◈</span>}
-                    {item}
+                    {MODE_LAUNCH_LABELS[item] || item}
                   </div>
                 );
               })}
@@ -3627,7 +4132,7 @@ function useAppController() {
               </div>
               <div className="mode-indicator">
                 <div className="mode-dot"></div>
-                <span className="mode-text">MODE: {displayedMode}</span>
+                <span className="mode-text">FOCUS: {displayedModeLabel}</span>
               </div>
               <div className="status-indicator">
                 <div className={`status-dot ${zaireStatus}`}></div>
@@ -3653,7 +4158,7 @@ function useAppController() {
                 onClick={handleUpgradePro}
                 disabled={isUpgradeLoading}
               >
-                {isUpgradeLoading ? 'OPENING...' : 'UPGRADE PRO'}
+                {isUpgradeLoading ? 'OPENING...' : (billingStatus?.plan && billingStatus.plan !== 'free' ? 'MANAGE PLAN' : 'UPGRADE PRO')}
               </button>
               <div className="clerk-user-profile">
                 <UserButton appearance={{
@@ -3666,8 +4171,31 @@ function useAppController() {
             </div>
           </div>
 
-          {/* ROW 2: LEFT PANEL */}
-          <div className="grid-left">
+          {/* ROW 2: ENGINEER MODE V2 OVERRIDE */}
+          {activeMode === 'ENGINEER' ? (
+            <div style={{ gridColumn: '1 / -1', gridRow: '2 / -1', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <EngineerModeV2 />
+            </div>
+          ) : activeMode === 'PROFESSOR' ? (
+            <div style={{ gridColumn: '1 / -1', gridRow: '2 / -1', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <ProfessorModeV2 />
+            </div>
+          ) : activeMode === 'TRADER' ? (
+            <div style={{ gridColumn: '1 / -1', gridRow: '2 / -1', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <TraderModeV2 />
+            </div>
+          ) : activeMode === 'SWARM' ? (
+            <div style={{ gridColumn: '1 / -1', gridRow: '2 / -1', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <SwarmModeV2 />
+            </div>
+          ) : activeCustomMode ? (
+            <div style={{ gridColumn: '1 / -1', gridRow: '2 / -1', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <CustomModeRenderer mode={customModes.find(m => m.name === activeCustomMode)} />
+            </div>
+          ) : (
+            <>
+              {/* ROW 2: LEFT PANEL */}
+              <div className="grid-left">
             {activeCustomMode ? (
               getZoneComponents('Left Sidebar').map(renderCustomComponent)
             ) : (
@@ -3959,44 +4487,68 @@ function useAppController() {
                 </div>
 
                 {traderSubMode === 'CHART' && (
-                  <div className="floor-top">
-                    <div className="neural-chart-wrap">
-                      <div className="chart-header">
-                        <div className="pair-info">BTC/USDT <span className="live-dot pulse"></span></div>
-                        <div className="chart-controls">
-                          <span>15M</span>
-                          <span
-                            onClick={() => handleSpecialistAction('TRADER', 'WHALE_FORENSICS', { asset: 'BTC' })}
-                            onKeyDown={(event) => handleAccessibleActivate(event, () => handleSpecialistAction('TRADER', 'WHALE_FORENSICS', { asset: 'BTC' }))}
-                            role="button"
-                            tabIndex={0}
-                          >
-                            WHALE_SCAN
-                          </span>
-                        </div>
+                  <div className="bloomberg-floor">
+                    <div className="bloomberg-cmd-bar">
+                      <div className="bbg-input-wrapper">
+                        <span className="bbg-prompt">&gt;</span>
+                        <input id="trader-bbg-command" name="trader-bbg-command" type="text" className="bbg-input" placeholder="Enter command (e.g., BTC ALL Q &lt;GO&gt;)" />
+                        <span className="bbg-go">GO</span>
                       </div>
-                      <div className="chart-canvas-area">
-                        <canvas ref={traderChartRef} style={{ width: '100%', height: '100%' }}></canvas>
-                        <div className="neural-overlay-text">NEURAL_SENTIMENT: {specialistData?.sentiment || 'BULLISH (84%)'}</div>
+                      <div className="bbg-clock">14:22:05 ET</div>
+                    </div>
+                    
+                    <div className="bbg-ticker-tape">
+                      <div className="bbg-ticker-scroll">
+                        <span className="bbg-tick up">BTC 68,230.12 ▲+2.4%</span>
+                        <span className="bbg-tick down">ETH 3,420.50 ▼-0.8%</span>
+                        <span className="bbg-tick up">SOL 145.20 ▲+5.1%</span>
+                        <span className="bbg-tick up">AVAX 35.10 ▲+1.2%</span>
+                        <span className="bbg-tick down">LINK 14.20 ▼-0.2%</span>
+                        <span className="bbg-tick up">BTC 68,230.12 ▲+2.4%</span>
                       </div>
                     </div>
 
-                    <div className="execution-side">
-                      <div className="side-label">LIVE EXECUTION</div>
-                      <div className="execution-log">
-                        {specialistData?.live_trades?.length === 0 && <div className="log-empty">SCANNING FOR SIGNALS…</div>}
-                        {(specialistData?.live_trades || liveTrades).map(trade => (
-                          <div key={trade.id} className="trade-entry">
-                            <div className="t-row">
-                              <span className={`t-type ${trade.type.toLowerCase()}`}>{trade.type}</span>
-                              <span className="t-pair">{trade.pair}</span>
-                            </div>
-                            <div className="t-row sub">
-                              <span>{trade.price}</span>
-                              <span className="t-status">{trade.status}</span>
-                            </div>
+                    <div className="floor-top">
+                      <div className="neural-chart-wrap bbg-panel">
+                        <div className="chart-header bbg-header">
+                          <div className="pair-info">1) BTCUSD Curncy <span className="live-dot pulse"></span></div>
+                          <div className="chart-controls bbg-controls">
+                            <span>GP</span>
+                            <span>IG</span>
+                            <span>15M</span>
+                            <span
+                              onClick={() => handleSpecialistAction('TRADER', 'WHALE_FORENSICS', { asset: 'BTC' })}
+                              onKeyDown={(event) => handleAccessibleActivate(event, () => handleSpecialistAction('TRADER', 'WHALE_FORENSICS', { asset: 'BTC' }))}
+                              role="button"
+                              tabIndex={0}
+                            >
+                              WHALE
+                            </span>
                           </div>
-                        ))}
+                        </div>
+                        <div className="chart-canvas-area" style={{ background: '#000' }}>
+                          <canvas ref={traderChartRef} style={{ width: '100%', height: '100%' }}></canvas>
+                          <div className="neural-overlay-text">NEURAL_SENTIMENT: {specialistData?.sentiment || 'BULLISH (84%)'}</div>
+                        </div>
+                      </div>
+
+                      <div className="execution-side bbg-panel">
+                        <div className="side-label bbg-header">2) ALLQ - Live Execution</div>
+                        <div className="execution-log bbg-log">
+                          {specialistData?.live_trades?.length === 0 && <div className="log-empty">SCANNING FOR SIGNALS…</div>}
+                          {(specialistData?.live_trades || liveTrades).map(trade => (
+                            <div key={trade.id} className="trade-entry bbg-trade">
+                              <div className="t-row">
+                                <span className={`t-type ${trade.type.toLowerCase()}`}>{trade.type}</span>
+                                <span className="t-pair">{trade.pair}</span>
+                              </div>
+                              <div className="t-row sub">
+                                <span style={{ color: '#fff' }}>{trade.price}</span>
+                                <span className="t-status">{trade.status}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -4093,43 +4645,47 @@ function useAppController() {
                 {professorSubMode === 'LECTURE' && (
                   <>
                     {!specialistData?.active_quiz ? (
-                      <div className="lecture-manifest">
-                        <div className="lecture-header">
-                          <div className="topic-badge">{professorTopic} {'//'} MODULE {specialistData?.module || '04'}</div>
-                          <div className="persona-dna-tag" title="Adaptive Teaching Style">DNA: {specialistData?.persona?.replace('_', ' ') || 'SERIOUS ACADEMIC'}</div>
-                          <div className="slide-counter">{specialistData?.slide_index || '04'} / {specialistData?.total_slides || '12'}</div>
-                        </div>
-                        <div className="manifest-content">
-                          <div className="concept-title">{specialistData?.current_concept?.title || 'Neural Entanglement & Superposition'}</div>
-                          <div className="concept-body">
-                            <p>{specialistData?.current_concept?.body || 'In the quantum realm, information is not binary. It exists in a state of probability, defined by the wave function Ψ. ZAIRE is currently synchronizing this knowledge core with your neural baseline.'}</p>
-                            <ul className="learning-points">
-                              {(() => {
-                                const pointItems = mapWithStableKeys(
-                                  specialistData?.current_concept?.points || [],
-                                  (p) => (typeof p === 'string' ? p : JSON.stringify(p)),
-                                  (p, stableKey) => <li key={stableKey}>✦ {p}</li>
-                                );
-                                return pointItems.length > 0 ? pointItems : (
-                                  <>
-                                    <li>✦ Superposition: N-dimensional state vectors.</li>
-                                    <li>✦ Interference: Constructive reinforcement of data.</li>
-                                    <li>✦ Decoherence: The primary bottleneck in neural sync.</li>
-                                  </>
-                                );
-                              })()}
-                            </ul>
-                          </div>
-                        </div>
-                        <div className="lecture-footer">
-                          <div className="professor-note">
-                            <span className="note-label">PROFESSOR_INSIGHT:</span>
-                            {specialistData?.current_concept?.insight || 'Focus on the relationship between entropy and information density.'}
-                          </div>
-                          <div className="professor-controls">
-                            <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'GENERATE_QUIZ', { topic: lastUserPromptRef.current || professorTopic })}>GENERATE QUIZ</button>
-                            <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'ARCHITECT_ROADMAP', { topic: lastUserPromptRef.current || professorTopic })}>ARCHITECT ROADMAP</button>
-                            <button className="p-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'MANIFEST_VISUAL_LAB', { concept: lastUserPromptRef.current || professorTopic })}>INITIALIZE LAB</button>
+                      <div className="harvard-chalkboard">
+                        <div className="chalkboard-frame">
+                          <div className="chalkboard-inner">
+                            <div className="lecture-header harvard-header">
+                              <div className="topic-badge chalk-text">{professorTopic} {'//'} MODULE {specialistData?.module || '04'}</div>
+                              <div className="persona-dna-tag chalk-text">PROF. ZAIRE (HARVARD_AI)</div>
+                              <div className="slide-counter chalk-text">PAGE {specialistData?.slide_index || '04'} / {specialistData?.total_slides || '12'}</div>
+                            </div>
+                            <div className="manifest-content harvard-content">
+                              <div className="concept-title chalk-title">{specialistData?.current_concept?.title || 'Neural Entanglement & Superposition'}</div>
+                              <div className="concept-body chalk-body">
+                                <p>{specialistData?.current_concept?.body || 'In the quantum realm, information is not binary. It exists in a state of probability, defined by the wave function Ψ. ZAIRE is currently synchronizing this knowledge core with your neural baseline.'}</p>
+                                <ul className="learning-points chalk-list">
+                                  {(() => {
+                                    const pointItems = mapWithStableKeys(
+                                      specialistData?.current_concept?.points || [],
+                                      (p) => (typeof p === 'string' ? p : JSON.stringify(p)),
+                                      (p, stableKey) => <li key={stableKey}>✧ {p}</li>
+                                    );
+                                    return pointItems.length > 0 ? pointItems : (
+                                      <>
+                                        <li>✧ Superposition: N-dimensional state vectors.</li>
+                                        <li>✧ Interference: Constructive reinforcement of data.</li>
+                                        <li>✧ Decoherence: The primary bottleneck in neural sync.</li>
+                                      </>
+                                    );
+                                  })()}
+                                </ul>
+                              </div>
+                            </div>
+                            <div className="lecture-footer harvard-footer">
+                              <div className="professor-note chalk-note">
+                                <span className="note-label chalk-label">THESIS ANALYSIS:</span>
+                                {specialistData?.current_concept?.insight || 'Focus on the relationship between entropy and information density.'}
+                              </div>
+                              <div className="professor-controls">
+                                <button className="p-btn harvard-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'GENERATE_QUIZ', { topic: lastUserPromptRef.current || professorTopic })}>GENERATE QUIZ</button>
+                                <button className="p-btn harvard-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'ARCHITECT_ROADMAP', { topic: lastUserPromptRef.current || professorTopic })}>SYLLABUS</button>
+                                <button className="p-btn harvard-btn" onClick={() => handleSpecialistAction('PROFESSOR', 'MANIFEST_VISUAL_LAB', { concept: lastUserPromptRef.current || professorTopic })}>LIBRARY ARCHIVE</button>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -4284,6 +4840,26 @@ function useAppController() {
             {activeMode === 'ENGINEER' && (
               <div className="engineer-studio">
                 <div className="studio-top">
+                  <div className="vscode-activity-bar">
+                    <div className="vab-icon active">📄</div>
+                    <div className="vab-icon">🔍</div>
+                    <div className="vab-icon">⎇</div>
+                    <div className="vab-icon">▶</div>
+                    <div className="vab-icon" style={{marginTop: 'auto'}}>⚙</div>
+                  </div>
+                  <div className="vscode-explorer">
+                    <div className="exp-header">EXPLORER</div>
+                    <div className="exp-section">
+                      <div className="exp-title">⌄ ZAIRE_CORE</div>
+                      <div className="exp-files">
+                        <div className="exp-file active">📄 MANIFEST.js</div>
+                        <div className="exp-file">📄 config.py</div>
+                        <div className="exp-file">📄 server.js</div>
+                        <div className="exp-folder">› components</div>
+                        <div className="exp-folder">› utils</div>
+                      </div>
+                    </div>
+                  </div>
                   <div className="editor-panel">
                     <div className="editor-header">
                       <div className="tabs-container">
@@ -4464,71 +5040,107 @@ function useAppController() {
                 <div className="studio-bottom">
                   <div className="studio-console">
                     <div className="console-header">
-                      <span>
-                        SYSTEM_CONSOLE {'//'} {specialistData?.forge_telemetry?.dna_locked ? `DNA_LOCKED: ${specialistData.forge_telemetry.dna_locked}` : (specialistData?.status || 'STABLE')}
-                        {specialistData?.forge_telemetry?.is_healing && <span className="healing-tag pulse">SELF-HEALING ACTIVE</span>}
-                        <span className="dna-indicator" title="User Design DNA Alignment">DNA: <span style={{ color: '#00ff88' }}>OPTIMIZED</span></span>
-                      </span>
-                      <div className="console-actions">
-                        <button className="c-btn" onClick={() => handleSpecialistAction('ENGINEER', 'MANIFEST_PROJECT', { prompt: lastUserPromptRef.current, project_name: 'zaire-engineered-site' })}>MANIFEST</button>
-                        <button className={`c-btn ${specialistData?.forge_telemetry?.is_healing ? 'healing-active' : ''}`} onClick={() => handleSpecialistAction('ENGINEER', 'VISION_AUDIT')}>
-                          {specialistData?.forge_telemetry?.is_healing ? 'HEALING…' : 'AUDIT'}
-                        </button>
+                      <div className="console-tabs" style={{ display: 'flex', gap: '15px' }}>
+                        <span style={{ color: '#fff', borderBottom: '1px solid #fff', paddingBottom: '4px' }}>TERMINAL</span>
+                        <span>OUTPUT</span>
+                        <span>PORTS</span>
+                        <span>GIT</span>
+                      </div>
+                      <div className="console-actions" style={{ display: 'flex', gap: '10px' }}>
+                        <span>bash ⌄</span>
+                        <span>+ ⌄</span>
+                        <span>🗑</span>
+                        <span>✖</span>
                       </div>
                     </div>
                     <div className="console-output">
-                      {specialistData?.forge_build_log?.length > 0 ? (
-                        mapWithStableKeys(
-                          specialistData.forge_build_log,
-                          (log) => log.id || `${log.timestamp}-${log.status}-${log.activity}`,
-                          (log, stableKey) => (
-                          <div key={stableKey} className="log-line">
-                            <span className="log-ts">[{log.timestamp}]</span>
-                            <span className={`log-tag ${log.status.toLowerCase()}`}>{log.status}</span>
-                            <span className="log-msg">{log.activity}</span>
-                          </div>
-                          )
-                        )
-                      ) : (
-                        <>
-                          <div className="log-line"><span className="log-ts">[17:28:01]</span> <span className="log-tag init">INIT</span> <span className="log-msg">Autonomous Web Studio Manifested.</span></div>
-                          <div className="log-line"><span className="log-ts">[17:28:05]</span> <span className="log-tag ok">OK</span> <span className="log-msg">Neural Link Synchronized.</span></div>
-                        </>
-                      )}
+                      <div className="log-line">
+                        <span className="log-ts">ZAIRE_OS</span><span style={{color: '#fff'}}>:</span><span style={{color: '#4fc1ff'}}>~/workspace/zaire-engineered-site</span>$ claude
+                      </div>
+                      <div className="log-line" style={{marginTop: '10px'}}>
+                        <span style={{color: '#dcdcaa'}}>Claude Code (AI Assistant) initialized.</span>
+                      </div>
+                      <div className="log-line">
+                        <span style={{color: '#c586c0'}}>System:</span> Connected to local neural daemon.
+                      </div>
+                      {specialistData?.forge_build_log?.map((log, i) => (
+                        <div key={i} className="log-line" style={{marginTop: '5px'}}>
+                          <span style={{color: log.status === 'OK' ? '#4caf50' : '#f48771'}}>{log.status === 'OK' ? '✓' : '⚠'}</span>
+                          <span style={{marginLeft: '8px'}}>{log.activity}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="claude-input-row">
+                      <span className="claude-prompt">claude&gt;</span>
+                      <input 
+                        type="text" 
+                        className="claude-input" 
+                        placeholder="Ask Claude to modify code, run tests, or debug..."
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSpecialistAction('ENGINEER', 'MANIFEST_PROJECT', { prompt: e.target.value, project_name: 'zaire-engineered-site' });
+                            e.target.value = '';
+                          }
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* ── SWARM CENTER: Master Protocol ── */}
             {activeMode === 'SWARM' && (
-              <div className="swarm-chamber">
-                <div className="chamber-header">
-                  <div className="chamber-title">NEURAL SWARM {'//'} MASTER PROTOCOL</div>
-                  <div className={`swarm-status-badge ${swarmPhase.toLowerCase()}`}>{swarmPhase}</div>
+              <div className="mission-control-chamber">
+                <div className="mc-header">
+                  <div className="mc-title">GLOBAL MISSION CONTROL // SWARM PROTOCOL</div>
+                  <div className={`mc-status-badge ${swarmPhase.toLowerCase()}`}>{swarmPhase === 'IDLE' ? 'AWAITING COMMAND' : swarmPhase}</div>
                 </div>
 
-                <div className="swarm-visualizer">
-                  <div className="central-node pulse">MASTER</div>
-                  <div className={`agent-node trader ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>TRADER</div>
-                  <div className={`agent-node professor ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>PROFESSOR</div>
-                  <div className={`agent-node engineer ${swarmPhase !== 'IDLE' ? 'active' : ''}`}>ENGINEER</div>
-                  <div className="swarm-stream">
-                    {mapWithStableKeys(
-                      swarmMessages,
-                      (m) => m.id || `${m.from}-${m.text}-${m.timestamp || ''}`,
-                      (m, stableKey) => (
-                      <div key={stableKey} className={`s-msg ${m.from.toLowerCase()}`}>
-                        <span className="s-from">[{m.from}]</span> {m.text}
+                <div className="mc-grid">
+                  <div className="mc-map-panel">
+                    <div className="mc-world-map"></div>
+                    <div className="mc-overlay">
+                      <div className="mc-node active" style={{ top: '30%', left: '20%' }}>TRD</div>
+                      <div className="mc-node active" style={{ top: '40%', left: '70%' }}>ENG</div>
+                      <div className="mc-node" style={{ top: '60%', left: '45%' }}>PRF</div>
+                      <div className="mc-node master pulse" style={{ top: '50%', left: '50%' }}>MASTER</div>
+                    </div>
+                  </div>
+                  
+                  <div className="mc-side-panels">
+                    <div className="mc-panel telemetry">
+                      <div className="mc-panel-header">NODE TELEMETRY</div>
+                      <div className="mc-telemetry-row"><span>TRADER_NODE</span> <span style={{color: '#00ff00'}}>ONLINE (24ms)</span></div>
+                      <div className="mc-telemetry-row"><span>ENGINEER_NODE</span> <span style={{color: '#00ff00'}}>ONLINE (18ms)</span></div>
+                      <div className="mc-telemetry-row"><span>PROFESSOR_NODE</span> <span style={{color: '#ff9900'}}>STANDBY</span></div>
+                    </div>
+                    
+                    <div className="mc-panel comms">
+                      <div className="mc-panel-header">SECURE COMMS LINK</div>
+                      <div className="mc-comms-stream">
+                        {mapWithStableKeys(
+                          swarmMessages,
+                          (m) => m.id || `${m.from}-${m.text}-${m.timestamp || ''}`,
+                          (m, stableKey) => (
+                          <div key={stableKey} className={`mc-msg ${m.from.toLowerCase()}`}>
+                            <span className="mc-from">[{m.from}]</span> {m.text}
+                          </div>
+                          )
+                        )}
+                        {swarmMessages.length === 0 && <div style={{opacity: 0.4, fontSize: '10px'}}>NO ACTIVE TRANSMISSIONS.</div>}
                       </div>
-                      )
-                    )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="swarm-controls">
-                  <button className="swarm-btn" onClick={() => handleSpecialistAction('SWARM', 'INITIATE_TASK', { task: lastUserPromptRef.current })}>INITIATE GLOBAL SYNC</button>
+                <div className="mc-footer">
+                  <input id="swarm-mission-directive" name="swarm-mission-directive" type="text" className="mc-command-input" placeholder="ENTER MISSION DIRECTIVE..." onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSpecialistAction('SWARM', 'INITIATE_TASK', { task: e.target.value });
+                      e.target.value = '';
+                    }
+                  }} />
+                  <button className="mc-launch-btn" onClick={() => handleSpecialistAction('SWARM', 'INITIATE_TASK', { task: lastUserPromptRef.current })}>EXECUTE DIRECTIVE</button>
                 </div>
               </div>
             )}
@@ -4580,7 +5192,21 @@ function useAppController() {
                     <span>SCREEN VISION</span>
                   </div>
                   <div className="vision-feed">
-                    {isVisionScanning ? (
+                    {visionTaskStatus?.running ? (
+                      <div className="vision-scan-box" style={{height: 'auto', minHeight: '120px', display: 'flex', flexDirection: 'column'}}>
+                        <div className="vision-meta" style={{color: '#0f0', marginBottom: '8px'}}>[AUTONOMOUS_VISION_ACTIVE]</div>
+                        <div style={{fontSize: '10px', color: '#888', marginBottom: '8px'}}>TASK: {visionTaskStatus.task}</div>
+                        <div style={{fontSize: '11px', color: '#fff', marginBottom: '8px'}}>STATUS: {visionTaskStatus.status}</div>
+                        <div style={{maxHeight: '100px', overflowY: 'auto', borderTop: '1px solid #333', paddingTop: '4px'}}>
+                          {visionTaskStatus.steps && visionTaskStatus.steps.map((s, idx) => (
+                            <div key={idx} style={{fontSize: '10px', marginBottom: '4px'}}>
+                              <span style={{color: '#0f0'}}>[{s.step}]</span> {s.action}: {s.reasoning} <span style={{color: '#aaa'}}>-&gt; {s.result}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <button className="c-btn" style={{marginTop: '8px'}} onClick={stopVisionTask}>ABORT TASK</button>
+                      </div>
+                    ) : isVisionScanning ? (
                       <div className="vision-scan-box">
                         <div className="scan-line-vision"></div>
                         <div className="vision-meta">OCR: ENABLED | NEURAL: SYNCING</div>
@@ -4589,6 +5215,10 @@ function useAppController() {
                       <div className="vision-placeholder">
                         <div className="vision-off-text">VISION CORE OFFLINE</div>
                         <div className="vision-hint-text">Say: "What's on my screen?"</div>
+                        <button className="c-btn" style={{marginTop: '8px'}} onClick={() => {
+                          const task = prompt("Enter an autonomous task objective (e.g. 'Open calculator and type 5+5=')");
+                          if (task) startVisionTask(task);
+                        }}>INITIATE AUTONOMOUS VISION</button>
                       </div>
                     )}
                   </div>
@@ -5078,10 +5708,26 @@ function useAppController() {
             <div className="neural-archives-page">
               <div className="neural-archives-shell">
                 <div className="archives-page-header">
-                  <div>
+                  <div className="archives-header-left">
                     <div className="archives-kicker">ZAIRE MEMORY CORE</div>
                     <div className="archives-title">NEURAL ARCHIVES</div>
                     <div className="archives-subtitle">All saved sessions with export-grade controls.</div>
+                  </div>
+                  <div className="archives-header-stats">
+                    <div className="archives-stat-pill">
+                      <span className="archives-stat-val">{chatSessions.length}</span>
+                      <span className="archives-stat-lbl">THREADS</span>
+                    </div>
+                    <div className="archives-stat-pill">
+                      <span className="archives-stat-val">{chatSessions.reduce((a, s) => a + (s.messageCount || 0), 0)}</span>
+                      <span className="archives-stat-lbl">MESSAGES</span>
+                    </div>
+                    <div className="archives-stat-pill">
+                      <span className="archives-stat-val" style={{ fontSize: '11px' }}>
+                        {chatSessions[0] ? new Date(chatSessions[0].timestamp).toLocaleDateString() : '—'}
+                      </span>
+                      <span className="archives-stat-lbl">LAST SYNC</span>
+                    </div>
                   </div>
                   <div className="archives-header-actions">
                     <button className="archive-head-btn" onClick={() => { handleNewChat(); setIsArchivesPageOpen(false); }}>NEW THREAD</button>
@@ -5125,30 +5771,71 @@ function useAppController() {
                             role="button"
                             tabIndex={0}
                           >
+                            {/* corner brackets */}
                             <div className="archive-card-corner archive-card-corner-tl" />
                             <div className="archive-card-corner archive-card-corner-br" />
-                            <div className="archive-card-main">
-                              <div className="archive-card-title">{archiveTitle}</div>
-                              <div className="archive-card-meta">
-                                <span className="archive-card-timestamp">
-                                  <ClientLocalTime value={session.timestamp} mode="datetime" />
-                                </span>
-                                <span className="archive-card-count">{session.messageCount} MSGS</span>
+
+                            {/* TOP ROW: title + actions */}
+                            <div className="archive-card-top">
+                              <div className="archive-card-main">
+                                {editingSessionId === session.id ? (
+                                  <input
+                                    className="session-rename-input"
+                                    value={editingTitle}
+                                    autoFocus
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => setEditingTitle(e.target.value)}
+                                    onBlur={() => { handleRenameSession(session.id, editingTitle); setEditingSessionId(null); fetchChatSessions(); }}
+                                    onKeyDown={(e) => {
+                                      e.stopPropagation();
+                                      if (e.key === 'Enter') { handleRenameSession(session.id, editingTitle); setEditingSessionId(null); fetchChatSessions(); }
+                                      if (e.key === 'Escape') setEditingSessionId(null);
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="archive-card-title">{archiveTitle}</div>
+                                )}
+                              </div>
+
+                              {/* action buttons — fade in on hover via CSS */}
+                              <div className="archive-card-actions">
+                                <button
+                                  className="session-action-btn rename"
+                                  title="Rename" aria-label="Rename chat"
+                                  onClick={(e) => { e.stopPropagation(); setEditingSessionId(session.id); setEditingTitle(archiveTitle); }}
+                                >
+                                  <ArchiveActionIcon type="rename" />
+                                </button>
+                                <button
+                                  className={`session-action-btn ${archiveReactions[session.id] === 'like' ? 'active-like' : ''}`}
+                                  title="Like" aria-label="Like chat"
+                                  onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'like'); }}
+                                >
+                                  <ArchiveActionIcon type="like" />
+                                </button>
+                                <button
+                                  className={`session-action-btn ${archiveReactions[session.id] === 'dislike' ? 'active-dislike' : ''}`}
+                                  title="Dislike" aria-label="Dislike chat"
+                                  onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'dislike'); }}
+                                >
+                                  <ArchiveActionIcon type="dislike" />
+                                </button>
+                                <button
+                                  className="session-action-btn delete"
+                                  title="Delete" aria-label="Delete chat"
+                                  onClick={(e) => handleDeleteSession(e, session.id)}
+                                >
+                                  <ArchiveActionIcon type="delete" />
+                                </button>
                               </div>
                             </div>
-                            <div className="archive-card-actions">
-                              <button className="session-action-btn rename" title="Rename chat" aria-label="Rename chat" onClick={(e) => { e.stopPropagation(); setEditingSessionId(session.id); setEditingTitle(archiveTitle); }}>
-                                <ArchiveActionIcon type="rename" />
-                              </button>
-                              <button className={`session-action-btn ${archiveReactions[session.id] === 'like' ? 'active-like' : ''}`} title="Like chat" aria-label="Like chat" onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'like'); }}>
-                                <ArchiveActionIcon type="like" />
-                              </button>
-                              <button className={`session-action-btn ${archiveReactions[session.id] === 'dislike' ? 'active-dislike' : ''}`} title="Dislike chat" aria-label="Dislike chat" onClick={(e) => { e.stopPropagation(); handleArchiveReaction(session.id, 'dislike'); }}>
-                                <ArchiveActionIcon type="dislike" />
-                              </button>
-                              <button className="session-action-btn delete" title="Delete chat" aria-label="Delete chat" onClick={(e) => handleDeleteSession(e, session.id)}>
-                                <ArchiveActionIcon type="delete" />
-                              </button>
+
+                            {/* META ROW: timestamp + message count */}
+                            <div className="archive-card-meta">
+                              <span className="archive-card-timestamp">
+                                <ClientLocalTime value={session.timestamp} mode="datetime" />
+                              </span>
+                              <span className="archive-card-count">{session.messageCount} MSGS</span>
                             </div>
                           </div>
                         );
@@ -5360,6 +6047,8 @@ function useAppController() {
               </div>
             </div>
       </div>
+            </>
+          )}
 
           {/* ── FLOATING RESPONSE STREAM (FUTURISTIC SUBTITLES) ── */}
           <div className={`floating-subtitles ${showResponsePanel && zaireResponseStream ? 'visible' : ''}`}>
@@ -5403,6 +6092,11 @@ function useAppController() {
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
           activeMode={activeMode}
+          focusModeEnabled={focusModeEnabled}
+          setFocusModeEnabled={setFocusModeEnabled}
+          performanceProfile={performanceProfile}
+          coreModeVisibility={coreModeVisibility}
+          onCoreModeVisibilityChange={setCoreModeVisibility}
           customModes={customModes}
           onCustomModesChange={(nextModes) => {
             const sanitizedModes = nextModes.map(sanitizeCustomModeRecord);
@@ -5411,6 +6105,7 @@ function useAppController() {
               setActiveCustomMode(null);
             }
           }}
+          billingStatus={billingStatus}
           biometricData={biometricData}
           blobColor={blobColor}
           setBlobColor={setBlobColor}
@@ -5528,20 +6223,7 @@ function useAppController() {
         )}
 
         {!isSystemEngaged && (
-          <div
-            className="engagement-overlay"
-            onClick={() => setIsSystemEngaged(true)}
-            onKeyDown={(event) => handleAccessibleActivate(event, () => setIsSystemEngaged(true))}
-            role="button"
-            tabIndex={0}
-          >
-            <div className="engagement-content">
-              <div className="power-icon">⚡</div>
-              <h2>INITIALIZE ZAIRE NEURAL LINK</h2>
-              <p>Click to synchronize sensory arrays and audio core.</p>
-              <div className="scan-line"></div>
-            </div>
-          </div>
+          <ZaireSplash onComplete={() => setIsSystemEngaged(true)} />
         )}
       </>
 

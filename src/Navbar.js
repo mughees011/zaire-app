@@ -33,6 +33,10 @@ function Navbar() {
     let animationId;
 
     const drawLogo = () => {
+      if (document.hidden) {
+        animationId = requestAnimationFrame(drawLogo);
+        return;
+      }
       lt += 0.025;
       lctx.clearRect(0, 0, 60, 60);
       const cx = 30, cy = 30;
@@ -141,7 +145,7 @@ function Navbar() {
               </div>
               <div>
                 <div className="logo-text">ZAIRE</div>
-                <div className="logo-sub">ZAIRE AI REASONING ENTITY · v1.0</div>
+                <div className="logo-sub">ENGINEER MODE FIRST · AI OPERATING SYSTEM</div>
               </div>
             </div>
 
@@ -188,9 +192,9 @@ function Navbar() {
 
       <div className="sec-strip">
         <div className="sec-left">
-          <span className="sec-item">ZAIRE CORE</span>
+          <span className="sec-item">ENGINEER CORE</span>
           <span className="breadcrumb-sep">›</span>
-          <span className="sec-item" style={{ color: 'rgba(0,212,255,0.7)' }}>v1.0</span>
+          <span className="sec-item" style={{ color: 'rgba(0,212,255,0.7)' }}>PRIMARY USE CASE · BUILDING SOFTWARE WITH AI</span>
           <span className="sec-item" style={{ marginLeft: '15px', color: 'var(--accent-green)' }}>AUTH: VERIFIED</span>
           <span className="breadcrumb-sep">›</span>
           <span className="sec-item" style={{ color: 'rgba(0,212,255,0.55)' }}>{activeItem}</span>

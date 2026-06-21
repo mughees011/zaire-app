@@ -2,14 +2,22 @@ import React, { useCallback, useEffect, useReducer } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { ZaireComponentRegistry } from './engine/ComponentRegistry';
 import './SettingsModal.css';
+import { resolveApiBase } from './apiBase';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://zaire-backend.onrender.com';
+const API_URL = resolveApiBase();
 const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
 const COMPONENT_LIBRARY = ZaireComponentRegistry;
 const CUSTOM_MODE_LOCKED_ZONES = ['Bottom Console'];
 
-const fetchJsonOrThrow = async (url, options) => {
-  const response = await fetch(url, options);
+const fetchJsonOrThrow = async (url, options = {}) => {
+  const opts = { ...options };
+  opts.headers = { ...opts.headers };
+  const licenseKey = localStorage.getItem('zaire_license_key');
+  if (licenseKey) {
+    opts.headers['x-zaire-license'] = licenseKey;
+    opts.headers['x-zaire-machine-id'] = 'BROWSER_HUD';
+  }
+  const response = await fetch(url, opts);
   const contentType = response.headers.get('content-type') || '';
 
   if (!response.ok) {
@@ -23,6 +31,19 @@ const fetchJsonOrThrow = async (url, options) => {
   }
 
   return response.json();
+};
+
+const isNetworkFetchError = (error) =>
+  error instanceof TypeError ||
+  /failed to fetch|networkerror|load failed/i.test(error?.message || '');
+
+const ensureOk = async (response, contextLabel) => {
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    const detail = text ? ` ${text.slice(0, 120)}` : '';
+    throw new Error(`${contextLabel} failed: HTTP ${response.status}.${detail}`.trim());
+  }
+  return response;
 };
 
 const sanitizeModeComponents = (components = []) =>
@@ -59,7 +80,15 @@ const INITIAL_MODAL_VIEW_STATE = {
   privateSession: false,
   missionDigest: true,
   selectedTemplateId: 'lawyer',
-  creatorStep: 1
+  creatorStep: 1,
+  voiceActor: 'Nova',
+  baseTone: 'Default',
+  characteristics: 'Warm',
+  fastAnswers: false,
+  zaireInstructions: '',
+  userName: '',
+  userOccupation: '',
+  userAbout: ''
 };
 
 const modalViewReducer = (state, action) => {
@@ -98,7 +127,9 @@ const buildInitialSettingsLocalState = (customModes) => ({
   memoryDashboard: null,
   memorySearchQuery: '',
   memoryDashboardLoading: false,
-  memoryActionStatus: ''
+  memoryActionStatus: '',
+  briefingsData: [],
+  briefingsLoading: false
 });
 
 const createReducerFieldSetter = (dispatch, field) => (value) => {
@@ -142,249 +173,372 @@ const getComponentAccentClass = (componentType = '') => {
 };
 
 function MiniPreview({ type, color = '#00d4ff' }) {
-  const accentStyle = { color: color };
-  const fillStyle = { background: color };
-  const borderStyle = { borderColor: color };
+  const isFinance = type.includes('Market') || type.includes('Scanner') || type.includes('Chart') || type.includes('Grid') || type.includes('Finance');
+  const isTerminal = type.includes('Terminal') || type.includes('Console') || type.includes('Shell') || type.includes('Logs');
+  const isMemory = type.includes('Memory') || type.includes('Graph') || type.includes('Vault');
+  const isCode = type.includes('File') || type.includes('Code') || type.includes('Builder') || type.includes('Preview') || type.includes('Canvas');
+  const isTask = type.includes('Task') || type.includes('Planner') || type.includes('Roadmap') || type.includes('Board') || type.includes('Timeline') || type.includes('Queue');
+  const isChat = type.includes('Chat') || type.includes('Voice') || type.includes('Agent') || type.includes('Critic') || type.includes('Surface');
 
-  switch (type) {
-    case 'Chat Panel':
-      return (
-        <div className="mini-chat-mock" style={borderStyle}>
-          <div className="mini-bubble user" style={{ background: 'rgba(255,255,255,0.07)' }} />
-          <div className="mini-bubble ai" style={{ background: `${color}15`, border: `1px solid ${color}33` }} />
-          <div className="mini-chat-input-line" style={{ borderTop: `1px solid ${color}22` }} />
+  const baseContainer = {
+    background: '#0a0a0a',
+    border: '1px solid #1f1f1f',
+    borderRadius: '4px',
+    height: '100%',
+    width: '100%',
+    overflow: 'hidden',
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    fontFamily: "'JetBrains Mono', monospace"
+  };
+
+  const headerStyle = {
+    padding: '4px 6px',
+    background: '#000000',
+    borderBottom: '1px solid #1f1f1f',
+    fontSize: '7px',
+    color: '#888',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: '1px'
+  };
+
+  if (isFinance) {
+    return (
+      <div style={baseContainer}>
+        <div style={headerStyle}>
+          <span style={{ color: color }}>QUANTUM_FIN</span>
+          <span className="animate-pulse" style={{ background: color, width: '4px', height: '4px', borderRadius: '50%' }}></span>
         </div>
-      );
-    case 'Task Queue':
-      return (
-        <div className="mini-queue-mock">
-          <div className="mini-progress-row">
-            <span className="dot" style={fillStyle} />
-            <div className="bar"><div className="fill" style={{ width: '70%', background: color }} /></div>
-          </div>
-          <div className="mini-progress-row">
-            <span className="dot" style={{ background: 'rgba(255,255,255,0.2)' }} />
-            <div className="bar"><div className="fill" style={{ width: '35%', background: color }} /></div>
-          </div>
+        <div style={{ flex: 1, padding: '6px', position: 'relative' }}>
+          {/* Sonar / Radar effect */}
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '30px', height: '30px', border: `1px solid ${color}40`, borderRadius: '50%' }}></div>
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '15px', height: '15px', border: `1px solid ${color}80`, borderRadius: '50%' }}></div>
+          <div style={{ position: 'absolute', top: '20%', left: '30%', width: '2px', height: '2px', background: '#ef4444', borderRadius: '50%', boxShadow: '0 0 4px #ef4444' }}></div>
+          <div style={{ position: 'absolute', bottom: '30%', right: '20%', width: '2px', height: '2px', background: '#10b981', borderRadius: '50%', boxShadow: '0 0 4px #10b981' }}></div>
         </div>
-      );
-    case 'File Browser':
-      return (
-        <div className="mini-files-mock">
-          <div className="row" style={accentStyle}>📁 src</div>
-          <div className="row indent">📄 App.js</div>
-          <div className="row indent">📄 index.js</div>
+        {/* Sparkline block */}
+        <div style={{ height: '15px', display: 'flex', alignItems: 'flex-end', gap: '1px', padding: '2px 4px', borderTop: '1px solid #1f1f1f', background: '#000000' }}>
+          {[...Array(8)].map((_, i) => (
+            <div key={i} style={{ flex: 1, background: i === 7 ? color : '#333', height: `${Math.max(10, Math.random() * 100)}%` }}></div>
+          ))}
         </div>
-      );
-    case 'Live Preview':
-      return (
-        <div className="mini-preview-mock" style={borderStyle}>
-          <div className="mini-browser-bar" style={{ background: `${color}15`, borderBottom: `1px solid ${color}33` }}>
-            <span className="dot" style={fillStyle} /><span className="dot" />
-          </div>
-          <div className="mini-browser-body" />
+      </div>
+    );
+  }
+
+  if (isMemory) {
+    return (
+      <div style={baseContainer}>
+        <div style={headerStyle}>
+          <span>VECTOR_DB</span>
+          <span style={{ color: color }}>1536_DIM</span>
         </div>
-      );
-    case 'Notes Panel':
-      return (
-        <div className="mini-notes-mock" style={borderStyle}>
-          <div className="scribble" />
-          <div className="scribble" style={{ width: '70%' }} />
-          <div className="scribble" style={{ width: '40%' }} />
-        </div>
-      );
-    case 'Memory Panel':
-      return (
-        <div className="mini-memory-mock">
-          <div className="vector-node" style={{ border: `1px solid ${color}` }}>VECTOR LINK</div>
-          <div className="vector-bars">
-            <div className="v-bar" style={fillStyle} />
-            <div className="v-bar" style={fillStyle} />
-            <div className="v-bar" style={{ background: 'rgba(255,255,255,0.1)' }} />
-          </div>
-        </div>
-      );
-    case 'Calendar Panel':
-      return (
-        <div className="mini-calendar-mock">
-          <div className="cal-grid">
-            {['slot-01', 'slot-02', 'slot-03', 'slot-04', 'slot-05', 'slot-06', 'slot-07', 'slot-08', 'slot-09', 'slot-10', 'slot-11', 'slot-12'].map((cellId, i) => (
-              <div key={cellId} className={`cal-cell ${i === 4 ? 'active' : ''}`} style={i === 4 ? fillStyle : undefined} />
+        <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
+          {/* Isometric grid mockup */}
+          <div style={{ transform: 'rotateX(60deg) rotateZ(45deg)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', width: '40px', height: '40px' }}>
+            {[...Array(16)].map((_, i) => (
+              <div key={i} style={{ background: Math.random() > 0.7 ? `${color}40` : `${color}10`, border: `1px solid ${color}30` }}></div>
             ))}
           </div>
         </div>
-      );
-    case 'Chart Panel':
-      return (
-        <div className="mini-chart-mock">
-          <div className="bar" style={{ height: '40%', background: color }} />
-          <div className="bar" style={{ height: '75%', background: color }} />
-          <div className="bar" style={{ height: '50%', background: color }} />
-          <div className="bar" style={{ height: '90%', background: color }} />
-        </div>
-      );
-    case 'Camera Feed':
-      return (
-        <div className="mini-camera-mock" style={borderStyle}>
-          <div className="reticle" style={{ border: `1px dashed ${color}` }} />
-          <span className="rec" style={accentStyle}>● REC</span>
-        </div>
-      );
-    case 'Voice Panel':
-      return (
-        <div className="mini-voice-mock">
-          <div className="wave" style={{ height: '6px', background: color }} />
-          <div className="wave" style={{ height: '14px', background: color }} />
-          <div className="wave" style={{ height: '9px', background: color }} />
-          <div className="wave" style={{ height: '18px', background: color }} />
-          <div className="wave" style={{ height: '5px', background: color }} />
-        </div>
-      );
-    case 'Terminal':
-      return (
-        <div className="mini-terminal-mock" style={{ background: 'rgba(0,0,0,0.8)', border: `1px solid ${color}44` }}>
-          <span className="prompt" style={accentStyle}>$&gt;</span>
-          <span className="cursor blink" style={fillStyle} />
-        </div>
-      );
-    case 'Code Editor':
-      return (
-        <div className="mini-code-mock">
-          <div className="line" style={{ width: '90%', background: color, opacity: 0.8 }} />
-          <div className="line" style={{ width: '60%', background: color, opacity: 0.8 }} />
-          <div className="line" style={{ width: '75%', background: color, opacity: 0.8 }} />
-        </div>
-      );
-    case 'Kanban Board':
-      return (
-        <div className="mini-kanban-mock">
-          <div className="lane" style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-            <div className="card" style={{ borderLeft: `2px solid ${color}` }} />
-          </div>
-          <div className="lane">
-            <div className="card" style={{ borderLeft: `2px solid ${color}` }} />
-          </div>
-        </div>
-      );
-    case 'Timeline':
-      return (
-        <div className="mini-timeline-mock">
-          <span className="node" style={fillStyle} />
-          <div className="connector" style={{ background: color }} />
-          <span className="node" style={{ border: `1px solid ${color}` }} />
-        </div>
-      );
-    case 'Research Panel':
-      return (
-        <div className="mini-research-mock">
-          <div className="ticker-line" style={{ background: `${color}15`, color: color }}>NEWS // GLOBAL SCAN</div>
-          <div className="ticker-bar" />
-        </div>
-      );
-    case 'Health Tracker':
-      return (
-        <div className="mini-health-mock">
-          <span className="pulse-heart" style={accentStyle}>♥</span>
-          <span className="status-val" style={accentStyle}>99.2%</span>
-        </div>
-      );
-    case 'Finance Panel':
-      return (
-        <div className="mini-finance-mock">
-          <div className="val" style={accentStyle}>$48K</div>
-          <div className="sub-val" style={{ color: 'var(--accent-red)' }}>-$0.24</div>
-        </div>
-      );
-    case 'Document Viewer':
-      return (
-        <div className="mini-doc-mock" style={borderStyle}>
-          <div className="doc-header" style={{ background: `${color}22` }}>PDF</div>
-          <div className="doc-body" />
-        </div>
-      );
-    case 'System Logs':
-      return (
-        <div className="mini-logs-mock" style={{ fontFamily: 'monospace', color: color }}>
-          <div>[09:12] OK</div>
-          <div>[09:13] VAULT</div>
-        </div>
-      );
-    case 'Agent Status':
-      return (
-        <div className="mini-status-mock">
-          <div className="badge" style={{ background: `${color}15`, border: `1px solid ${color}`, color: color }}>🤖 ON</div>
-        </div>
-      );
-    default:
-      return null;
+      </div>
+    );
   }
+
+  if (isTerminal) {
+    return (
+      <div style={baseContainer}>
+        <div style={headerStyle}>
+          <span>root@zaire</span>
+          <span>TTY1</span>
+        </div>
+        <div style={{ flex: 1, padding: '4px', background: '#000', fontSize: '6px', color: '#555', lineHeight: '1.4' }}>
+          <div style={{ color: color }}>$ init_sequence()</div>
+          <div>[OK] Kernel loaded</div>
+          <div>[OK] Neuro-link active</div>
+          <div style={{ color: color, marginTop: '2px' }}>$ <span className="animate-pulse">_</span></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isCode) {
+    return (
+      <div style={baseContainer}>
+        <div style={headerStyle}>
+          <span>AST_WORKSPACE</span>
+          <span style={{ color: '#f59e0b' }}>MODIFIED</span>
+        </div>
+        <div style={{ flex: 1, display: 'flex' }}>
+          {/* File tree */}
+          <div style={{ width: '20px', borderRight: '1px solid #1f1f1f', padding: '4px 2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div style={{ width: '100%', height: '2px', background: '#444' }}></div>
+            <div style={{ width: '70%', height: '2px', background: color }}></div>
+            <div style={{ width: '80%', height: '2px', background: '#444' }}></div>
+          </div>
+          {/* Code block */}
+          <div style={{ flex: 1, padding: '4px', display: 'flex', flexDirection: 'column', gap: '2px', background: '#000' }}>
+            <div style={{ width: '40%', height: '3px', background: '#c678dd' }}></div>
+            <div style={{ width: '60%', height: '3px', background: '#61afef' }}></div>
+            <div style={{ width: '80%', height: '3px', background: '#98c379', marginLeft: '4px' }}></div>
+            <div style={{ width: '50%', height: '3px', background: '#e5c07b', marginLeft: '4px' }}></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isTask) {
+    return (
+      <div style={baseContainer}>
+        <div style={headerStyle}>
+          <span>TELEMETRY</span>
+          <span style={{ color: '#10b981' }}>NOMINAL</span>
+        </div>
+        <div style={{ flex: 1, padding: '4px', display: 'flex', flexDirection: 'column', gap: '3px', background: '#000' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '4px', height: '4px', borderRadius: '50%', border: '1px solid #10b981' }}></div>
+            <div style={{ flex: 1, height: '1px', background: '#1f1f1f', position: 'relative' }}>
+               <div style={{ position: 'absolute', left: 0, top: 0, height: '1px', width: '100%', background: '#10b981' }}></div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '4px', height: '4px', borderRadius: '50%', border: '1px solid #444' }}></div>
+            <div style={{ flex: 1, height: '1px', background: '#1f1f1f', position: 'relative' }}>
+               <div className="animate-[scanning-laser_1.5s_infinite]" style={{ position: 'absolute', left: 0, top: 0, height: '1px', width: '40%', background: color }}></div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '4px', height: '4px', borderRadius: '50%', border: '1px solid #444' }}></div>
+            <div style={{ flex: 1, height: '1px', background: '#1f1f1f' }}></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Default to Composer Block (isChat / others)
+  return (
+    <div style={baseContainer}>
+      <div style={headerStyle}>
+        <span>COMPOSER</span>
+        <span style={{ color: color }}>IDLE</span>
+      </div>
+      <div style={{ flex: 1, padding: '4px', background: '#000', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {/* User Block */}
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <div style={{ width: '4px', height: '4px', background: '#555', marginTop: '1px' }}></div>
+          <div style={{ width: '100%', height: '2px', background: '#444', marginTop: '2px' }}></div>
+        </div>
+        {/* AI Block */}
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <div style={{ width: '4px', height: '4px', background: color, borderRadius: '50%', marginTop: '1px' }}></div>
+          <div style={{ flex: 1, border: '1px solid #1f1f1f', borderRadius: '2px', padding: '2px', background: '#0a0a0a' }}>
+            <div style={{ width: '80%', height: '2px', background: '#666', marginBottom: '2px' }}></div>
+            <div style={{ width: '60%', height: '2px', background: '#666' }}></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
+
+const AI_SYSTEMS_LIBRARY = [
+  {
+    category: 'COMMAND TIER',
+    items: [
+      { id: 'Command Surface', score: '★★★★★', usedIn: '98%', cost: 'Medium', feature: 'Mission Context' },
+      { id: 'Mission Control', score: '★★★★★', usedIn: '95%', cost: 'High', feature: 'Status HUD' },
+      { id: 'Execution Console', score: '★★★★☆', usedIn: '88%', cost: 'Medium', feature: 'Build Progress' },
+      { id: 'Timeline Command', score: '★★★★☆', usedIn: '72%', cost: 'Low', feature: 'Milestone Tracking' }
+    ]
+  },
+  {
+    category: 'OPERATIONS TIER',
+    items: [
+      { id: 'Mission Board', score: '★★★★★', usedIn: '91%', cost: 'Low', feature: 'Agent Assignment' },
+      { id: 'Swarm Operations', score: '★★★★★', usedIn: '84%', cost: 'High', feature: 'Live Thoughts' },
+      { id: 'Decision Center', score: '★★★☆☆', usedIn: '60%', cost: 'High', feature: 'Accepted/Rejected' }
+    ]
+  },
+  {
+    category: 'INTELLIGENCE TIER',
+    items: [
+      { id: 'Intelligence Stream', score: '★★★★★', usedIn: '76%', cost: 'Medium', feature: 'Breaking Scans' },
+      { id: 'Opportunity Scanner', score: '★★★★☆', usedIn: '54%', cost: 'High', feature: 'Market Gaps' },
+      { id: 'Risk Radar', score: '★★★★☆', usedIn: '42%', cost: 'High', feature: 'Severity Matrix' }
+    ]
+  },
+  {
+    category: 'MEMORY TIER',
+    items: [
+      { id: 'Neural Memory', score: '★★★★★', usedIn: '95%', cost: 'High', feature: 'Entity Links' },
+      { id: 'Knowledge Vault', score: '★★★★☆', usedIn: '68%', cost: 'Medium', feature: 'Vector DB' },
+      { id: 'AI Personality Core', score: '★★★☆☆', usedIn: '45%', cost: 'Low', feature: 'Behavior Editor' }
+    ]
+  },
+  {
+    category: 'DEVELOPMENT & BUSINESS',
+    items: [
+      { id: 'Engineering Studio', score: '★★★★★', usedIn: '42%', cost: 'High', feature: '4-Pane Layout' },
+      { id: 'Digital Twin', score: '★★★★☆', usedIn: '38%', cost: 'High', feature: 'Multi-Device Render' },
+      { id: 'Revenue Center', score: '★★★★☆', usedIn: '30%', cost: 'Medium', feature: 'MRR Tracking' },
+      { id: 'Strategy Map', score: '★★★☆☆', usedIn: '25%', cost: 'Medium', feature: 'Goal Graphs' }
+    ]
+  },
+  {
+    category: 'VISUALIZATION LAYER',
+    items: [
+      { id: 'Neural Graph', score: '★★★★★', usedIn: '84%', cost: 'High', feature: 'Agent Network' },
+      { id: 'Market Matrix', score: '★★★★☆', usedIn: '25%', cost: 'High', feature: 'Heatmap' },
+      { id: 'Whale Scanner', score: '★★★★☆', usedIn: '18%', cost: 'High', feature: 'Tx Feed' }
+    ]
+  }
+];
 
 const modeTemplates = [
   {
-    id: 'lawyer',
-    color: '#60a5fa',
-    name: 'LAWYER MODE',
-    desc: 'Reviews contracts, summarizes legal risk, and prepares negotiation notes',
-    capabilities: ['WEB SEARCH', 'FILE SYSTEM', 'SCREEN VISION'],
-    persona: 'Precise, cautious, citation-first',
-  },
-  {
-    id: 'doctor',
-    color: '#34d399',
-    name: 'DOCTOR MODE',
-    desc: 'Organizes symptoms, appointment notes, medications, and health questions',
-    capabilities: ['WEB SEARCH', 'FILE SYSTEM', 'SCREEN VISION'],
-    persona: 'Careful, calm, safety-aware',
-  },
-  {
-    id: 'fitness',
-    color: '#fb7185',
-    name: 'FITNESS COACH',
-    desc: 'Plans workouts, tracks meals, sleep, recovery, and daily discipline',
-    capabilities: ['FILE SYSTEM', 'CHARTS'],
-    persona: 'Direct, motivating, habit-focused',
-  },
-  {
-    id: 'therapist',
-    color: '#c084fc',
-    name: 'THERAPIST MODE',
-    desc: 'Reflects mood patterns, journaling themes, and grounding routines',
-    capabilities: ['FILE SYSTEM'],
-    persona: 'Warm, reflective, non-judgmental',
-  },
-  {
-    id: 'chef',
+    id: 'startup-founder',
     color: '#f97316',
-    name: 'CHEF MODE',
-    desc: 'Builds meal plans, recipes, pantry lists, and nutrition-aware menus',
-    capabilities: ['WEB SEARCH', 'FILE SYSTEM', 'IMAGE GEN'],
-    persona: 'Creative, practical, taste-led',
+    name: 'STARTUP FOUNDER',
+    desc: 'Pitch decks, product strategy, market analysis, and user interviews.',
+    category: 'Business',
+    icon: 'lucide-rocket',
+    outputStyle: 'Strategic, Action-Oriented',
+    specialists: ['Project Manager', 'Market Analyst', 'Planner Agent'],
+    components: [
+      { type: 'Command Surface', zone: 'Main Workspace', index: 0 },
+      { type: 'Mission Board', zone: 'Right Inspector', index: 0 },
+      { type: 'Neural Memory', zone: 'Left Sidebar', index: 0 },
+      { type: 'Execution Console', zone: 'Bottom Console', index: 0 }
+    ],
+    permissions: { fileSystem: true, internetAccess: true, shellExecution: false },
+    persona: 'Strategic, direct, execution-focused',
   },
   {
-    id: 'language',
-    color: '#22d3ee',
-    name: 'LANGUAGE TEACHER',
-    desc: 'Creates lessons, quizzes, pronunciation drills, and immersion plans',
-    capabilities: ['WEB SEARCH', 'FILE SYSTEM'],
-    persona: 'Patient, structured, correction-friendly',
+    id: 'crypto-trader',
+    color: '#10b981',
+    name: 'TRADER LAB',
+    desc: 'Experimental lab for market analysis, execution feeds, and risk workflows.',
+    category: 'Finance',
+    icon: 'lucide-trending-up',
+    outputStyle: 'Analytical, Numbers-First',
+    specialists: ['Market Analyst', 'Critic Agent', 'Executor Agent'],
+    components: [
+      { type: 'Whale Scanner', zone: 'Left Sidebar', index: 0 },
+      { type: 'Market Matrix', zone: 'Main Workspace', index: 0 },
+      { type: 'Tactical Terminal', zone: 'Bottom Console', index: 0 }
+    ],
+    permissions: { internetAccess: true, shellExecution: false },
+    persona: 'Aggressive, analytical, risk-aware',
   },
   {
-    id: 'financial',
-    color: '#facc15',
-    name: 'FINANCIAL PLANNER',
-    desc: 'Tracks budgets, goals, spending patterns, and long-term planning',
-    capabilities: ['WEB SEARCH', 'FILE SYSTEM', 'CHARTS'],
-    persona: 'Conservative, clear, numbers-first',
+    id: 'youtube-creator',
+    color: '#ef4444',
+    name: 'YOUTUBE CREATOR',
+    desc: 'Script writing, title A/B testing, hook generation, and analytics.',
+    category: 'Content',
+    icon: 'lucide-video',
+    outputStyle: 'Creative, High-Energy',
+    specialists: ['Writer Agent', 'Critic Agent', 'Research Agent'],
+    components: [
+      { type: 'Chat Panel', zone: 'Right Inspector', index: 0 },
+      { type: 'Document Viewer', zone: 'Main Workspace', index: 0 },
+      { type: 'Timeline', zone: 'Bottom Console', index: 0 }
+    ],
+    permissions: { fileSystem: true, internetAccess: true, hardwareMedia: true },
+    persona: 'Creative, engaging, audience-first',
   },
   {
-    id: 'news',
-    color: '#38bdf8',
-    name: 'NEWS ANALYST',
-    desc: 'Monitors events, extracts signal, and builds daily intelligence briefs',
-    capabilities: ['WEB SEARCH', 'FILE SYSTEM', 'CHARTS'],
-    persona: 'Skeptical, concise, source-aware',
+    id: 'software-engineer',
+    color: '#3b82f6',
+    name: 'SOFTWARE ENGINEER',
+    desc: 'Code architecture, pair programming, and continuous deployment.',
+    category: 'Development',
+    icon: 'lucide-code',
+    outputStyle: 'Technical, Concise',
+    specialists: ['Code Architect', 'Critic Agent', 'Executor Agent'],
+    components: [
+      { type: 'Chat Panel', zone: 'Left Sidebar', index: 0 },
+      { type: 'Code Studio', zone: 'Main Workspace', index: 0 },
+      { type: 'Memory Vault', zone: 'Right Inspector', index: 0 },
+      { type: 'Tactical Terminal', zone: 'Bottom Console', index: 0 }
+    ],
+    permissions: { fileSystem: true, internetAccess: true, shellExecution: true },
+    persona: 'Logical, rigorous, best-practices focused',
   },
+  {
+    id: 'university-student',
+    color: '#a855f7',
+    name: 'PROFESSOR LAB',
+    desc: 'Experimental lab for tutoring, study guides, and structured learning flows.',
+    category: 'Education',
+    icon: 'lucide-book',
+    outputStyle: 'Explanatory, Step-by-Step',
+    specialists: ['Research Agent', 'Writer Agent', 'Planner Agent'],
+    components: [
+      { type: 'Chat Panel', zone: 'Left Sidebar', index: 0 },
+      { type: 'Neural Graph', zone: 'Main Workspace', index: 0 },
+      { type: 'Memory Vault', zone: 'Right Inspector', index: 0 }
+    ],
+    permissions: { fileSystem: true, internetAccess: true },
+    persona: 'Patient, explanatory, academic',
+  },
+  {
+    id: 'research-scientist',
+    color: '#06b6d4',
+    name: 'SWARM LAB',
+    desc: 'Experimental lab for multi-agent research, synthesis, and hypothesis testing.',
+    category: 'Research',
+    icon: 'lucide-microscope',
+    outputStyle: 'Academic, Rigorous',
+    specialists: ['Research Agent', 'Market Analyst', 'Critic Agent'],
+    components: [
+      { type: 'Swarm Operations', zone: 'Left Sidebar', index: 0 },
+      { type: 'Intelligence Stream', zone: 'Main Workspace', index: 0 },
+      { type: 'Neural Graph', zone: 'Right Inspector', index: 0 }
+    ],
+    permissions: { fileSystem: true, internetAccess: true },
+    persona: 'Objective, precise, inquisitive',
+  },
+  {
+    id: 'sales-operator',
+    color: '#eab308',
+    name: 'SALES OPERATOR',
+    desc: 'Lead generation, cold email sequencing, and CRM updating.',
+    category: 'Sales',
+    icon: 'lucide-phone',
+    outputStyle: 'Persuasive, Professional',
+    specialists: ['Writer Agent', 'Planner Agent', 'Executor Agent'],
+    components: [
+      { type: 'Chat Panel', zone: 'Left Sidebar', index: 0 },
+      { type: 'Task Queue', zone: 'Main Workspace', index: 0 },
+      { type: 'Notes Panel', zone: 'Right Inspector', index: 0 }
+    ],
+    permissions: { fileSystem: false, internetAccess: true },
+    persona: 'Charming, persistent, results-driven',
+  },
+  {
+    id: 'marketing-agency',
+    color: '#ec4899',
+    name: 'MARKETING AGENCY',
+    desc: 'Ad copy, SEO optimization, brand strategy, and social schedules.',
+    category: 'Marketing',
+    icon: 'lucide-megaphone',
+    outputStyle: 'Creative, Conversion-Focused',
+    specialists: ['Writer Agent', 'Market Analyst', 'Planner Agent'],
+    components: [
+      { type: 'Chat Panel', zone: 'Left Sidebar', index: 0 },
+      { type: 'Calendar Panel', zone: 'Main Workspace', index: 0 },
+      { type: 'Live Preview', zone: 'Right Inspector', index: 0 }
+    ],
+    permissions: { internetAccess: true, fileSystem: true },
+    persona: 'Trend-aware, persuasive, metrics-focused',
+  }
 ];
 
 const defaultCustomModes = [
@@ -409,19 +563,33 @@ const defaultCustomModes = [
 ];
 
 const blankCreatorDraft = {
-  name: '',
-  desc: '',
-  color: '#00d4ff',
-  capabilities: ['WEB SEARCH', 'FILE SYSTEM'],
-  persona: '',
-  goals: '',
-  neverDo: '',
-  preferredOutput: 'Action Plan',
-  routingPriority: 'Balanced',
-  components: [
-    { type: 'Chat Panel', zone: 'Main Workspace', index: 0 },
-    { type: 'Task Queue', zone: 'Left Sidebar', index: 0 }
-  ],
+  identity: {
+    name: '',
+    desc: '',
+    category: '',
+    color: '#00d4ff',
+    icon: '',
+    outputStyle: 'Action Plan',
+    targetUser: ''
+  },
+  intelligence: {
+    goals: '',
+    purpose: '',
+    neverDo: '',
+    persona: '',
+    preQuestions: '',
+    successDefinition: '',
+    specialists: [],
+    capabilities: ['WEB SEARCH', 'FILE SYSTEM']
+  },
+  interface: {
+    components: [
+      { type: 'Chat Panel', zone: 'Main Workspace', index: 0 },
+      { type: 'Task Queue', zone: 'Left Sidebar', index: 0 }
+    ],
+    themeDensity: 'compact',
+    animationStyle: 'neural'
+  },
   permissions: {
     fileSystem: false,
     shellExecution: false,
@@ -486,9 +654,11 @@ const navGroups = [
     label: 'SYSTEM',
     items: [
       { id: 'voice', label: 'VOICE & WAKE', icon: '\u25c9' },
+      { id: 'personalize', label: 'PERSONALIZATION', icon: '\u263A', tag: 'NEW' },
       { id: 'security', label: 'PROTECTION', icon: '\u25a3' },
       { id: 'licensing', label: 'LICENSING', icon: '\uD83D\uDD12', badge: 'SECURE' },
       { id: 'memory', label: 'MEMORY', icon: '\u25a6' },
+      { id: 'briefing', label: 'WEEKLY BRIEFINGS', icon: '\u25ce', tag: 'NEW' },
       { id: 'notif', label: 'ALERTS', icon: '\u25cc' },
     ],
   },
@@ -507,12 +677,14 @@ function Toggle({ checked, onChange }) {
   );
 }
 
-function Slider({ min, max, step, value, onChange, suffix = '%', format }) {
+function Slider({ min, max, step, value, onChange, suffix = '%', format, id, name }) {
   const display = format ? format(value) : `${value}${suffix}`;
 
   return (
     <div className="slider-wrap">
       <input
+        id={id}
+        name={name || id}
         type="range"
         className="slider"
         min={min}
@@ -564,7 +736,8 @@ function Segment({ value, options, onChange }) {
   );
 }
 
-function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empty = false, onChange }) {
+function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empty = false, onChange, mask }) {
+  const baseId = `api-slot-${slot}`;
   return (
     <div className="api-slot">
       <div className="api-slot-header">
@@ -574,6 +747,8 @@ function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empt
         </span>
       </div>
       <select
+        id={`${baseId}-provider`}
+        name={`${baseId}-provider`}
         className="api-provider-select"
         value={provider}
         onChange={(e) => onChange({ provider: e.target.value })}
@@ -591,13 +766,17 @@ function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empt
         <option>Empty</option>
       </select>
       <input
+        id={`${baseId}-key`}
+        name={`${baseId}-key`}
         className="api-key-input"
         type="password"
         value={apiKey || ''}
         onChange={(e) => onChange({ apiKey: e.target.value, hasKey: Boolean(e.target.value) })}
-        placeholder={empty ? 'Paste provider key...' : 'sk-... encrypted key stored locally'}
+        placeholder={mask ? `Stored: ${mask}` : (empty ? 'Paste provider key...' : 'sk-... encrypted key stored locally')}
       />
       <input
+        id={`${baseId}-base-url`}
+        name={`${baseId}-base-url`}
         className="api-key-input"
         type="text"
         value={baseUrl || ''}
@@ -605,6 +784,8 @@ function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empt
         placeholder="Optional custom base URL (OpenAI-compatible)"
       />
       <input
+        id={`${baseId}-model`}
+        name={`${baseId}-model`}
         className="api-key-input"
         type="text"
         value={model || ''}
@@ -612,7 +793,7 @@ function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empt
         placeholder="Optional exact model ID from your provider account"
       />
       <div className="api-row">
-        <select className="api-purpose" value={purpose} onChange={(e) => onChange({ purpose: e.target.value })}>
+        <select id={`${baseId}-purpose`} name={`${baseId}-purpose`} className="api-purpose" value={purpose} onChange={(e) => onChange({ purpose: e.target.value })}>
           <option>Primary</option>
           <option>Coding</option>
           <option>Research</option>
@@ -629,6 +810,11 @@ function useSettingsModalController({
   isOpen,
   onClose,
   activeMode,
+  focusModeEnabled,
+  setFocusModeEnabled,
+  performanceProfile,
+  coreModeVisibility,
+  onCoreModeVisibilityChange,
   blobColor,
   setBlobColor,
   blobSize,
@@ -647,7 +833,9 @@ function useSettingsModalController({
   biometricData,
   customModes,
   onCustomModesChange,
+  billingStatus
 }) {
+  const { getToken } = useAuth();
   const [modalViewState, dispatchModalView] = useReducer(modalViewReducer, INITIAL_MODAL_VIEW_STATE);
   const {
     activePage,
@@ -669,7 +857,15 @@ function useSettingsModalController({
     privateSession,
     missionDigest,
     selectedTemplateId,
-    creatorStep
+    creatorStep,
+    voiceActor,
+    baseTone,
+    characteristics,
+    fastAnswers,
+    zaireInstructions,
+    userName,
+    userOccupation,
+    userAbout
   } = modalViewState;
   const [settingsLocalState, dispatchSettingsLocalState] = useReducer(
     settingsLocalStateReducer,
@@ -687,7 +883,9 @@ function useSettingsModalController({
     memoryDashboard,
     memorySearchQuery,
     memoryDashboardLoading,
-    memoryActionStatus
+    memoryActionStatus,
+    briefingsData,
+    briefingsLoading
   } = settingsLocalState;
   const setCreatorDraft = createReducerFieldSetter(dispatchSettingsLocalState, 'creatorDraft');
   const setLocalModes = createReducerFieldSetter(dispatchSettingsLocalState, 'localModes');
@@ -700,11 +898,48 @@ function useSettingsModalController({
   const setMemorySearchQuery = createReducerFieldSetter(dispatchSettingsLocalState, 'memorySearchQuery');
   const setMemoryDashboardLoading = createReducerFieldSetter(dispatchSettingsLocalState, 'memoryDashboardLoading');
   const setMemoryActionStatus = createReducerFieldSetter(dispatchSettingsLocalState, 'memoryActionStatus');
+  const setBriefingsData = createReducerFieldSetter(dispatchSettingsLocalState, 'briefingsData');
+  const setBriefingsLoading = createReducerFieldSetter(dispatchSettingsLocalState, 'briefingsLoading');
+  const settingsWarningState = React.useRef({
+    briefingsLogged: false,
+    memoryLogged: false,
+    vaultLogged: false,
+    customModesLogged: false
+  });
+
+  const fetchBriefings = async () => {
+    setBriefingsLoading(true);
+    try {
+      const data = await fetchJsonOrThrow(`${API_URL}/api/briefings`);
+      if (data.success) {
+        setBriefingsData(data.briefings || []);
+      }
+      settingsWarningState.current.briefingsLogged = false;
+    } catch (err) {
+      setBriefingsData([]);
+      if (!isNetworkFetchError(err) && !settingsWarningState.current.briefingsLogged) {
+        console.warn('Briefings fetch failed:', err.message);
+        settingsWarningState.current.briefingsLogged = true;
+      }
+    } finally {
+      setBriefingsLoading(false);
+    }
+  };
+
+  const generateBriefing = async () => {
+    try {
+      await fetchJsonOrThrow(`${API_URL}/api/briefings/generate`, { method: 'POST' });
+      // Reload briefings after a short delay to see it in 'running' state
+      setTimeout(fetchBriefings, 2000);
+    } catch (err) {
+      console.error('Generate briefing failed:', err.message);
+    }
+  };
 
   const fetchLicensingInfo = async () => {
     setLicensingLoading(true);
     try {
-      const storedLicense = localStorage.getItem('zaire_license_key') || '';
+      const storedLicense = billingStatus?.details?.license_key || localStorage.getItem('zaire_license_key') || '';
       if (storedLicense) {
         setLicenseKeyInput(storedLicense);
         const data = await fetchJsonOrThrow(`${API_URL}/api/license/validate`, {
@@ -737,8 +972,13 @@ function useSettingsModalController({
       if (data.success) {
         setMemoryDashboard(normalizeMemoryDashboard(data.stats, data.memories));
       }
+      settingsWarningState.current.memoryLogged = false;
     } catch (err) {
-      console.warn('Memory dashboard fetch failed:', err.message);
+      setMemoryDashboard(null);
+      if (!isNetworkFetchError(err) && !settingsWarningState.current.memoryLogged) {
+        console.warn('Memory dashboard fetch failed:', err.message);
+        settingsWarningState.current.memoryLogged = true;
+      }
     } finally {
       setMemoryDashboardLoading(false);
     }
@@ -767,9 +1007,16 @@ function useSettingsModalController({
   const loadMemorySettingsConfig = useCallback(async () => {
     try {
       const data = await fetchJsonOrThrow(`${API_URL}/config`);
-      const memorySettings = data?.success ? (data.data?.memorySettings || {}) : {};
+      const configRoot = data?.success ? (data.data || {}) : {};
+      const memorySettings = configRoot.memorySettings || {};
+      const personalization = configRoot.personalization || configRoot.voice || {};
+      const desktopProfile = configRoot.desktopProfile || {};
+      const slotConfig = Array.isArray(configRoot.aiVault?.slots) ? configRoot.aiVault.slots.slice(0, 3) : [];
       if (memorySettings.retentionPeriod) {
         dispatchModalView({ type: 'SET_FIELD', field: 'retentionPeriod', value: memorySettings.retentionPeriod });
+      }
+      if (memorySettings.memoryDepth !== undefined) {
+        dispatchModalView({ type: 'SET_FIELD', field: 'memoryDepth', value: memorySettings.memoryDepth });
       }
       if (typeof memorySettings.gazeMemoryEnabled === 'boolean') {
         dispatchModalView({ type: 'SET_FIELD', field: 'gazeMemoryEnabled', value: memorySettings.gazeMemoryEnabled });
@@ -777,15 +1024,82 @@ function useSettingsModalController({
       if (typeof memorySettings.crossModeSharing === 'boolean') {
         dispatchModalView({ type: 'SET_FIELD', field: 'crossModeSharing', value: memorySettings.crossModeSharing });
       }
+      if (typeof memorySettings.privateSession === 'boolean') {
+        dispatchModalView({ type: 'SET_FIELD', field: 'privateSession', value: memorySettings.privateSession });
+      }
+
+      if (personalization.voiceActor !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'voiceActor', value: personalization.voiceActor });
+      if (personalization.baseTone !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'baseTone', value: personalization.baseTone });
+      if (personalization.characteristics !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'characteristics', value: personalization.characteristics });
+      if (personalization.fastAnswers !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'fastAnswers', value: personalization.fastAnswers });
+      if (personalization.zaireInstructions !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'zaireInstructions', value: personalization.zaireInstructions });
+      if (personalization.userName !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'userName', value: personalization.userName });
+      if (personalization.userOccupation !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'userOccupation', value: personalization.userOccupation });
+      if (personalization.userAbout !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'userAbout', value: personalization.userAbout });
+
+      if (desktopProfile?.licensing?.cachedLicenseKey && !localStorage.getItem('zaire_license_key')) {
+        localStorage.setItem('zaire_license_key', desktopProfile.licensing.cachedLicenseKey);
+        setLicenseKeyInput(desktopProfile.licensing.cachedLicenseKey);
+      }
+
+      if (slotConfig.length > 0) {
+        const normalized = Array.from({ length: 3 }, (_, index) => {
+          const slot = slotConfig[index];
+          if (!slot) {
+            return { provider: 'Empty', apiKey: '', hasKey: false, model: '', purpose: index === 0 ? 'Primary' : index === 1 ? 'Coding' : 'Fallback', baseUrl: '', enabled: false };
+          }
+          return {
+            provider: slot.provider || 'Empty',
+            apiKey: '',
+            hasKey: Boolean(slot.hasKey),
+            model: slot.model || '',
+            purpose: slot.purpose || (index === 0 ? 'Primary' : index === 1 ? 'Coding' : 'Fallback'),
+            baseUrl: slot.baseUrl || '',
+            enabled: Boolean(slot.enabled),
+            mask: slot.hasKey ? 'Saved Locally' : ''
+          };
+        });
+        setAiSlots(normalized);
+      }
     } catch (_) {}
-  }, []);
+  }, [setAiSlots, setLicenseKeyInput]);
 
   useEffect(() => {
     if (isOpen) {
       fetchLicensingInfo();
       fetchMemoryDashboard();
+      fetchBriefings();
+      
+      getToken().then(token => {
+        if (!token) return;
+        fetch(`${API_URL}/api/settings`, { headers: { 'Authorization': `Bearer ${token}` } })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success && data.settings) {
+              const { agent, voice } = data.settings;
+              if (agent) {
+                if (agent.memoryDepth !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'memoryDepth', value: agent.memoryDepth });
+                if (agent.retentionPeriod !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'retentionPeriod', value: agent.retentionPeriod });
+                if (agent.gazeMemoryEnabled !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'gazeMemoryEnabled', value: agent.gazeMemoryEnabled });
+                if (agent.crossModeSharing !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'crossModeSharing', value: agent.crossModeSharing });
+                if (agent.privateSession !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'privateSession', value: agent.privateSession });
+              }
+              if (voice) {
+                if (voice.voiceActor !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'voiceActor', value: voice.voiceActor });
+                if (voice.baseTone !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'baseTone', value: voice.baseTone });
+                if (voice.characteristics !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'characteristics', value: voice.characteristics });
+                if (voice.fastAnswers !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'fastAnswers', value: voice.fastAnswers });
+                if (voice.zaireInstructions !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'zaireInstructions', value: voice.zaireInstructions });
+                if (voice.userName !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'userName', value: voice.userName });
+                if (voice.userOccupation !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'userOccupation', value: voice.userOccupation });
+                if (voice.userAbout !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'userAbout', value: voice.userAbout });
+              }
+            }
+          })
+          .catch(() => {});
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, getToken]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -809,6 +1123,15 @@ function useSettingsModalController({
       });
       if (data.valid) {
         localStorage.setItem('zaire_license_key', licenseKeyInput.trim());
+        window.dispatchEvent(new CustomEvent('ZAIRE_PERSIST_CONFIG', {
+          detail: {
+            desktopProfile: {
+              licensing: {
+                cachedLicenseKey: licenseKeyInput.trim()
+              }
+            }
+          }
+        }));
         setLicensingInfo(data);
         setLicensingError(null);
       } else {
@@ -854,31 +1177,38 @@ function useSettingsModalController({
 
   const loadAiProviders = useCallback(async () => {
     try {
-      const data = await fetchJsonOrThrow(`${API_URL}/llm/providers`);
-      const slots = data?.slots;
-      if (Array.isArray(slots) && slots.length > 0) {
-        const normalized = [0, 1, 2].map((i) => ({
-          provider: slots[i]?.provider || 'Empty',
-          apiKey: slots[i]?.apiKey || '',
-          hasKey: Boolean(slots[i]?.hasKey),
-          model: slots[i]?.model || '',
-          purpose: slots[i]?.purpose || (i === 0 ? 'Primary' : i === 1 ? 'Coding' : 'Fallback'),
-          baseUrl: slots[i]?.baseUrl || '',
-          enabled: Boolean(slots[i]?.enabled ?? true)
-        }));
+      const token = await getToken();
+      if (!token) return;
+      const data = await fetchJsonOrThrow(`${API_URL}/api/vault/status`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const vault = data?.vault_status;
+      if (vault) {
+        const normalized = [
+          { provider: 'Groq', apiKey: '', hasKey: vault.groq?.configured, model: '', purpose: 'Primary', baseUrl: '', enabled: true, mask: vault.groq?.mask },
+          { provider: 'OpenAI', apiKey: '', hasKey: vault.openai?.configured, model: '', purpose: 'Coding', baseUrl: '', enabled: true, mask: vault.openai?.mask },
+          { provider: 'Gemini', apiKey: '', hasKey: vault.gemini?.configured, model: '', purpose: 'Fallback', baseUrl: '', enabled: vault.gemini?.configured, mask: vault.gemini?.mask }
+        ];
+        // Merge OpenRouter if needed, or put it in slot 3
+        if (vault.openrouter?.configured) {
+          normalized[2] = { provider: 'OpenRouter', apiKey: '', hasKey: true, model: '', purpose: 'Fallback', baseUrl: '', enabled: true, mask: vault.openrouter?.mask };
+        }
         setAiSlots(normalized);
       }
-    } catch {
-      // Provider discovery is best-effort when the modal opens.
+      settingsWarningState.current.vaultLogged = false;
+    } catch (err) {
+      if (!isNetworkFetchError(err) && !settingsWarningState.current.vaultLogged) {
+        console.warn('Failed to fetch from vault:', err.message);
+        settingsWarningState.current.vaultLogged = true;
+      }
     }
-  }, []);
+  }, [getToken, setAiSlots]);
 
   useEffect(() => {
     if (!isOpen) return;
     loadAiProviders();
   }, [isOpen, loadAiProviders]);
 
-  const { getToken } = useAuth();
   const setModalField = useCallback((field, value) => {
     dispatchModalView({ type: 'SET_FIELD', field, value });
   }, []);
@@ -902,10 +1232,47 @@ function useSettingsModalController({
   const setMissionDigest = useCallback((value) => setModalField('missionDigest', value), [setModalField]);
   const setSelectedTemplateId = useCallback((value) => setModalField('selectedTemplateId', value), [setModalField]);
   const setCreatorStep = useCallback((value) => setModalField('creatorStep', value), [setModalField]);
+  const setVoiceActor = useCallback((value) => setModalField('voiceActor', value), [setModalField]);
+  const setBaseTone = useCallback((value) => setModalField('baseTone', value), [setModalField]);
+  const setCharacteristics = useCallback((value) => setModalField('characteristics', value), [setModalField]);
+  const setFastAnswers = useCallback((value) => setModalField('fastAnswers', value), [setModalField]);
+  const setZaireInstructions = useCallback((value) => setModalField('zaireInstructions', value), [setModalField]);
+  const setUserName = useCallback((value) => setModalField('userName', value), [setModalField]);
+  const setUserOccupation = useCallback((value) => setModalField('userOccupation', value), [setModalField]);
+  const setUserAbout = useCallback((value) => setModalField('userAbout', value), [setModalField]);
+  const experimentalCoreModes = [
+    {
+      id: 'TRADER',
+      name: 'TRADER LAB',
+      desc: 'Market intelligence, signals, and execution workflows.'
+    },
+    {
+      id: 'PROFESSOR',
+      name: 'PROFESSOR LAB',
+      desc: 'Teaching, explanation, and structured study systems.'
+    },
+    {
+      id: 'SWARM',
+      name: 'SWARM LAB',
+      desc: 'Multi-agent orchestration and mission control workflows.'
+    }
+  ];
 
   const fetchCustomModes = async () => {
     try {
       const token = await getToken();
+      if (!token) {
+        const configData = await fetchJsonOrThrow(`${API_URL}/config`);
+        const desktopModes = Array.isArray(configData?.data?.desktopProfile?.customModes)
+          ? configData.data.desktopProfile.customModes.map(sanitizeModeRecord)
+          : [];
+        if (desktopModes.length > 0) {
+          setLocalModes(desktopModes);
+          localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(desktopModes));
+          if (onCustomModesChange) onCustomModesChange(desktopModes);
+        }
+        return;
+      }
       const data = await fetchJsonOrThrow(`${API_URL}/api/custom_modes`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -917,8 +1284,12 @@ function useSettingsModalController({
         localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(sanitizedModes));
         if (onCustomModesChange) onCustomModesChange(sanitizedModes);
       }
+      settingsWarningState.current.customModesLogged = false;
     } catch (err) {
-      console.warn('Failed to fetch custom modes from backend, fallback to local storage:', err.message);
+      if (!isNetworkFetchError(err) && !settingsWarningState.current.customModesLogged) {
+        console.warn('Failed to fetch custom modes from backend, fallback to local storage:', err.message);
+        settingsWarningState.current.customModesLogged = true;
+      }
     }
   };
 
@@ -944,6 +1315,7 @@ function useSettingsModalController({
   const saveCustomMode = async (mode) => {
     try {
       const token = await getToken();
+      if (!token) return;
       await fetch(`${API_URL}/api/custom_modes`, {
         method: 'POST',
         headers: {
@@ -960,6 +1332,9 @@ function useSettingsModalController({
   const duplicateCustomMode = async (modeId) => {
     try {
       const token = await getToken();
+      if (!token) {
+        throw new TypeError('No authenticated user session');
+      }
       const data = await fetchJsonOrThrow(`${API_URL}/api/custom_modes/${modeId}/duplicate`, {
         method: 'POST',
         headers: {
@@ -986,10 +1361,56 @@ function useSettingsModalController({
     }
   };
 
+  const exportCustomMode = (modeId) => {
+    const mode = localModes.find(m => m.id === modeId);
+    if (!mode) return;
+    const exportData = {
+      ...mode,
+      id: undefined,
+      isZaireExport: true
+    };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+    const a = document.createElement('a');
+    a.href = dataStr;
+    a.download = `${mode.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_zaire_mode.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const importCustomMode = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const importedMode = JSON.parse(e.target.result);
+        if (!importedMode.isZaireExport) {
+          alert('Invalid ZAIRE mode file.');
+          return;
+        }
+        const newMode = {
+          ...importedMode,
+          id: `custom-mode-${Date.now()}`,
+          name: `${importedMode.name} (Imported)`,
+        };
+        await saveCustomMode(newMode);
+        fetchCustomModes();
+      } catch (err) {
+        alert('Failed to parse mode file.');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
+
   const deleteCustomMode = async (modeId) => {
     if (!window.confirm('Wipe this custom mode from database permanently?')) return;
     try {
       const token = await getToken();
+      if (!token) {
+        throw new TypeError('No authenticated user session');
+      }
       const response = await fetch(`${API_URL}/api/custom_modes/${modeId}`, {
         method: 'DELETE',
         headers: {
@@ -1015,28 +1436,29 @@ function useSettingsModalController({
   };
 
   const applyTemplateToDraft = (template) => {
-    const defaultComps = [
-      { type: 'Chat Panel', zone: 'Main Workspace', index: 0 },
-      { type: 'Task Queue', zone: 'Left Sidebar', index: 0 }
-    ];
     setCreatorDraft({
-      name: template.name,
-      desc: template.desc,
-      color: template.color,
-      capabilities: template.capabilities,
-      persona: template.persona,
-      goals: '',
-      neverDo: '',
-      preferredOutput: 'Action Plan',
-      routingPriority: 'Balanced',
-      components: defaultComps,
+      identity: { 
+        ...blankCreatorDraft.identity, 
+        name: template.name || '', 
+        desc: template.desc || '', 
+        color: template.color || '#00d4ff',
+        category: template.category || '',
+        icon: template.icon || '',
+        outputStyle: template.outputStyle || ''
+      },
+      intelligence: { 
+        ...blankCreatorDraft.intelligence, 
+        persona: template.persona || '', 
+        specialists: template.specialists || [],
+        capabilities: template.capabilities || []
+      },
+      interface: { 
+        ...blankCreatorDraft.interface, 
+        components: template.components || [] 
+      },
       permissions: {
-        fileSystem: template.capabilities.includes('FILE SYSTEM'),
-        shellExecution: false,
-        internetAccess: template.capabilities.includes('WEB SEARCH'),
-        costWarnings: true,
-        screenCapture: template.capabilities.includes('SCREEN VISION'),
-        hardwareMedia: false
+        ...blankCreatorDraft.permissions,
+        ...(template.permissions || {})
       }
     });
     setSelectedTemplateId(template.id);
@@ -1046,12 +1468,15 @@ function useSettingsModalController({
 
   const toggleDraftCapability = (capability) => {
     setCreatorDraft((draft) => {
-      const hasCapability = draft.capabilities.includes(capability);
+      const hasCapability = draft.intelligence.capabilities.includes(capability);
       return {
         ...draft,
-        capabilities: hasCapability
-          ? draft.capabilities.filter((item) => item !== capability)
-          : [...draft.capabilities, capability],
+        intelligence: {
+          ...draft.intelligence,
+          capabilities: hasCapability
+            ? draft.intelligence.capabilities.filter((item) => item !== capability)
+            : [...draft.intelligence.capabilities, capability],
+        }
       };
     });
   };
@@ -1059,11 +1484,11 @@ function useSettingsModalController({
   const handleAddComponentToZone = (compType, zone) => {
     if (CUSTOM_MODE_LOCKED_ZONES.includes(zone)) return;
     setCreatorDraft(draft => {
-      const clean = draft.components.filter(c => c.type !== compType);
+      const clean = draft.interface.components.filter(c => c.type !== compType);
       const index = clean.filter(c => c.zone === zone).length;
       return {
         ...draft,
-        components: [...clean, { type: compType, zone, index }]
+        interface: { ...draft.interface, components: [...clean, { type: compType, zone, index }] }
       };
     });
   };
@@ -1071,13 +1496,13 @@ function useSettingsModalController({
   const handleRemoveComponent = (compType) => {
     setCreatorDraft(draft => ({
       ...draft,
-      components: draft.components.filter(c => c.type !== compType)
+      interface: { ...draft.interface, components: draft.interface.components.filter(c => c.type !== compType) }
     }));
   };
 
   const manifestMode = async () => {
-    const name = creatorDraft.name.trim();
-    const desc = creatorDraft.desc.trim();
+    const name = creatorDraft.identity.name.trim();
+    const desc = creatorDraft.identity.desc.trim();
 
     if (!name || !desc) {
       alert('Please specify a Mode Name and Description.');
@@ -1088,23 +1513,23 @@ function useSettingsModalController({
       id: `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
       name: name.toUpperCase(),
       desc,
-      color: creatorDraft.color,
-      capabilities: creatorDraft.capabilities,
-      persona: creatorDraft.persona.trim() || 'Custom ZAIRE specialist',
-      goals: creatorDraft.goals.trim(),
-      neverDo: creatorDraft.neverDo.trim(),
-      preferredOutput: creatorDraft.preferredOutput,
-      components: sanitizeModeComponents(creatorDraft.components),
-      routingPriority: creatorDraft.routingPriority,
+      color: creatorDraft.identity.color,
+      capabilities: creatorDraft.intelligence.capabilities,
+      persona: creatorDraft.intelligence.persona.trim() || 'Custom ZAIRE specialist',
+      goals: creatorDraft.intelligence.goals.trim(),
+      neverDo: creatorDraft.intelligence.neverDo.trim(),
+      preferredOutput: creatorDraft.identity.outputStyle,
+      components: sanitizeModeComponents(creatorDraft.interface.components),
+      routingPriority: 'Balanced',
       expertBlueprint: buildModeExpertBlueprint({
         name,
         desc,
-        persona: creatorDraft.persona,
-        goals: creatorDraft.goals,
-        neverDo: creatorDraft.neverDo,
-        preferredOutput: creatorDraft.preferredOutput,
-        routingPriority: creatorDraft.routingPriority,
-        capabilities: creatorDraft.capabilities
+        persona: creatorDraft.intelligence.persona,
+        goals: creatorDraft.intelligence.goals,
+        neverDo: creatorDraft.intelligence.neverDo,
+        preferredOutput: creatorDraft.identity.outputStyle,
+        routingPriority: 'Balanced',
+        capabilities: creatorDraft.intelligence.capabilities
       }),
       permissions: creatorDraft.permissions,
       enabled: true,
@@ -1130,6 +1555,7 @@ function useSettingsModalController({
     try {
       const mode = nextModes.find(m => m.id === modeId);
       const token = await getToken();
+      if (!token) return;
       await fetch(`${API_URL}/api/custom_modes/${modeId}`, {
         method: 'PUT',
         headers: {
@@ -1141,6 +1567,14 @@ function useSettingsModalController({
     } catch (err) {
       console.warn('Failed to update mode status on backend:', err.message);
     }
+  };
+
+  const toggleCoreModeEnabled = (modeId) => {
+    if (!onCoreModeVisibilityChange) return;
+    onCoreModeVisibilityChange((currentValue) => ({
+      ...(currentValue || {}),
+      [modeId]: !currentValue?.[modeId]
+    }));
   };
 
   const renderView = () => (
@@ -1181,7 +1615,7 @@ function useSettingsModalController({
           {activePage === 'hud' && (
             <div className="page active">
               <div className="page-title">HUD & VISUALS</div>
-              <div className="page-sub">Calibrate the interface appearance and behavior</div>
+              <div className="page-sub">Calibrate the interface appearance and behavior · PERF {String(performanceProfile || 'active').toUpperCase()}</div>
 
               <Section title="INTERFACE CALIBRATION">
                 <SettingRow name="HUD OPACITY" desc="Transparency of all holographic panels">
@@ -1237,6 +1671,9 @@ function useSettingsModalController({
                 </SettingRow>
                 <SettingRow name="NEURAL INTERRUPT FLASH" desc="Full-screen flash when ZAIRE detects urgent events">
                   <Toggle checked={urgentFlash} onChange={setUrgentFlash} />
+                </SettingRow>
+                <SettingRow name="FOCUS MODE" desc="Reduce render load, keep the HUD quiet, and trim optional workers when you are not actively driving ZAIRE">
+                  <Toggle checked={focusModeEnabled} onChange={setFocusModeEnabled} />
                 </SettingRow>
                 <button type="button" className="footer-btn footer-btn-apply full-width-action" onClick={onEnterDragMode}>
                   REPOSITION NEURAL CORE
@@ -1294,6 +1731,7 @@ function useSettingsModalController({
                   model={aiSlots[0]?.model || ''}
                   apiKey={aiSlots[0]?.apiKey || ''}
                   baseUrl={aiSlots[0]?.baseUrl || ''}
+                  mask={aiSlots[0]?.mask}
                   empty={(aiSlots[0]?.provider || 'Empty') === 'Empty'}
                   onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => i === 0 ? { ...s, ...patch } : s))}
                 />
@@ -1305,6 +1743,7 @@ function useSettingsModalController({
                   model={aiSlots[1]?.model || ''}
                   apiKey={aiSlots[1]?.apiKey || ''}
                   baseUrl={aiSlots[1]?.baseUrl || ''}
+                  mask={aiSlots[1]?.mask}
                   empty={(aiSlots[1]?.provider || 'Empty') === 'Empty'}
                   onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => i === 1 ? { ...s, ...patch } : s))}
                 />
@@ -1316,10 +1755,11 @@ function useSettingsModalController({
                   model={aiSlots[2]?.model || ''}
                   apiKey={aiSlots[2]?.apiKey || ''}
                   baseUrl={aiSlots[2]?.baseUrl || ''}
+                  mask={aiSlots[2]?.mask}
                   empty={(aiSlots[2]?.provider || 'Empty') === 'Empty'}
                   onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => i === 2 ? { ...s, ...patch } : s))}
                 />
-                <div className="api-limit-note">Keys are saved locally in your ZAIRE system config and applied at runtime.</div>
+                <div className="api-limit-note">Keys are saved securely on your local server.</div>
               </Section>
             </div>
           )}
@@ -1330,13 +1770,13 @@ function useSettingsModalController({
               <div className="page-sub">Register external services used by specialist modes</div>
               <Section title="CUSTOM API ENDPOINTS">
                 <div className="custom-api-row">
-                  <input className="custom-api-input" placeholder="Service name" />
-                  <input className="custom-api-input" placeholder="https://api.example.com" />
+                  <input id="custom-api-service-name" name="custom-api-service-name" className="custom-api-input" placeholder="Service name" />
+                  <input id="custom-api-base-url" name="custom-api-base-url" className="custom-api-input" placeholder="https://api.example.com" />
                   <button type="button" className="add-btn">ADD</button>
                 </div>
                 <div className="custom-api-row">
-                  <input className="custom-api-input" placeholder="Header key" />
-                  <input className="custom-api-input" placeholder="Encrypted token" type="password" />
+                  <input id="custom-api-header-key" name="custom-api-header-key" className="custom-api-input" placeholder="Header key" />
+                  <input id="custom-api-token" name="custom-api-token" className="custom-api-input" placeholder="Encrypted token" type="password" />
                   <button type="button" className="api-test-btn">VERIFY</button>
                 </div>
               </Section>
@@ -1364,404 +1804,362 @@ function useSettingsModalController({
           )}
 
           {activePage === 'creator' && (
-            <div className="page active">
-              <div className="page-title">ZAIRE MODE STUDIO</div>
-              <div className="page-sub">Step-by-step modular specialist creation workspace</div>
-
-              {/* Wizard Steps Header */}
-              <div className="wizard-step-header wizard-step-header-spaced">
-                <div className="wizard-step-tabs">
-                  {['1. IDENTITY', '2. INTELLIGENCE', '3. INTERFACE', '4. PERMISSIONS'].map((lbl, idx) => (
-                    <button
-                      type="button"
-                      key={lbl}
-                      className={`wizard-step-tab ${creatorStep === idx + 1 ? 'active' : creatorStep > idx + 1 ? 'done' : ''}`}
-                      onClick={() => setCreatorStep(idx + 1)}
-                    >
-                      {lbl}
-                    </button>
-                  ))}
-                </div>
-                <div className="step-indicator">
-                  {[
-                    { step: 1, label: 'IDENTITY' },
-                    { step: 2, label: 'INTEL' },
-                    { step: 3, label: 'INTERFACE' },
-                    { step: 4, label: 'PERMS' }
-                  ].map(({ step, label }) => (
-                    <span key={step} className="step-dot-group">
-                      <span
-                        className={`step-dot ${creatorStep > step ? 'done' : creatorStep === step ? 'current' : ''}`}
-                      />
-                      <span className="step-dot-label">{label}</span>
-                    </span>
-                  ))}
-                </div>
+            <div className="page active forge-page" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              
+              {/* HEADER WITH PROGRESS */}
+              <div className="creator-header-shell" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                 <div>
+                    <div className="page-title" style={{ fontSize: '24px', letterSpacing: '4px', textShadow: '0 0 20px #f97316', marginBottom: '5px' }}>MODE CREATOR</div>
+                    <div className="page-sub" style={{ color: '#f97316', marginBottom: '0' }}>Design focused operating environments with guided intelligence, interface, and permissions.</div>
+                 </div>
+                 <div className="creator-progress-shell" style={{ display: 'flex', gap: '20px' }}>
+                    {[1, 2, 3, 4].map(step => (
+                       <div key={step} className="creator-progress-step" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                          <div style={{ width: '40px', height: '4px', background: creatorStep >= step ? '#f97316' : 'rgba(255,255,255,0.1)', borderRadius: '2px', boxShadow: creatorStep >= step ? '0 0 10px #f97316' : 'none' }}></div>
+                          <span style={{ fontSize: '9px', color: creatorStep >= step ? 'white' : 'gray', fontWeight: 'bold', letterSpacing: '1px' }}>
+                             {step === 1 ? 'IDENTITY' : step === 2 ? 'INTELLIGENCE' : step === 3 ? 'INTERFACE' : 'PERMISSIONS'}
+                          </span>
+                       </div>
+                    ))}
+                 </div>
               </div>
 
-              {/* STEP 1: IDENTITY */}
-              {creatorStep === 1 && (
-                <div style={{ animation: 'fadeIn 0.3s' }}>
-                  <Section title="MODE IDENTITY PROFILE">
-                    <div className="wizard-field">
-                      <label className="wf-label" htmlFor="creator-mode-name">MODE NAME</label>
-                      <input
-                        id="creator-mode-name"
-                        className="wf-input"
-                        placeholder="e.g. BRAND MODE, HEALTH SENTINEL, LAWYER"
-                        value={creatorDraft.name}
-                        onChange={(e) => setCreatorDraft((prev) => ({ ...prev, name: e.target.value }))}
-                      />
-                    </div>
-                    <div className="wizard-field">
-                      <label className="wf-label" htmlFor="creator-mode-desc">ONE LINE DESCRIPTION</label>
-                      <input
-                        id="creator-mode-desc"
-                        className="wf-input"
-                        placeholder="What should this mode manage?"
-                        value={creatorDraft.desc}
-                        onChange={(e) => setCreatorDraft((prev) => ({ ...prev, desc: e.target.value }))}
-                      />
-                    </div>
-                    <div className="wizard-field">
-                      <div className="wf-label">CHROMA COLOR (AESTHETICS)</div>
-                      <div className="color-row">
-                        {['#00d4ff', '#00ff88', '#a78bfa', '#fbbf24', '#f97316', '#ec4899', '#60a5fa', '#34d399'].map((color) => (
-                          <button
-                            type="button"
-                            className={`color-opt ${creatorDraft.color === color ? 'selected' : ''}`}
-                            style={{ background: color, boxShadow: `0 0 5px ${color}` }}
-                            key={color}
-                            onClick={() => setCreatorDraft((prev) => ({ ...prev, color }))}
-                            aria-label={`Select color ${color}`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </Section>
-                  
-                  <Section title="POPULATE FROM TEMPLATE CORE">
-                    <div className="template-grid">
-                      {modeTemplates.map((template) => (
-                        <button
-                          type="button"
-                          className={`template-card ${selectedTemplateId === template.id ? 'selected' : ''}`}
-                          key={template.id}
-                          onClick={() => applyTemplateToDraft(template)}
-                        >
-                          <span className="template-color" style={{ background: template.color, boxShadow: `0 0 8px ${template.color}` }} />
-                          <span className="template-name">{template.name}</span>
-                          <span className="template-desc">{template.desc}</span>
-                          <span className="template-meta">{template.capabilities.join(' / ')}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </Section>
+              {/* MAIN CONTENT AREA */}
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'center', overflowY: 'auto', padding: '20px 0', overflowX: 'hidden' }}>
+                 <div style={{ width: '100%', maxWidth: '900px', display: 'flex', flexDirection: 'column' }}>
 
-                  <div className="wizard-nav">
-                    <button type="button" className="wiz-btn wiz-btn-back" onClick={() => setCreatorDraft(blankCreatorDraft)}>WIPE DRAFT</button>
-                    <button type="button" className="wiz-btn wiz-btn-next" onClick={() => setCreatorStep(2)}>NEXT: INTELLIGENCE</button>
-                  </div>
-                </div>
-              )}
+                    {creatorStep === 1 && (
+                       <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                          <div style={{ textAlign: 'center' }}>
+                             <h2 style={{ fontSize: '28px', color: 'white', fontWeight: 'bold', margin: '0 0 10px 0', letterSpacing: '2px' }}>Define Your Workspace</h2>
+                             <p style={{ color: 'gray', fontSize: '14px', margin: 0 }}>Select a popular blueprint or build from scratch.</p>
+                          </div>
 
-              {/* STEP 2: INTELLIGENCE */}
-              {creatorStep === 2 && (
-                <div style={{ animation: 'fadeIn 0.3s' }}>
-                  <Section title="SPECIALIST INSTRUCTIONS">
-                    <div className="wizard-field">
-                      <label className="wf-label" htmlFor="creator-mode-persona">PERSONALITY DIRECTIVE</label>
-                      <textarea
-                        id="creator-mode-persona"
-                        className="wf-textarea"
-                        placeholder="How should ZAIRE think, speak, and prioritize inside this mode? (e.g. Calm, medical safety-first, direct and motivating)"
-                        value={creatorDraft.persona}
-                        onChange={(e) => setCreatorDraft((prev) => ({ ...prev, persona: e.target.value }))}
-                      />
-                    </div>
-                    <div className="wizard-field">
-                      <label className="wf-label" htmlFor="creator-mode-goals">MISSION OBJECTIVES (What should it help with?)</label>
-                      <textarea
-                        id="creator-mode-goals"
-                        className="wf-textarea"
-                        placeholder="List specific goals or tasks ZAIRE should optimize for in this workspace."
-                        value={creatorDraft.goals}
-                        onChange={(e) => setCreatorDraft((prev) => ({ ...prev, goals: e.target.value }))}
-                      />
-                    </div>
-                    <div className="wizard-field">
-                      <label className="wf-label" htmlFor="creator-mode-neverdo">NEGATIVE CONSTRAINTS (What should it never do?)</label>
-                      <textarea
-                        id="creator-mode-neverdo"
-                        className="wf-textarea"
-                        placeholder="Specify forbidden actions or bounds (e.g., never execute destructive shell commands)."
-                        value={creatorDraft.neverDo || ''}
-                        onChange={(e) => setCreatorDraft((prev) => ({ ...prev, neverDo: e.target.value }))}
-                      />
-                    </div>
-                  </Section>
-
-                  <Section title="TASK ROUTING & CAPABILITIES">
-                    <div className="wizard-field">
-                      <label className="wf-label" htmlFor="creator-mode-output">PREFERRED OUTPUT STYLE</label>
-                      <select
-                        id="creator-mode-output"
-                        className="hud-select"
-                        value={creatorDraft.preferredOutput}
-                        onChange={(e) => setCreatorDraft((prev) => ({ ...prev, preferredOutput: e.target.value }))}
-                      >
-                        <option>Action Plan</option>
-                        <option>Deep Analysis</option>
-                        <option>Checklist</option>
-                        <option>Executive Summary</option>
-                        <option>Teach Me</option>
-                      </select>
-                    </div>
-                    <div className="wizard-field">
-                      <div className="wf-label">ROUTING PRIORITY</div>
-                      <Segment
-                        value={creatorDraft.routingPriority}
-                        options={['Speed', 'Balanced', 'Reasoning']}
-                        onChange={(value) => setCreatorDraft((prev) => ({ ...prev, routingPriority: value }))}
-                      />
-                    </div>
-                    <div className="wizard-field">
-                      <div className="wf-label">ACTIVE SYSTEM CAPABILITIES</div>
-                      <div className="component-grid">
-                        {['WEB SEARCH', 'FILE SYSTEM', 'SCREEN VISION', 'COMPUTER USE', 'CHARTS', 'IMAGE GEN'].map((item) => (
-                          <button
-                            type="button"
-                            className={`comp-opt ${creatorDraft.capabilities.includes(item) ? 'selected' : ''}`}
-                            key={item}
-                            onClick={() => toggleDraftCapability(item)}
-                          >
-                            {item}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </Section>
-
-                  <div className="wizard-nav">
-                    <button type="button" className="wiz-btn wiz-btn-back" onClick={() => setCreatorStep(1)}>BACK</button>
-                    <button type="button" className="wiz-btn wiz-btn-next" onClick={() => setCreatorStep(3)}>NEXT: INTERFACE BUILDER</button>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 3: INTERFACE */}
-              {creatorStep === 3 && (
-                <div style={{ animation: 'fadeIn 0.3s' }}>
-                  <Section title="MODE INTERFACE BUILDER">
-                    <div style={{ fontSize: '12px', color: 'rgba(0, 212, 255, 0.4)', marginBottom: 10 }}>
-                      Drag components from the library or click the green "+" button to assign them to layout zones.
-                    </div>
-
-                    <div className="layout-builder-container">
-                      {/* Component Library Column */}
-                      <div className="layout-library">
-                        <div className="library-title">COMPONENT LIBRARY</div>
-                        <div className="library-scroll">
-                          {COMPONENT_LIBRARY.map((comp) => {
-                            const alreadyPlaced = creatorDraft.components.some(c => c.type === comp.type);
-                            return (
-                              <div
-                                key={comp.type}
-                                className={`library-item ${getComponentAccentClass(comp.type)}`}
-                                draggable={!alreadyPlaced}
-                                onDragStart={(e) => {
-                                  e.dataTransfer.setData('text/plain', comp.type);
-                                }}
-                                style={alreadyPlaced ? { opacity: 0.35, cursor: 'not-allowed' } : { borderColor: `${creatorDraft.color}22` }}
-                              >
-                                <div className="lib-item-info">
-                                  <span className="lib-item-icon">{comp.icon}</span>
-                                  <div className="lib-item-text">
-                                    <div className="lib-item-name">{comp.type}</div>
-                                    <div className="lib-item-desc">{comp.desc}</div>
-                                  </div>
+                          <div className="creator-template-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px' }}>
+                             {modeTemplates.map(t => (
+                                <div className="creator-template-card" key={t.id} onClick={() => applyTemplateToDraft(t)} style={{ padding: '20px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s', ':hover': { background: 'rgba(255,255,255,0.05)' } }}>
+                                   <div style={{ fontSize: '14px', color: 'white', fontWeight: 'bold', marginBottom: '8px' }}>{t.name}</div>
+                                   <div style={{ fontSize: '11px', color: 'gray', lineHeight: '1.4' }}>{t.desc}</div>
                                 </div>
-                                {!alreadyPlaced && (
-                                  <select
-                                    className="library-item-add-btn"
-                                    value=""
-                                    onChange={(e) => {
-                                      if (e.target.value) {
-                                        handleAddComponentToZone(comp.type, e.target.value);
-                                        e.target.value = '';
-                                      }
-                                    }}
-                                    style={{ color: creatorDraft.color }}
-                                  >
-                                    <option value="" disabled>+</option>
-                                    <option value="Top Status Bar">Top</option>
-                                    <option value="Left Sidebar">Left</option>
-                                    <option value="Main Workspace">Center</option>
-                                    <option value="Right Inspector">Right</option>
-                                  </select>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
+                             ))}
+                          </div>
 
-                      {/* Dashboard Mockup grid */}
-                      <div>
-                        <div className="library-title" style={{ textAlign: 'center' }}>WORKSPACE SCHEMATIC</div>
-                        <div className="layout-dashboard-mock">
-                          {/* Zones */}
-                          {['Top Status Bar', 'Left Sidebar', 'Main Workspace', 'Right Inspector'].map((zone) => {
-                            const zoneClass =
-                              zone === 'Top Status Bar' ? 'zone-top' :
-                              zone === 'Left Sidebar' ? 'zone-left' :
-                              zone === 'Main Workspace' ? 'zone-center' :
-                              zone === 'Right Inspector' ? 'zone-right' : 'zone-bottom';
+                          <div className="creator-identity-shell" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '30px', display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                   <label style={{ fontSize: '11px', color: 'gray', fontWeight: 'bold', letterSpacing: '1px' }}>MODE NAME</label>
+                                   <input style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '15px', borderRadius: '8px', outline: 'none', fontSize: '14px' }} placeholder="e.g. Trading Terminal" value={creatorDraft.identity.name} onChange={e => setCreatorDraft(p => ({...p, identity: {...p.identity, name: e.target.value}}))} />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                   <label style={{ fontSize: '11px', color: 'gray', fontWeight: 'bold', letterSpacing: '1px' }}>CATEGORY</label>
+                                   <input style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '15px', borderRadius: '8px', outline: 'none', fontSize: '14px' }} placeholder="Finance, Code..." value={creatorDraft.identity.category} onChange={e => setCreatorDraft(p => ({...p, identity: {...p.identity, category: e.target.value}}))} />
+                                </div>
+                             </div>
 
-                            const zoneComponents = creatorDraft.components
-                              .filter(c => c.zone === zone)
-                              .sort((a, b) => a.index - b.index);
+                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label style={{ fontSize: '11px', color: 'gray', fontWeight: 'bold', letterSpacing: '1px' }}>SHORT DESCRIPTION</label>
+                                <input style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '15px', borderRadius: '8px', outline: 'none', fontSize: '14px' }} placeholder="What does this mode do?" value={creatorDraft.identity.desc} onChange={e => setCreatorDraft(p => ({...p, identity: {...p.identity, desc: e.target.value}}))} />
+                             </div>
 
-                            return (
-                              <div
-                                key={zone}
-                                className={`zone ${zoneClass}`}
-                                onDragOver={(e) => e.preventDefault()}
-                                onDrop={(e) => {
-                                  e.preventDefault();
-                                  const compType = e.dataTransfer.getData('text/plain');
-                                  if (compType) {
-                                    handleAddComponentToZone(compType, zone);
-                                  }
-                                }}
-                                style={{
-                                  borderColor: `${creatorDraft.color}22`,
-                                  background: `${creatorDraft.color}03`
-                                }}
-                              >
-                                <div className="zone-label">{zone}</div>
-                                <div className="zone-components-list">
-                                  {zoneComponents.length === 0 && (
-                                    <div className="zone-empty-copy">Drop components here</div>
-                                  )}
-                                  {zoneComponents.map((c) => {
-                                    const matchedLib = COMPONENT_LIBRARY.find(l => l.type === c.type);
+                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                   <label style={{ fontSize: '11px', color: 'gray', fontWeight: 'bold', letterSpacing: '1px' }}>PRIMARY COLOR</label>
+                                   <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center', height: '100%' }}>
+                                      {['#00d4ff', '#00ff88', '#a78bfa', '#fbbf24', '#f97316', '#ec4899', '#3b82f6', '#10b981'].map(c => (
+                                         <div key={c} onClick={() => setCreatorDraft(p => ({...p, identity: {...p.identity, color: c}}))} style={{ width: '32px', height: '32px', borderRadius: '50%', background: c, cursor: 'pointer', border: creatorDraft.identity.color === c ? '2px solid white' : '2px solid transparent', boxShadow: creatorDraft.identity.color === c ? `0 0 15px ${c}` : 'none', transition: 'all 0.2s' }}></div>
+                                      ))}
+                                   </div>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                   <label style={{ fontSize: '11px', color: 'gray', fontWeight: 'bold', letterSpacing: '1px' }}>ICON CLASS</label>
+                                   <input style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '15px', borderRadius: '8px', outline: 'none', fontSize: '14px' }} placeholder="e.g. lucide-rocket" value={creatorDraft.identity.icon} onChange={e => setCreatorDraft(p => ({...p, identity: {...p.identity, icon: e.target.value}}))} />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                   <label style={{ fontSize: '11px', color: 'gray', fontWeight: 'bold', letterSpacing: '1px' }}>OUTPUT STYLE</label>
+                                   <input style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '15px', borderRadius: '8px', outline: 'none', fontSize: '14px' }} placeholder="e.g. Analytical" value={creatorDraft.identity.outputStyle} onChange={e => setCreatorDraft(p => ({...p, identity: {...p.identity, outputStyle: e.target.value}}))} />
+                                </div>
+                             </div>
+                          </div>
+                       </div>
+                    )}
+
+                    {creatorStep === 2 && (
+                       <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                          <div style={{ textAlign: 'center' }}>
+                             <h2 style={{ fontSize: '28px', color: 'white', fontWeight: 'bold', margin: '0 0 10px 0', letterSpacing: '2px' }}>Core Directives</h2>
+                             <p style={{ color: 'gray', fontSize: '14px', margin: 0 }}>Define how this intelligence behaves and the agents it employs.</p>
+                          </div>
+
+                          <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '30px', display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label style={{ fontSize: '11px', color: 'gray', fontWeight: 'bold', letterSpacing: '1px' }}>MAIN PURPOSE</label>
+                                <input style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '15px', borderRadius: '8px', outline: 'none', fontSize: '14px' }} value={creatorDraft.intelligence.purpose} onChange={e => setCreatorDraft(p => ({...p, intelligence: {...p.intelligence, purpose: e.target.value}}))} />
+                             </div>
+
+                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                   <label style={{ fontSize: '11px', color: 'gray', fontWeight: 'bold', letterSpacing: '1px' }}>HELP WITH (GOALS)</label>
+                                   <textarea style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '15px', borderRadius: '8px', outline: 'none', fontSize: '14px', height: '100px', resize: 'none' }} value={creatorDraft.intelligence.goals} onChange={e => setCreatorDraft(p => ({...p, intelligence: {...p.intelligence, goals: e.target.value}}))} />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                   <label style={{ fontSize: '11px', color: 'gray', fontWeight: 'bold', letterSpacing: '1px' }}>NEVER DO</label>
+                                   <textarea style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '15px', borderRadius: '8px', outline: 'none', fontSize: '14px', height: '100px', resize: 'none' }} value={creatorDraft.intelligence.neverDo} onChange={e => setCreatorDraft(p => ({...p, intelligence: {...p.intelligence, neverDo: e.target.value}}))} />
+                                </div>
+                             </div>
+
+                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                   <label style={{ fontSize: '11px', color: 'gray', fontWeight: 'bold', letterSpacing: '1px' }}>EXPERT PERSONALITY</label>
+                                   <input style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '15px', borderRadius: '8px', outline: 'none', fontSize: '14px' }} value={creatorDraft.intelligence.persona} onChange={e => setCreatorDraft(p => ({...p, intelligence: {...p.intelligence, persona: e.target.value}}))} />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                   <label style={{ fontSize: '11px', color: 'gray', fontWeight: 'bold', letterSpacing: '1px' }}>SUCCESS DEFINITION</label>
+                                   <input style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '15px', borderRadius: '8px', outline: 'none', fontSize: '14px' }} value={creatorDraft.intelligence.successDefinition} onChange={e => setCreatorDraft(p => ({...p, intelligence: {...p.intelligence, successDefinition: e.target.value}}))} />
+                                </div>
+                             </div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '30px' }}>
+                             <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '12px', color: 'white', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '15px', display: 'block' }}>ASSIGN SPECIALISTS</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px' }}>
+                                   {['Research Agent', 'Planner Agent', 'Writer Agent', 'Critic Agent', 'Executor Agent', 'Code Architect', 'Market Analyst', 'Project Manager'].map(agent => {
+                                      const active = creatorDraft.intelligence.specialists.includes(agent);
+                                      return (
+                                         <div key={agent} onClick={() => {
+                                            setCreatorDraft(p => {
+                                               const current = p.intelligence.specialists;
+                                               const next = active ? current.filter(a => a !== agent) : [...current, agent];
+                                               return {...p, intelligence: {...p.intelligence, specialists: next}};
+                                            });
+                                         }} style={{ padding: '15px', background: active ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.4)', border: `1px solid ${active ? creatorDraft.identity.color : 'rgba(255,255,255,0.05)'}`, borderRadius: '12px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s', boxShadow: active ? `0 0 15px ${creatorDraft.identity.color}22` : 'none' }}>
+                                            <span style={{ fontSize: '12px', color: active ? 'white' : 'gray', fontWeight: active ? 'bold' : 'normal' }}>{agent}</span>
+                                            {active && <span style={{ color: creatorDraft.identity.color, fontSize: '14px' }}>✓</span>}
+                                         </div>
+                                      );
+                                   })}
+                                </div>
+                             </div>
+
+                             <div style={{ width: '300px', background: 'rgba(0,0,0,0.5)', border: `1px solid ${creatorDraft.identity.color}44`, borderRadius: '16px', padding: '25px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <label style={{ fontSize: '12px', color: 'gray', fontWeight: 'bold', letterSpacing: '2px', display: 'block', textAlign: 'center' }}>WORKSPACE DNA</label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', flex: 1, justifyContent: 'center' }}>
+                                   {[
+                                      { label: 'Analysis', value: Math.min(100, 15 + creatorDraft.intelligence.specialists.filter(a => ['Research Agent', 'Market Analyst', 'Critic Agent'].includes(a)).length * 30) },
+                                      { label: 'Execution', value: Math.min(100, 15 + creatorDraft.intelligence.specialists.filter(a => ['Executor Agent', 'Code Architect', 'Project Manager'].includes(a)).length * 30) },
+                                      { label: 'Creativity', value: Math.min(100, 15 + creatorDraft.intelligence.specialists.filter(a => ['Writer Agent', 'Planner Agent'].includes(a)).length * 40) },
+                                      { label: 'Automation', value: Math.min(100, 15 + creatorDraft.intelligence.specialists.filter(a => ['Executor Agent', 'Code Architect', 'Planner Agent'].includes(a)).length * 30) }
+                                   ].map(stat => (
+                                      <div key={stat.label} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'white', fontWeight: 'bold', letterSpacing: '1px' }}>
+                                            <span>{stat.label}</span>
+                                            <span style={{ color: creatorDraft.identity.color }}>{stat.value}%</span>
+                                         </div>
+                                         <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                                            <div style={{ height: '100%', width: `${stat.value}%`, background: creatorDraft.identity.color, transition: 'width 0.3s ease-out' }}></div>
+                                         </div>
+                                      </div>
+                                   ))}
+                                </div>
+                             </div>
+                          </div>
+                       </div>
+                    )}
+
+                    {creatorStep === 3 && (
+                       <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '600px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '10px' }}>
+                             <div style={{ textAlign: 'left' }}>
+                                <h2 style={{ fontSize: '28px', color: 'white', fontWeight: 'bold', margin: '0 0 10px 0', letterSpacing: '2px' }}>Workspace Architecture</h2>
+                                <p style={{ color: 'gray', fontSize: '14px', margin: 0 }}>Drag components from the library and drop them into the layout zones.</p>
+                             </div>
+                             
+                             <div className="creator-efficiency-card" style={{ background: 'rgba(0,0,0,0.5)', border: `1px solid ${creatorDraft.identity.color}44`, padding: '10px 15px', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                <div style={{ fontSize: '10px', color: 'gray', letterSpacing: '1px', fontWeight: 'bold', marginBottom: '4px' }}>WORKSPACE EFFICIENCY</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                   <div style={{ fontSize: '24px', color: creatorDraft.identity.color, fontWeight: 'bold', textShadow: `0 0 10px ${creatorDraft.identity.color}66` }}>
+                                      {creatorDraft.interface.components.length === 0 ? '0%' : Math.min(100, creatorDraft.interface.components.length * 20 + 20)}%
+                                   </div>
+                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                      {creatorDraft.interface.components.length < 2 && <span style={{ fontSize: '9px', color: '#ef4444' }}>! Missing core panels</span>}
+                                      {creatorDraft.interface.components.length >= 2 && creatorDraft.interface.components.length < 5 && <span style={{ fontSize: '9px', color: '#10b981' }}>✓ Optimal load</span>}
+                                      {creatorDraft.interface.components.length >= 5 && <span style={{ fontSize: '9px', color: '#f59e0b' }}>! High cognitive load</span>}
+                                   </div>
+                                </div>
+                             </div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '30px', flex: 1, minHeight: 0 }}>
+                             {/* Left: Library & Settings */}
+                             <div style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <div className="creator-config-shell" style={{ display: 'flex', flexDirection: 'column', gap: '15px', background: 'rgba(0,0,0,0.4)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                   <div style={{ marginBottom: '5px' }}>
+                                      <label style={{ fontSize: '11px', color: 'gray', fontWeight: 'bold', marginBottom: '8px', display: 'block', letterSpacing: '1px' }}>THEME DENSITY</label>
+                                      <select className="hud-select" style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px', outline: 'none' }} value={creatorDraft.interface.themeDensity} onChange={e => setCreatorDraft(p => ({...p, interface: {...p.interface, themeDensity: e.target.value}}))}>
+                                         <option value="compact">Compact</option>
+                                         <option value="comfortable">Comfortable</option>
+                                         <option value="spacious">Spacious</option>
+                                      </select>
+                                      <div style={{ marginTop: '10px', padding: '10px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', borderLeft: `2px solid ${creatorDraft.identity.color}` }}>
+                                         <div style={{ fontSize: '10px', color: 'white', fontWeight: 'bold', marginBottom: '4px' }}>{creatorDraft.interface.themeDensity === 'compact' ? 'Compact Layout' : creatorDraft.interface.themeDensity === 'spacious' ? 'Spacious Layout' : 'Comfortable Layout'}</div>
+                                         <div style={{ fontSize: '10px', color: '#10b981', display: 'flex', gap: '5px' }}><span>+</span> {creatorDraft.interface.themeDensity === 'compact' ? 'More info on screen' : creatorDraft.interface.themeDensity === 'spacious' ? 'Easy to read' : 'Balanced interface'}</div>
+                                         <div style={{ fontSize: '10px', color: '#10b981', display: 'flex', gap: '5px' }}><span>+</span> {creatorDraft.interface.themeDensity === 'compact' ? 'Faster workflows' : creatorDraft.interface.themeDensity === 'spacious' ? 'Less cognitive load' : 'Standard spacing'}</div>
+                                         <div style={{ fontSize: '10px', color: '#ef4444', display: 'flex', gap: '5px' }}><span>-</span> {creatorDraft.interface.themeDensity === 'compact' ? 'Smaller text' : creatorDraft.interface.themeDensity === 'spacious' ? 'More scrolling' : 'No strong specialization'}</div>
+                                      </div>
+                                   </div>
+                                   <div>
+                                      <label style={{ fontSize: '11px', color: 'gray', fontWeight: 'bold', marginBottom: '8px', display: 'block', letterSpacing: '1px' }}>ANIMATION STYLE</label>
+                                      <select className="hud-select" style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px', borderRadius: '8px', outline: 'none' }} value={creatorDraft.interface.animationStyle} onChange={e => setCreatorDraft(p => ({...p, interface: {...p.interface, animationStyle: e.target.value}}))}>
+                                         <option value="neural">Neural (Glow & Scanlines)</option>
+                                         <option value="minimal">Minimal (Instant)</option>
+                                         <option value="cinematic">Cinematic (Smooth)</option>
+                                      </select>
+                                      <div style={{ marginTop: '10px', padding: '10px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', borderLeft: `2px solid ${creatorDraft.identity.color}` }}>
+                                         <div style={{ fontSize: '10px', color: 'white', fontWeight: 'bold', marginBottom: '4px' }}>Best For:</div>
+                                         <div style={{ fontSize: '10px', color: 'gray', marginBottom: '4px' }}>{creatorDraft.interface.animationStyle === 'neural' ? '• Trading\n• Cybersecurity\n• Research' : creatorDraft.interface.animationStyle === 'minimal' ? '• Engineering\n• Data Entry\n• Fast Ops' : '• Consumer Apps\n• Marketing\n• Education'}</div>
+                                         <div style={{ fontSize: '10px', color: 'white', fontWeight: 'bold', marginTop: '6px' }}>Visual Style:</div>
+                                         <div style={{ fontSize: '10px', color: creatorDraft.identity.color }}>{creatorDraft.interface.animationStyle === 'neural' ? 'High-tech tactical HUD' : creatorDraft.interface.animationStyle === 'minimal' ? 'Raw utility and speed' : 'Fluid motion graphics'}</div>
+                                      </div>
+                                   </div>
+                                </div>
+
+                                <div className="creator-library-shell" style={{ flex: 1, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', overflowY: 'hidden' }}>
+                                   <label style={{ fontSize: '12px', color: 'white', fontWeight: 'bold', letterSpacing: '2px', marginBottom: '15px', display: 'block' }}>COMPONENT LIBRARY</label>
+                                   <div className="custom-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '25px', paddingRight: '10px' }}>
+                                      {AI_SYSTEMS_LIBRARY.map(layer => (
+                                         <div key={layer.category} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                            <div style={{ fontSize: '10px', color: 'gray', fontWeight: 'bold', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                               <span style={{ color: creatorDraft.identity.color }}>❖</span> {layer.category}
+                                            </div>
+                                            {layer.items.map(comp => {
+                                               const alreadyPlaced = creatorDraft.interface.components.some(c => c.type === comp.id);
+                                               return (
+                                                  <div key={comp.id} draggable={!alreadyPlaced} onDragStart={(e) => e.dataTransfer.setData('text/plain', comp.id)} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${alreadyPlaced ? 'rgba(255,255,255,0.05)' : creatorDraft.identity.color}`, borderRadius: '8px', cursor: alreadyPlaced ? 'not-allowed' : 'grab', opacity: alreadyPlaced ? 0.3 : 1, transition: 'all 0.2s', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                           <span style={{ color: creatorDraft.identity.color, opacity: 0.5 }}>≡</span>
+                                                           <span style={{ fontSize: '12px', color: 'white', fontWeight: 'bold' }}>{comp.id}</span>
+                                                        </div>
+                                                        <span style={{ fontSize: '9px', color: '#f59e0b', letterSpacing: '1px' }}>{comp.score}</span>
+                                                     </div>
+                                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'gray' }}>
+                                                        <span>Used in {comp.usedIn}</span>
+                                                        <span style={{ color: comp.cost === 'Low' ? '#10b981' : comp.cost === 'Medium' ? '#f59e0b' : '#ef4444' }}>Cost: {comp.cost}</span>
+                                                     </div>
+                                                     <div style={{ fontSize: '9px', color: creatorDraft.identity.color, marginTop: '2px', fontWeight: 'bold' }}>✦ {comp.feature}</div>
+                                                  </div>
+                                               );
+                                            })}
+                                         </div>
+                                      ))}
+                                   </div>
+                                </div>
+                             </div>
+
+                             {/* Right: The Grid */}
+                             <div className="creator-zone-shell" style={{ flex: 1, background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '20px', position: 'relative' }}>
+                                <div className="layout-dashboard-mock" style={{ width: '100%', height: '100%', border: 'none', background: 'transparent' }}>
+                                  {['Top Status Bar', 'Left Sidebar', 'Main Workspace', 'Right Inspector', 'Bottom Console'].map((zone) => {
+                                    const zoneClass =
+                                      zone === 'Top Status Bar' ? 'zone-top' :
+                                      zone === 'Left Sidebar' ? 'zone-left' :
+                                      zone === 'Main Workspace' ? 'zone-center' :
+                                      zone === 'Right Inspector' ? 'zone-right' : 'zone-bottom';
+
+                                    const zoneComponents = creatorDraft.interface.components
+                                      .filter(c => c.zone === zone)
+                                      .sort((a, b) => a.index - b.index);
+
                                     return (
-                                      <div 
-                                        key={c.type} 
-                                        className={`zone-component-card-visual ${getComponentAccentClass(c.type)}`} 
-                                        style={{ border: `1px solid ${creatorDraft.color}22`, background: `rgba(0, 0, 0, 0.4)` }}
+                                      <div
+                                        key={zone}
+                                        className={`zone ${zoneClass}`}
+                                        onDragOver={(e) => e.preventDefault()}
+                                        onDrop={(e) => {
+                                          e.preventDefault();
+                                          const compType = e.dataTransfer.getData('text/plain');
+                                          if (compType) handleAddComponentToZone(compType, zone);
+                                        }}
+                                        style={{ borderColor: `${creatorDraft.identity.color}33`, background: `${creatorDraft.identity.color}05`, borderRadius: '8px' }}
                                       >
-                                        <div className="visual-card-header" style={{ borderBottom: `1px solid ${creatorDraft.color}11` }}>
-                                          <span className="visual-card-title"><span style={{ marginRight: 4 }}>{matchedLib?.icon}</span>{c.type.toUpperCase()}</span>
-                                          <button
-                                            type="button"
-                                            className="zone-component-remove"
-                                            onClick={() => handleRemoveComponent(c.type)}
-                                            title="Remove component"
-                                            aria-label={`Remove ${c.type} component`}
-                                          >
-                                            ✕
-                                          </button>
-                                        </div>
-                                          
-                                        <div className="visual-card-preview-area">
-                                          <MiniPreview type={c.type} color={creatorDraft.color} />
+                                        <div className="zone-label" style={{ background: 'rgba(0,0,0,0.6)', padding: '2px 8px', borderRadius: '4px' }}>{zone}</div>
+                                        <div className="zone-components-list">
+                                          {zoneComponents.length === 0 && <div className="zone-empty-copy" style={{ opacity: 0.5 }}>Drop here</div>}
+                                          {zoneComponents.map((c) => (
+                                            <div key={c.type} className={`zone-component-card-visual`} style={{ border: `1px solid ${creatorDraft.identity.color}44`, background: `rgba(0, 0, 0, 0.6)`, borderRadius: '6px' }}>
+                                              <div className="visual-card-header" style={{ borderBottom: `1px solid ${creatorDraft.identity.color}22` }}>
+                                                <span className="visual-card-title" style={{ fontSize: '10px' }}>{c.type.toUpperCase()}</span>
+                                                <button type="button" className="zone-component-remove" onClick={() => handleRemoveComponent(c.type)}>✕</button>
+                                              </div>
+                                              <div className="visual-card-preview-area" style={{ padding: '10px' }}><MiniPreview type={c.type} color={creatorDraft.identity.color} /></div>
+                                            </div>
+                                          ))}
                                         </div>
                                       </div>
                                     );
                                   })}
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </Section>
+                             </div>
+                          </div>
+                       </div>
+                    )}
 
-                  <div className="wizard-nav">
-                    <button type="button" className="wiz-btn wiz-btn-back" onClick={() => setCreatorStep(2)}>BACK</button>
-                    <button type="button" className="wiz-btn wiz-btn-next" onClick={() => setCreatorStep(4)}>NEXT: PERMISSIONS</button>
-                  </div>
-                </div>
-              )}
+                    {creatorStep === 4 && (
+                       <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                          <div style={{ textAlign: 'center' }}>
+                             <h2 style={{ fontSize: '28px', color: 'white', fontWeight: 'bold', margin: '0 0 10px 0', letterSpacing: '2px' }}>System Capabilities</h2>
+                             <p style={{ color: 'gray', fontSize: '14px', margin: 0 }}>Grant access to local computing resources and web services.</p>
+                          </div>
 
-              {/* STEP 4: PERMISSIONS */}
-              {creatorStep === 4 && (
-                <div style={{ animation: 'fadeIn 0.3s' }}>
-                  <Section title="MODE PERMISSIONS POLICY">
-                    <div style={{ fontSize: '12px', color: 'rgba(0, 212, 255, 0.4)', marginBottom: 15 }}>
-                      Establish cryptographic permission boundaries and security policies for this specialist mode.
-                    </div>
+                          <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '30px' }}>
+                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                {[
+                                   { id: 'internetAccess', label: 'Web Search', risk: 'Safe' },
+                                   { id: 'fileSystem', label: 'File System', risk: 'Needs Approval' },
+                                   { id: 'screenCapture', label: 'Screen Vision', risk: 'Needs Approval' },
+                                   { id: 'camera', label: 'Camera', risk: 'Dangerous' },
+                                   { id: 'microphone', label: 'Microphone', risk: 'Needs Approval' },
+                                   { id: 'clipboard', label: 'Clipboard', risk: 'Safe' },
+                                   { id: 'shellExecution', label: 'Terminal', risk: 'Dangerous' },
+                                   { id: 'computerUse', label: 'Computer Use', risk: 'Dangerous' },
+                                   { id: 'memory', label: 'Memory', risk: 'Safe' },
+                                   { id: 'calendar', label: 'Calendar', risk: 'Needs Approval' },
+                                   { id: 'email', label: 'Email', risk: 'Dangerous' },
+                                   { id: 'charts', label: 'Charts', risk: 'Safe' },
+                                   { id: 'apiKeys', label: 'API Keys', risk: 'Dangerous' }
+                                ].map(perm => (
+                                   <div key={perm.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '15px 20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                      <div>
+                                         <div style={{ fontSize: '14px', color: 'white', fontWeight: 'bold' }}>{perm.label}</div>
+                                         <div style={{ fontSize: '11px', color: perm.risk === 'Dangerous' ? '#ef4444' : perm.risk === 'Needs Approval' ? '#f59e0b' : '#10b981', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: perm.risk === 'Dangerous' ? '#ef4444' : perm.risk === 'Needs Approval' ? '#f59e0b' : '#10b981' }}></div>
+                                            {perm.risk}
+                                         </div>
+                                      </div>
+                                      <Toggle checked={creatorDraft.permissions[perm.id] || false} onChange={val => setCreatorDraft(p => ({...p, permissions: {...p.permissions, [perm.id]: val}}))} />
+                                   </div>
+                                ))}
+                             </div>
+                          </div>
+                       </div>
+                    )}
 
-                    <SettingRow name="FILE SYSTEM READ/WRITE" desc="Allows the agent to write files and modify code directories">
-                      <Toggle
-                        checked={creatorDraft.permissions.fileSystem}
-                        onChange={(val) => setCreatorDraft((prev) => ({
-                          ...prev,
-                          permissions: { ...prev.permissions, fileSystem: val }
-                        }))}
-                      />
-                    </SettingRow>
+                 </div>
+              </div>
 
-                    <SettingRow name="SHELL / TERMINAL EXECUTION" desc="Allows executing host operating system shell commands">
-                      <Toggle
-                        checked={creatorDraft.permissions.shellExecution}
-                        onChange={(val) => setCreatorDraft((prev) => ({
-                          ...prev,
-                          permissions: { ...prev.permissions, shellExecution: val }
-                        }))}
-                      />
-                    </SettingRow>
+              {/* FOOTER */}
+              <div className="creator-footer-shell" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 30px', background: 'rgba(0,0,0,0.8)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                 <button className="wiz-btn-back" style={{ visibility: creatorStep > 1 ? 'visible' : 'hidden', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px', transition: 'all 0.2s' }} onClick={() => setCreatorStep(creatorStep - 1)}>BACK</button>
+                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                    <button style={{ background: 'transparent', color: 'gray', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px' }}>SAVE DRAFT</button>
+                    {creatorStep < 4 ? (
+                       <button className="wiz-btn-next" style={{ background: 'white', color: 'black', border: 'none', padding: '12px 30px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px', transition: 'all 0.2s' }} onClick={() => setCreatorStep(creatorStep + 1)}>NEXT STEP</button>
+                    ) : (
+                       <button className="wiz-btn-create" style={{ background: creatorDraft.identity.color, color: 'black', fontWeight: 'bold', border: 'none', padding: '12px 30px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', letterSpacing: '1px', boxShadow: `0 0 20px ${creatorDraft.identity.color}66` }} onClick={manifestMode}>MANIFEST MODE</button>
+                    )}
+                 </div>
+              </div>
 
-                    <SettingRow name="UNRESTRICTED INTERNET ACCESS" desc="Allows outbound networking, API connections and Web Search">
-                      <Toggle
-                        checked={creatorDraft.permissions.internetAccess}
-                        onChange={(val) => setCreatorDraft((prev) => ({
-                          ...prev,
-                          permissions: { ...prev.permissions, internetAccess: val }
-                        }))}
-                      />
-                    </SettingRow>
-
-                    <SettingRow name="TOKEN COST RUNTIME WARNINGS" desc="Prompt for confirmation before executing high-token reasoning calls">
-                      <Toggle
-                        checked={creatorDraft.permissions.costWarnings}
-                        onChange={(val) => setCreatorDraft((prev) => ({
-                          ...prev,
-                          permissions: { ...prev.permissions, costWarnings: val }
-                        }))}
-                      />
-                    </SettingRow>
-
-                    <SettingRow name="SCREEN VISION CAPTURE" desc="Allows periodic desktop screen visual grabs and OCR analysis">
-                      <Toggle
-                        checked={creatorDraft.permissions.screenCapture}
-                        onChange={(val) => setCreatorDraft((prev) => ({
-                          ...prev,
-                          permissions: { ...prev.permissions, screenCapture: val }
-                        }))}
-                      />
-                    </SettingRow>
-
-                    <SettingRow name="HARDWARE SENSORY ACCESS" desc="Allows direct access to user microphone and camera feeds">
-                      <Toggle
-                        checked={creatorDraft.permissions.hardwareMedia}
-                        onChange={(val) => setCreatorDraft((prev) => ({
-                          ...prev,
-                          permissions: { ...prev.permissions, hardwareMedia: val }
-                        }))}
-                      />
-                    </SettingRow>
-                  </Section>
-
-                  <div className="wizard-nav">
-                    <button type="button" className="wiz-btn wiz-btn-back" onClick={() => setCreatorStep(3)}>BACK</button>
-                    <button type="button" className="wiz-btn wiz-btn-create" onClick={manifestMode}>MANIFEST MODE</button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -1769,6 +2167,27 @@ function useSettingsModalController({
             <div className="page active">
               <div className="page-title">MY CUSTOM MODES</div>
               <div className="page-sub">Your personally created specialist modes</div>
+              <Section title="EXPERIMENTAL LABS">
+                {experimentalCoreModes.map((mode) => (
+                  <div className="custom-mode-card" key={mode.id}>
+                    <span className="mode-color-dot" style={{ background: '#1d4ed8', boxShadow: '0 0 5px #1d4ed8' }} />
+                    <div className="mode-card-copy">
+                      <div className="mode-card-name">{mode.name}</div>
+                      <div className="mode-card-desc">{mode.desc}</div>
+                      <div className="mode-card-meta">BUILT-IN MODE · CANNOT BE DELETED</div>
+                    </div>
+                    <div className="mode-card-actions">
+                      <button
+                        type="button"
+                        className="mode-action-btn"
+                        onClick={() => toggleCoreModeEnabled(mode.id)}
+                      >
+                        {coreModeVisibility?.[mode.id] ? 'DISABLE' : 'ENABLE'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </Section>
               <Section title="ACTIVE CUSTOM MODES">
                 {localModes.map((mode) => (
                   <div className="custom-mode-card" key={mode.id}>
@@ -1796,6 +2215,13 @@ function useSettingsModalController({
                       <button
                         type="button"
                         className="mode-action-btn"
+                        onClick={() => exportCustomMode(mode.id)}
+                      >
+                        EXPORT
+                      </button>
+                      <button
+                        type="button"
+                        className="mode-action-btn"
                         onClick={() => deleteCustomMode(mode.id)}
                         style={{ color: '#ff3366', borderColor: 'rgba(255,51,102,0.2)' }}
                       >
@@ -1804,7 +2230,13 @@ function useSettingsModalController({
                     </div>
                   </div>
                 ))}
-                <button type="button" className="create-mode-link" onClick={() => setActivePage('creator')}>+ CREATE NEW MODE</button>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                  <button type="button" className="create-mode-link" onClick={() => setActivePage('creator')} style={{ flex: 1, textAlign: 'center' }}>+ CREATE NEW MODE</button>
+                  <label className="create-mode-link" style={{ flex: 1, textAlign: 'center', cursor: 'pointer', margin: 0 }}>
+                    + IMPORT MODE
+                    <input type="file" accept=".json" style={{ display: 'none' }} onChange={importCustomMode} />
+                  </label>
+                </div>
               </Section>
               <Section title="QUICK START TEMPLATES">
                 <div className="template-list-compact">
@@ -1828,12 +2260,106 @@ function useSettingsModalController({
             <div className="page active">
               <div className="page-title">VOICE & WAKE</div>
               <div className="page-sub">Tune voice activation and command capture</div>
+              <Section title="VOICE CONFIGURATION">
+                <SettingRow name="VOICE ACTOR" desc="Select the voice persona for ZAIRE's verbal responses">
+                  <select id="settings-voice-actor" name="settings-voice-actor" className="hud-select" value={voiceActor} onChange={(e) => setVoiceActor(e.target.value)}>
+                    <option>Nova</option>
+                    <option>Echo</option>
+                    <option>Alloy</option>
+                    <option>Onyx</option>
+                    <option>Shimmer</option>
+                  </select>
+                </SettingRow>
+              </Section>
               <Section title="WAKE DETECTION">
                 <SettingRow name="VOICE WAKE WORD" desc="Sensitivity for ZAIRE wake detection">
                   <Slider min={0} max={100} step={1} value={voiceWake} onChange={setVoiceWake} />
                 </SettingRow>
                 <SettingRow name="AMBIENT NOISE REJECTION" desc="Filter background audio before command parsing">
                   <Toggle checked={ambientNoise} onChange={setAmbientNoise} />
+                </SettingRow>
+              </Section>
+            </div>
+          )}
+
+          {activePage === 'personalize' && (
+            <div className="page active">
+              <div className="page-title">PERSONALIZATION</div>
+              <div className="page-sub">Customize ZAIRE's conversational identity and user context</div>
+              
+              <Section title="AI IDENTITY">
+                <SettingRow name="BASE STYLE & TONE" desc="How ZAIRE should fundamentally sound">
+                  <input
+                    id="settings-base-tone"
+                    name="settings-base-tone"
+                    type="text"
+                    className="creator-input"
+                    value={baseTone}
+                    onChange={(e) => setBaseTone(e.target.value)}
+                    placeholder="e.g., Default, Professional, Casual"
+                  />
+                </SettingRow>
+                <SettingRow name="CHARACTERISTICS" desc="Select the defining traits of the responses">
+                  <select id="settings-characteristics" name="settings-characteristics" className="hud-select" value={characteristics} onChange={(e) => setCharacteristics(e.target.value)}>
+                    <option>Warm (Default)</option>
+                    <option>Enthusiastic (Default)</option>
+                    <option>Emoji (Default)</option>
+                    <option>Analytical</option>
+                    <option>Direct</option>
+                  </select>
+                </SettingRow>
+                <SettingRow name="FAST ANSWERS" desc="Prefer shorter, direct responses over detailed reasoning">
+                  <Toggle checked={fastAnswers} onChange={setFastAnswers} />
+                </SettingRow>
+              </Section>
+
+              <Section title="CUSTOM INSTRUCTIONS">
+                <SettingRow name="INSTRUCTIONS FOR ZAIRE" desc="Global rules for behavior (max 1000 words)">
+                  <textarea
+                    id="settings-zaire-instructions"
+                    name="settings-zaire-instructions"
+                    className="creator-textarea"
+                    value={zaireInstructions}
+                    onChange={(e) => setZaireInstructions(e.target.value)}
+                    placeholder="Enter custom instructions..."
+                    rows={4}
+                  />
+                </SettingRow>
+              </Section>
+
+              <Section title="ABOUT YOU">
+                <SettingRow name="NAME" desc="What ZAIRE should call you">
+                  <input
+                    id="settings-user-name"
+                    name="settings-user-name"
+                    type="text"
+                    className="creator-input"
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                    placeholder="Your Name"
+                  />
+                </SettingRow>
+                <SettingRow name="OCCUPATION" desc="Your professional context">
+                  <input
+                    id="settings-user-occupation"
+                    name="settings-user-occupation"
+                    type="text"
+                    className="creator-input"
+                    value={userOccupation}
+                    onChange={(e) => setUserOccupation(e.target.value)}
+                    placeholder="Your Occupation"
+                  />
+                </SettingRow>
+                <SettingRow name="MORE ABOUT YOU" desc="Additional context ZAIRE should know">
+                  <textarea
+                    id="settings-user-about"
+                    name="settings-user-about"
+                    className="creator-textarea"
+                    value={userAbout}
+                    onChange={(e) => setUserAbout(e.target.value)}
+                    placeholder="Hobbies, goals, preferences..."
+                    rows={3}
+                  />
                 </SettingRow>
               </Section>
             </div>
@@ -1861,6 +2387,59 @@ function useSettingsModalController({
                     }}
                   />
                 </SettingRow>
+              </Section>
+            </div>
+          )}
+
+          {activePage === 'briefing' && (
+            <div className="page active">
+              <div className="page-title">WEEKLY BRIEFINGS</div>
+              <div className="page-sub">Auto-generated intelligence reports on your system usage and progress</div>
+              
+              <Section title="MANUAL TRIGGER">
+                <SettingRow name="GENERATE NOW" desc="Force an immediate compilation of your weekly briefing">
+                  <button className="footer-btn footer-btn-save" onClick={generateBriefing} disabled={briefingsLoading}>
+                    {briefingsLoading ? 'GENERATING...' : 'COMPILE BRIEFING'}
+                  </button>
+                </SettingRow>
+              </Section>
+              
+              <Section title="DASHBOARD ARCHIVE">
+                {briefingsLoading ? (
+                  <div className="memory-action-status">Syncing archive...</div>
+                ) : briefingsData.length === 0 ? (
+                  <div className="memory-empty-copy">No briefings generated yet.</div>
+                ) : (
+                  <div className="memory-search-results">
+                    {briefingsData.map((b) => (
+                      <div className="memory-result-card" key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div className="memory-result-meta">
+                            <span>{new Date(b.created_at).toLocaleString()}</span>
+                            <span>STATUS: {b.status.toUpperCase()}</span>
+                          </div>
+                          <div className="memory-result-text" style={{ marginTop: '8px' }}>
+                            {b.summary ? b.summary.substring(0, 100) + '...' : 'Awaiting compilation...'}
+                          </div>
+                        </div>
+                        {b.status === 'finished' && (
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            {b.pdf_url && (
+                              <button className="footer-btn" onClick={() => window.open(`http://127.0.0.1:3088${b.pdf_url}`, '_blank')}>
+                                VIEW PDF
+                              </button>
+                            )}
+                            {b.audio_url && (
+                              <button className="footer-btn" onClick={() => window.open(`http://127.0.0.1:3088${b.audio_url}`, '_blank')}>
+                                PLAY AUDIO
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </Section>
             </div>
           )}
@@ -2005,6 +2584,21 @@ function useSettingsModalController({
                     </SettingRow>
                   </Section>
 
+                  <Section title="API USAGE & METRICS">
+                    <SettingRow name="MONTHLY REQUESTS" desc="Volume of backend model generation consumed">
+                      <span style={{ color: '#00d4ff', fontFamily: 'Courier New', fontSize: 12 }}>
+                        {licensingInfo.monthly_requests} / {licensingInfo.request_limit === 0 ? 'BYOK ONLY' : licensingInfo.request_limit}
+                      </span>
+                    </SettingRow>
+                    <div style={{ marginTop: 10, padding: 10, border: '1px solid rgba(0,212,255,0.2)', background: 'rgba(0,0,0,0.5)', fontSize: 11, color: '#aaa', fontFamily: 'Courier New' }}>
+                      {licensingInfo.request_limit === 0 ? (
+                        <span style={{ color: '#fbbf24' }}>WARNING: Initiate Tier. You must supply your own API keys in the AI Vault to use ZAIRE OS. No managed requests available.</span>
+                      ) : (
+                        `You have consumed ${((licensingInfo.monthly_requests / licensingInfo.request_limit) * 100).toFixed(1)}% of your monthly AI quota. To lower costs, provide your own keys in AI Vault.`
+                      )}
+                    </div>
+                  </Section>
+
                   <Section title="DEPLOYED HARDWARE CORES">
                     {licensingInfo.machines && licensingInfo.machines.length > 0 ? (
                       <div className="license-machine-list">
@@ -2078,20 +2672,94 @@ function useSettingsModalController({
             <button
               type="button"
               className="footer-btn footer-btn-apply"
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent('ZAIRE_PERSIST_CONFIG', {
-                  detail: {
-                    aiVault: {
-                      slots: aiSlots.slice(0, 3)
-                    },
-                    memorySettings: {
-                      memoryDepth,
-                      retentionPeriod,
-                      gazeMemoryEnabled,
-                      crossModeSharing,
-                      privateSession
-                    }
+              onClick={async () => {
+                const configPayload = {
+                  aiVault: {
+                    slots: aiSlots.slice(0, 3)
+                  },
+                  memorySettings: {
+                    memoryDepth,
+                    retentionPeriod,
+                    gazeMemoryEnabled,
+                    crossModeSharing,
+                    privateSession
+                  },
+                  personalization: {
+                    voiceActor,
+                    baseTone,
+                    characteristics,
+                    fastAnswers,
+                    zaireInstructions,
+                    userName,
+                    userOccupation,
+                    userAbout
                   }
+                };
+
+                try {
+                  const configResponse = await fetch(`${API_URL}/config`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      aiVault: configPayload.aiVault,
+                      memorySettings: configPayload.memorySettings,
+                      personalization: configPayload.personalization,
+                      desktopProfile: {
+                        licensing: {
+                          cachedLicenseKey: licenseKeyInput.trim() || localStorage.getItem('zaire_license_key') || ''
+                        }
+                      }
+                    })
+                  });
+                  await ensureOk(configResponse, 'Desktop config save');
+
+                  const token = await getToken();
+                  if (token) {
+                    const vaultPayload = {};
+                    aiSlots.forEach(slot => {
+                      if (!slot.apiKey) return;
+                      const p = slot.provider.toLowerCase();
+                      if (p.includes('groq')) vaultPayload.groq_key = slot.apiKey;
+                      else if (p.includes('openai') && !p.includes('azure')) vaultPayload.openai_key = slot.apiKey;
+                      else if (p.includes('gemini')) vaultPayload.gemini_key = slot.apiKey;
+                      else if (p.includes('openrouter')) vaultPayload.openrouter_key = slot.apiKey;
+                    });
+
+                    if (Object.keys(vaultPayload).length > 0) {
+                      const vaultResponse = await fetch(`${API_URL}/api/vault/save`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(vaultPayload)
+                      });
+                      await ensureOk(vaultResponse, 'Vault save');
+                    }
+
+                    const settingsResponse = await fetch(`${API_URL}/api/settings`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify({
+                        agent: configPayload.memorySettings,
+                        voice: configPayload.personalization
+                      })
+                    });
+                    await ensureOk(settingsResponse, 'Settings save');
+                  }
+                } catch (err) {
+                  if (!isNetworkFetchError(err)) {
+                    console.warn('Failed to save config remotely:', err.message || err);
+                  }
+                }
+
+                window.dispatchEvent(new CustomEvent('ZAIRE_PERSIST_CONFIG', {
+                  detail: configPayload
                 }));
                 onClose();
               }}

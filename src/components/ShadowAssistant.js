@@ -198,6 +198,8 @@ const ShadowAssistant = ({ socket }) => {
             <div className="p-4 bg-white/5">
               <div className="relative flex items-center">
                 <input
+                  id="shadow-assistant-input"
+                  name="shadow-assistant-input"
                   value={input}
                   onChange={(e) => dispatch({ type: 'set_input', value: e.target.value })}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}

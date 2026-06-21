@@ -1,0 +1,29 @@
+.memory-vault-container {
+  background: rgba(10, 5, 20, 0.85);
+}
+
+.hex-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(rgba(167, 139, 250, 0.1) 15%, transparent 16%),
+    radial-gradient(rgba(167, 139, 250, 0.1) 15%, transparent 16%);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+  opacity: 0.3;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.breathing {
+  animation: breathe 6s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0% { transform: scale(1); opacity: 0.2; }
+  50% { transform: scale(1.05); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 0.2; }
+}
