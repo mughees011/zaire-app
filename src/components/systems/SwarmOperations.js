@@ -66,8 +66,8 @@ function AgentCard({ agent, isSelected, onClick }) {
                   <Terminal size={8} /> stdout
                 </div>
                 <div className="flex flex-col gap-1 max-h-20 overflow-y-auto">
-                  {(agent.thoughts || []).slice(-4).map((t, i) => (
-                    <div key={i} className="text-[9px] font-mono flex gap-2">
+                  {(agent.thoughts || []).slice(-4).map((t) => (
+                    <div key={`${t.time}-${t.text}`} className="text-[9px] font-mono flex gap-2">
                       <span className="text-[#444]">[{t.time}]</span>
                       <span style={{ color: meta.color }}>{t.text}</span>
                     </div>

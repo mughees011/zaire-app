@@ -20,14 +20,14 @@ const SwarmModeV2 = () => {
   ];
 
   const agentLogs = [
-    { time: '09:21:05', agent: 'RESEARCH', msg: 'Found 12 competitors in the SaaS CRM space. Extracting hero copywriting...' },
-    { time: '09:21:45', agent: 'RESEARCH', msg: 'Extracted 144 design tokens. Compiled into JSON schema.' },
-    { time: '09:22:12', agent: 'PLANNER', msg: 'Generated component roadmap: [Hero, Features, Pricing, Footer].' },
-    { time: '09:23:00', agent: 'DEVELOPER', msg: 'Initiated React scaffold. Writing Hero component.' },
-    { time: '09:23:35', agent: 'DEVELOPER', msg: 'Injecting Framer Motion animations into Hero CTA.' },
-    { time: '09:24:10', agent: 'DEVELOPER', msg: 'Hero.jsx generated. Writing Pricing.jsx.' },
-    { time: '09:24:50', agent: 'DEVELOPER', msg: 'CSS Grid applied. Adjusting responsive breakpoints.' },
-    { time: '09:25:20', agent: 'DEVELOPER', msg: 'Compiling module. Awaiting file I/O operations.' }
+    { id: 'research-092105', time: '09:21:05', agent: 'RESEARCH', msg: 'Found 12 competitors in the SaaS CRM space. Extracting hero copywriting...' },
+    { id: 'research-092145', time: '09:21:45', agent: 'RESEARCH', msg: 'Extracted 144 design tokens. Compiled into JSON schema.' },
+    { id: 'planner-092212', time: '09:22:12', agent: 'PLANNER', msg: 'Generated component roadmap: [Hero, Features, Pricing, Footer].' },
+    { id: 'developer-092300', time: '09:23:00', agent: 'DEVELOPER', msg: 'Initiated React scaffold. Writing Hero component.' },
+    { id: 'developer-092335', time: '09:23:35', agent: 'DEVELOPER', msg: 'Injecting Framer Motion animations into Hero CTA.' },
+    { id: 'developer-092410', time: '09:24:10', agent: 'DEVELOPER', msg: 'Hero.jsx generated. Writing Pricing.jsx.' },
+    { id: 'developer-092450', time: '09:24:50', agent: 'DEVELOPER', msg: 'CSS Grid applied. Adjusting responsive breakpoints.' },
+    { id: 'developer-092520', time: '09:25:20', agent: 'DEVELOPER', msg: 'Compiling module. Awaiting file I/O operations.' }
   ];
 
   const agentIntel = {
@@ -177,8 +177,8 @@ const SwarmModeV2 = () => {
           <div className="s-timeline-section">
             <div className="s-panel-header"><Activity size={14} className="text-cyan-400" /> MISSION TIMELINE</div>
             <div className="s-timeline-list">
-              {agentLogs.map((l, i) => (
-                <div key={i} className="s-log-entry">
+            {agentLogs.map((l) => (
+                <div key={l.id} className="s-log-entry">
                   <span className="s-log-time">[{l.time}]</span>
                   <span className={`s-log-agent ${l.agent.toLowerCase()}`}>{l.agent} AGENT</span>
                   <span className="s-log-msg">{l.msg}</span>
@@ -209,8 +209,8 @@ const SwarmModeV2 = () => {
           <div className="s-outputs-section">
             <div className="s-panel-header"><Code2 size={14} className="text-yellow-400" /> DELIVERABLES & OUTPUTS</div>
             <div className="s-output-list">
-              {['Hero.jsx', 'Pricing.jsx', 'Features.jsx', 'Footer.jsx', 'tailwind.config.js'].map((file, i) => (
-                <div key={i} className="s-output-file"><FileSearch size={14} /> {file}</div>
+              {['Hero.jsx', 'Pricing.jsx', 'Features.jsx', 'Footer.jsx', 'tailwind.config.js'].map((file) => (
+                <div key={file} className="s-output-file"><FileSearch size={14} /> {file}</div>
               ))}
             </div>
           </div>
@@ -255,8 +255,8 @@ const SwarmModeV2 = () => {
           <div className="s-intel-section">
             <div className="s-intel-title">CRITICAL DECISIONS</div>
             <div className="s-intel-box list">
-              {activeIntel.decisions.map((dec, i) => (
-                <div key={i} className="s-intel-list-item"><span className="bullet"></span>{dec}</div>
+              {activeIntel.decisions.map((dec) => (
+                <div key={dec} className="s-intel-list-item"><span className="bullet"></span>{dec}</div>
               ))}
             </div>
           </div>
@@ -264,8 +264,8 @@ const SwarmModeV2 = () => {
           <div className="s-intel-section">
             <div className="s-intel-title">SOURCES & REFERENCES</div>
             <div className="s-intel-tags">
-              {activeIntel.sources.map((src, i) => (
-                <span key={i} className="s-intel-tag">{src}</span>
+              {activeIntel.sources.map((src) => (
+                <span key={src} className="s-intel-tag">{src}</span>
               ))}
             </div>
           </div>
@@ -273,8 +273,8 @@ const SwarmModeV2 = () => {
           <div className="s-intel-section">
             <div className="s-intel-title">GENERATED ASSETS</div>
             <div className="s-intel-tags">
-              {activeIntel.files.length > 0 ? activeIntel.files.map((file, i) => (
-                <span key={i} className="s-intel-tag text-emerald-400 border-emerald-400/30 bg-emerald-400/10"><Code2 size={10} className="inline mr-1"/>{file}</span>
+              {activeIntel.files.length > 0 ? activeIntel.files.map((file) => (
+                <span key={file} className="s-intel-tag text-emerald-400 border-emerald-400/30 bg-emerald-400/10"><Code2 size={10} className="inline mr-1"/>{file}</span>
               )) : <span className="text-xs text-gray-500">No output generated yet.</span>}
             </div>
           </div>

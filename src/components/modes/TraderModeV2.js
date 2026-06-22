@@ -23,9 +23,9 @@ const TraderModeV2 = () => {
   ];
 
   const signals = [
-    { time: '10:45', type: 'BUY', msg: 'Technical Analyst detected ascending triangle breakout.' },
-    { time: '10:42', type: 'ALERT', msg: 'Whale accumulated 1,500 BTC on Binance.' },
-    { time: '10:15', type: 'SELL', msg: 'Risk Engine warns of rising macro volatility.' }
+    { id: 'signal-buy-1045', time: '10:45', type: 'BUY', msg: 'Technical Analyst detected ascending triangle breakout.' },
+    { id: 'signal-alert-1042', time: '10:42', type: 'ALERT', msg: 'Whale accumulated 1,500 BTC on Binance.' },
+    { id: 'signal-sell-1015', time: '10:15', type: 'SELL', msg: 'Risk Engine warns of rising macro volatility.' }
   ];
 
   return (
@@ -183,8 +183,8 @@ const TraderModeV2 = () => {
         <div className="t-panel t-signals-panel">
           <div className="t-panel-header"><Network size={14} /> LIVE SWARM SIGNALS</div>
           <div className="t-signals-feed">
-            {signals.map((sig, i) => (
-              <div key={i} className={`sig-row ${sig.type.toLowerCase()}`}>
+            {signals.map((sig) => (
+              <div key={sig.id} className={`sig-row ${sig.type.toLowerCase()}`}>
                 <span className="sig-time">{sig.time}</span>
                 <span className={`sig-badge ${sig.type.toLowerCase()}`}>{sig.type}</span>
                 <span className="sig-msg">{sig.msg}</span>

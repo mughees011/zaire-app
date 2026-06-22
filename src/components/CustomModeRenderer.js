@@ -7,50 +7,50 @@ import 'react-resizable/css/styles.css';
 import { ZaireOSProvider } from '../engine/ZaireOSContext';
 import { ComponentErrorBoundary, ComponentSkeleton } from './systems/ComponentShell';
 
-// Premium component imports
-import CommandSurface    from './systems/CommandSurface';
-import MissionBoard      from './systems/MissionBoard';
-import SwarmOperations   from './systems/SwarmOperations';
+import CommandSurface from './systems/CommandSurface';
+import MissionBoard from './systems/MissionBoard';
+import SwarmOperations from './systems/SwarmOperations';
 import IntelligenceStream from './systems/IntelligenceStream';
-import NeuralGraph       from './systems/NeuralGraph';
-import MarketMatrix      from './systems/MarketMatrix';
-import WhaleScanner      from './systems/WhaleScanner';
-import MemoryVault       from './systems/MemoryVault';
-import CodeStudio        from './systems/CodeStudio';
-import TacticalTerminal  from './systems/TacticalTerminal';
+import NeuralGraph from './systems/NeuralGraph';
+import MarketMatrix from './systems/MarketMatrix';
+import WhaleScanner from './systems/WhaleScanner';
+import MemoryVault from './systems/MemoryVault';
+import CodeStudio from './systems/CodeStudio';
+import TacticalTerminal from './systems/TacticalTerminal';
 
 import './CustomModeRenderer.css';
 
-// ─── Registry ───────────────────────────────────────────────────────────────
 const REGISTRY = {
-  'Command Surface':     CommandSurface,
-  'Mission Board':       MissionBoard,
-  'Swarm Operations':    SwarmOperations,
+  'Command Surface': CommandSurface,
+  'Mission Board': MissionBoard,
+  'Swarm Operations': SwarmOperations,
   'Intelligence Stream': IntelligenceStream,
-  'Neural Graph':        NeuralGraph,
-  'Market Matrix':       MarketMatrix,
-  'Whale Scanner':       WhaleScanner,
-  'Memory Vault':        MemoryVault,
-  'Code Studio':         CodeStudio,
-  'Tactical Terminal':   TacticalTerminal,
-  'Neural Console':      TacticalTerminal,
+  'Neural Graph': NeuralGraph,
+  'Market Matrix': MarketMatrix,
+  'Whale Scanner': WhaleScanner,
+  'Memory Vault': MemoryVault,
+  'Code Studio': CodeStudio,
+  'Tactical Terminal': TacticalTerminal,
+  'Neural Console': TacticalTerminal
 };
 
-// ─── Default layout generator by zone ───────────────────────────────────────
 function buildDefaultLayout(components) {
   const layout = [];
   const counters = { left: 0, center: 0, right: 0, bottom: 0 };
 
   components.forEach((comp) => {
     const zone = (comp.zone || 'Main Workspace').toLowerCase();
-    let x = 3, w = 6;
+    let x = 3;
+    let w = 6;
 
     if (zone.includes('left')) {
-      x = 0; w = 3;
+      x = 0;
+      w = 3;
       layout.push({ i: comp.type, x, y: counters.left, w, h: 14, minW: 2, minH: 6 });
       counters.left += 14;
     } else if (zone.includes('right')) {
-      x = 9; w = 3;
+      x = 9;
+      w = 3;
       layout.push({ i: comp.type, x, y: counters.right, w, h: 14, minW: 2, minH: 6 });
       counters.right += 14;
     } else if (zone.includes('bottom')) {
@@ -65,12 +65,30 @@ function buildDefaultLayout(components) {
   return layout;
 }
 
-// ─── Placeholder for unregistered components ────────────────────────────────
+function resolveStoredLayout(mode, storageKey) {
+  if (!mode?.components?.length) return [];
+
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const allPresent = mode.components.every((component) => parsed.find((entry) => entry.i === component.type));
+      if (allPresent) {
+        return parsed;
+      }
+    }
+  } catch (error) {
+    // Ignore corrupted layout cache and fall back to defaults.
+  }
+
+  return buildDefaultLayout(mode.components);
+}
+
 function ComponentPlaceholder({ type }) {
   return (
     <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg gap-2">
       <div className="w-8 h-8 rounded-lg bg-[#111] border border-[#1f1f1f] flex items-center justify-center">
-        <span className="text-[14px]">⚙️</span>
+        <span className="text-[14px]">CFG</span>
       </div>
       <div className="text-[11px] font-medium text-[#888]">{type}</div>
       <div className="text-[9px] text-[#555] font-mono">Component not yet implemented</div>
@@ -78,28 +96,32 @@ function ComponentPlaceholder({ type }) {
   );
 }
 
-// ─── Single panel wrapper with loading state ─────────────────────────────────
 function PanelWrapper({ comp, modeColor }) {
   const [isReady, setIsReady] = useState(false);
   const Component = REGISTRY[comp.type];
 
   useEffect(() => {
-    // Brief loading skeleton before mounting heavy components
-    const t = setTimeout(() => setIsReady(true), 150 + Math.random() * 200);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setIsReady(true), 150 + Math.random() * 200);
+    return () => clearTimeout(timer);
   }, [comp.type]);
 
   return (
     <div className="zaire-panel-wrapper h-full w-full relative">
-      {/* Drag handle — appears on hover */}
-      <div className="panel-drag-handle absolute top-0 left-0 right-0 h-3 z-30 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.06), transparent)' }} />
+      <div
+        className="panel-drag-handle absolute top-0 left-0 right-0 h-3 z-30 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.06), transparent)' }}
+      />
 
       <ComponentErrorBoundary>
         <AnimatePresence mode="wait">
           {!isReady ? (
-            <motion.div key="skeleton" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="h-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg overflow-hidden">
+            <motion.div
+              key="skeleton"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg overflow-hidden"
+            >
               <div className="px-4 py-2.5 border-b border-[#1a1a1a] bg-[#000] flex items-center gap-2">
                 <div className="w-3 h-3 rounded skeleton-pulse" />
                 <div className="h-2.5 w-24 rounded skeleton-pulse" />
@@ -108,10 +130,7 @@ function PanelWrapper({ comp, modeColor }) {
             </motion.div>
           ) : (
             <motion.div key="component" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full">
-              {Component
-                ? <Component accent={modeColor || '#00d4ff'} />
-                : <ComponentPlaceholder type={comp.type} />
-              }
+              {Component ? <Component accent={modeColor || '#00d4ff'} /> : <ComponentPlaceholder type={comp.type} />}
             </motion.div>
           )}
         </AnimatePresence>
@@ -120,46 +139,32 @@ function PanelWrapper({ comp, modeColor }) {
   );
 }
 
-// ─── Main renderer ───────────────────────────────────────────────────────────
 export default function CustomModeRenderer({ mode }) {
-  const [layout, setLayout] = useState([]);
-  const [mounted, setMounted] = useState(false);
   const storageKey = `zaire_layout_${mode?.id}`;
+  const layoutKey = `${mode?.id || 'unknown'}::${(mode?.components || []).map((component) => component.type).join('|')}`;
+  const [resolvedLayoutKey, setResolvedLayoutKey] = useState(layoutKey);
+  const [layout, setLayout] = useState(() => resolveStoredLayout(mode, storageKey));
 
-  useEffect(() => {
-    if (!mode?.components?.length) return;
-
-    // Try to restore persisted layout
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Validate — make sure all current components have a layout entry
-        const allPresent = mode.components.every(c => parsed.find(l => l.i === c.type));
-        if (allPresent) {
-          setLayout(parsed);
-          setMounted(true);
-          return;
-        }
-      }
-    } catch (e) { /* ignore */ }
-
-    // Build fresh default layout
-    setLayout(buildDefaultLayout(mode.components));
-    setMounted(true);
-  }, [mode?.id, mode?.components, storageKey]);
+  if (resolvedLayoutKey !== layoutKey) {
+    setResolvedLayoutKey(layoutKey);
+    setLayout(resolveStoredLayout(mode, storageKey));
+  }
 
   const handleLayoutChange = useCallback((newLayout) => {
     setLayout(newLayout);
-    try { localStorage.setItem(storageKey, JSON.stringify(newLayout)); } catch (e) {}
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(newLayout));
+    } catch (error) {
+      // Ignore storage failures and keep the in-memory layout.
+    }
   }, [storageKey]);
 
-  if (!mounted || !mode) {
+  if (!mode) {
     return (
       <div className="h-full w-full bg-[#050505] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-[#00d4ff]/20 border-t-[#00d4ff] rounded-full animate-spin" />
-          <span className="text-[10px] font-mono text-[#555]">INITIALIZING {mode?.name?.toUpperCase() || 'MODE'}...</span>
+          <span className="text-[10px] font-mono text-[#555]">INITIALIZING MODE...</span>
         </div>
       </div>
     );
@@ -179,9 +184,10 @@ export default function CustomModeRenderer({ mode }) {
   return (
     <ZaireOSProvider>
       <div className="custom-mode-layout relative h-full" style={{ background: '#050505' }}>
-        {/* Ambient background glow */}
-        <div className="absolute inset-0 pointer-events-none z-0"
-          style={{ background: `radial-gradient(ellipse at 50% 0%, ${mode.color || '#00d4ff'}0d 0%, transparent 60%)` }} />
+        <div
+          className="absolute inset-0 pointer-events-none z-0"
+          style={{ background: `radial-gradient(ellipse at 50% 0%, ${(mode.color || '#00d4ff')}0d 0%, transparent 60%)` }}
+        />
 
         <div className="relative z-10 h-full overflow-auto">
           <ResponsiveGridLayout

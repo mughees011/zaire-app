@@ -17,6 +17,9 @@ import { ZaireComponentRegistry, getComponentBlueprintByType } from './engine/Co
 import * as EliteComponents from './engine/EliteComponents';
 import EliteHUDWrapper from './engine/EliteHUDWrapper';
 import { resolveApiBase } from './apiBase';
+import ClientLocalTime from './components/app/ClientLocalTime';
+import ArchiveConversation from './components/app/ArchiveConversation';
+import ArchiveActionIcon from './components/app/ArchiveActionIcon';
 
 /* eslint-disable react-hooks/exhaustive-deps */
 
@@ -143,27 +146,6 @@ const getPerformanceCadenceMs = (profile) => {
   if (profile === 'idle') return 220;
   return 0;
 };
-
-function ClientLocalTime({ value, mode = 'time', options }) {
-  const formatted = useMemo(() => {
-    if (!value) {
-      return '';
-    }
-
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return '';
-    }
-
-    if (mode === 'datetime') {
-      return date.toLocaleString(undefined, options);
-    }
-
-    return date.toLocaleTimeString([], options);
-  }, [mode, options, value]);
-
-  return <>{formatted || '--'}</>;
-}
 
 const INITIAL_BIOMETRIC_DATA = { detected: false, name: 'ABSENT', confidence: 0 };
 
@@ -313,49 +295,6 @@ const getNextSystemState = ({
   return 'IDLE';
 };
 
-function FileTreeNode({ node, depth = 0, onOpenFile }) {
-  const [isOpen, setIsOpen] = React.useState(depth === 0);
-  const isDir = node.type === 'directory';
-  const nodePath = node.path || node.name;
-
-  const handleNodeClick = () => {
-    if (isDir) {
-      setIsOpen((prev) => !prev);
-      return;
-    }
-    if (onOpenFile) onOpenFile(node);
-  };
-
-  return (
-    <div className="file-tree-node" style={{ marginLeft: `${depth * 10}px` }}>
-      <button
-        type="button"
-        className={`node-label ${isDir ? 'directory' : 'file'} clickable`}
-        onClick={handleNodeClick}
-      >
-        <span className="node-icon">{isDir ? (isOpen ? '📂' : '📁') : '📄'}</span>
-        <span className="node-name">{node.name}</span>
-        {node.size && <span className="node-size">({(node.size / 1024).toFixed(1)}kb)</span>}
-      </button>
-      {isDir && isOpen && node.children && (
-        <div className="node-children">
-          {node.children.map((child) => {
-            const childPath = child.path || `${nodePath}/${child.name}`;
-            return (
-              <FileTreeNode
-                key={childPath}
-                node={{ ...child, path: childPath }}
-                depth={depth + 1}
-                onOpenFile={onOpenFile}
-              />
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 const buildCustomModeActivationLine = (modeDef) => {
   if (!modeDef) return 'Custom workspace loaded. Specialist parameters synchronized.';
 
@@ -408,112 +347,6 @@ const getArchiveSessionTitle = (session) => {
 
   const collapsed = String(firstUserMessage.content || '').replace(/\s+/g, ' ').trim();
   return collapsed.length > 40 ? `${collapsed.slice(0, 40).trimEnd()}...` : collapsed;
-};
-
-const buildArchiveMessageItems = (session) => {
-  const messages = Array.isArray(session?.messages) ? session.messages : [];
-  const signatureCounts = new Map();
-
-  return messages.map((message) => {
-    const signature = [
-      message?.id || '',
-      message?.timestamp || message?.createdAt || '',
-      message?.role || 'assistant',
-      String(message?.content || '').trim()
-    ].join('::');
-    const duplicateCount = (signatureCounts.get(signature) || 0) + 1;
-    signatureCounts.set(signature, duplicateCount);
-
-    return {
-      message,
-      messageKey: `${signature}::${duplicateCount}`
-    };
-  });
-};
-
-const ArchiveConversation = ({ session }) => {
-  const archiveItems = buildArchiveMessageItems(session);
-
-  if (!archiveItems.length) {
-    return <div className="archives-empty-state">Select and load a session to preview full transcript.</div>;
-  }
-
-  return archiveItems.map(({ message, messageKey }, index) => {
-    const isUser = message.role === 'user';
-    return (
-      <div
-        key={messageKey}
-        className={`archive-message ${isUser ? 'user' : 'zaire'}`}
-      >
-        <div className="archive-message-head">
-          <span className="archive-message-role">{isUser ? 'USER' : 'ZAIRE'}</span>
-          <span className="archive-message-index">#{index + 1}</span>
-        </div>
-        <div className="archive-message-body">{message.content}</div>
-      </div>
-    );
-  });
-};
-
-const ArchiveActionIcon = ({ type }) => {
-  switch (type) {
-    case 'rename':
-      return (
-        <svg viewBox="0 0 16 16" className="archive-action-icon">
-          <path d="M3 11.5 11.9 2.6l1.5 1.5L4.5 13H3z" />
-          <path d="M10.9 3.6 12.4 2.1 13.9 3.6 12.4 5.1z" />
-        </svg>
-      );
-    case 'copy':
-      return (
-        <svg viewBox="0 0 16 16" className="archive-action-icon">
-          <rect x="5" y="3" width="7" height="9" rx="1" />
-          <path d="M3.5 5.5V13h7.5" />
-        </svg>
-      );
-    case 'share':
-      return (
-        <svg viewBox="0 0 16 16" className="archive-action-icon">
-          <path d="M6 10 11.5 4.5" />
-          <path d="M8.5 4.5h3v3" />
-          <path d="M4 6.5v5h5" />
-        </svg>
-      );
-    case 'like':
-      return (
-        <svg viewBox="0 0 16 16" className="archive-action-icon">
-          <path d="M6.5 6V3.8c0-.8.5-1.5 1.2-1.8l.8 2.2-.7 2.3H12l-.8 5H5V6z" />
-          <rect x="3" y="6" width="2" height="6" rx=".5" />
-        </svg>
-      );
-    case 'dislike':
-      return (
-        <svg viewBox="0 0 16 16" className="archive-action-icon">
-          <path d="M6.5 10V12.2c0 .8.5 1.5 1.2 1.8l.8-2.2-.7-2.3H12l-.8-5H5v5z" />
-          <rect x="3" y="4" width="2" height="6" rx=".5" />
-        </svg>
-      );
-    case 'open':
-      return (
-        <svg viewBox="0 0 16 16" className="archive-action-icon">
-          <path d="M3 12.5h10" />
-          <path d="M8 11V3.5" />
-          <path d="M5.5 6 8 3.5 10.5 6" />
-        </svg>
-      );
-    case 'delete':
-      return (
-        <svg viewBox="0 0 16 16" className="archive-action-icon">
-          <path d="M3.5 4.5h9" />
-          <path d="M6 4.5V3h4v1.5" />
-          <path d="M5 6.5v5.5" />
-          <path d="M8 6.5v5.5" />
-          <path d="M11 6.5v5.5" />
-        </svg>
-      );
-    default:
-      return null;
-  }
 };
 
 function normalizeHexColor(value) {
@@ -1022,7 +855,7 @@ function useAppController() {
     setNavItem('HOME');
   }, [focusModeEnabled, isSystemEngaged, navItem]);
 
-  const persistConfigPayload = React.useEffectEvent(async (payload) => {
+  const persistConfigPayload = React.useCallback(async (payload) => {
     try {
       await fetch(`${API_BASE_URL}/config`, {
         method: 'POST',
@@ -1048,9 +881,9 @@ function useAppController() {
         }
       } catch (_) { }
     }
-  });
+  }, [getToken, user?.id]);
 
-  const syncDesktopProfile = React.useEffectEvent(async (overrides = {}) => {
+  const syncDesktopProfile = React.useCallback(async (overrides = {}) => {
     if (!desktopProfileReadyRef.current) return;
 
     const payload = {
@@ -1081,9 +914,24 @@ function useAppController() {
     };
 
     await persistConfigPayload(payload);
-  });
+  }, [
+    archiveReactions,
+    autoLintEnabled,
+    blobColor,
+    blobSize,
+    componentNudges,
+    coreModeVisibility,
+    customModes,
+    focusModeEnabled,
+    halalFilterEnabled,
+    holographicTiltEnabled,
+    hudOpacity,
+    modeLayouts,
+    neuralGlowEnabled,
+    persistConfigPayload
+  ]);
 
-  const applyDesktopProfile = React.useEffectEvent((configData = {}) => {
+  const applyDesktopProfile = React.useCallback((configData = {}) => {
     const theme = configData?.theme || {};
     const desktopProfile = configData?.desktopProfile || {};
     const profileTheme = desktopProfile?.theme || {};
@@ -1132,7 +980,7 @@ function useAppController() {
     if (cachedLicenseKey) {
       localStorage.setItem('zaire_license_key', cachedLicenseKey);
     }
-  });
+  }, []);
 
   useEffect(() => {
     if (user?.id) {
@@ -1233,10 +1081,10 @@ function useAppController() {
 
 
 
-  const syncSpecialistVisualState = React.useEffectEvent(() => {
+  function syncSpecialistVisualState() {
     if (!specialistData) return;
     dispatchSpecialistVisualState({ type: 'SYNC_FROM_SPECIALIST_DATA', activeMode, specialistData });
-  });
+  }
 
   const lastUserPromptRef = useRef('');
 
@@ -1318,7 +1166,7 @@ function useAppController() {
     return () => clearInterval(interval);
   }, [activeMode]);
 
-  const handleSocketConnectError = React.useEffectEvent((err) => {
+  function handleSocketConnectError(err) {
     const message = err?.message || 'unknown socket error';
     if (/timeout/i.test(message)) {
       if (!socketTimeoutLoggedRef.current) {
@@ -1328,9 +1176,9 @@ function useAppController() {
       return;
     }
     console.error('[SOCKET] Connection error:', message);
-  });
+  }
 
-  const handleAudioChunk = React.useEffectEvent((data) => {
+  function handleAudioChunk(data) {
     console.log('[SOCKET] Received audio_chunk:', data.index);
     if (data.index === 0) {
       console.log('[TTS] Sequence Reset detected (index 0)');
@@ -1338,13 +1186,13 @@ function useAppController() {
     }
     audioQueueRef.current[data.index] = data;
     playNextAudioChunk();
-  });
+  }
 
-  const handleAiTextComplete = React.useEffectEvent(() => {
+  function handleAiTextComplete() {
     fetchChatSessions();
-  });
+  }
 
-  const handleTextChunks = React.useEffectEvent(async ({ chunks }) => {
+  async function handleTextChunks({ chunks }) {
     console.log('[SOCKET] Received text_chunks:', chunks.length);
     nextExpectedIndexRef.current = 0;
     await Promise.all(chunks.map(async (chunk) => {
@@ -1354,18 +1202,18 @@ function useAppController() {
         playNextAudioChunk();
       }
     }));
-  });
+  }
 
-  const handleDeepThinking = React.useEffectEvent((isThinking) => {
+  function handleDeepThinking(isThinking) {
     isDeepThinkingRef.current = isThinking;
-  });
+  }
 
-  const handleSpecialistTelemetry = React.useEffectEvent((data) => {
+  function handleSpecialistTelemetry(data) {
     console.log('[SOCKET] Specialist Telemetry:', data);
     setSpecialistData(data);
-  });
+  }
 
-  const handleSystemActionEvent = React.useEffectEvent((action) => {
+  function recordSystemAction(action) {
     lastSystemActionRef.current = action;
     const now = new Date();
     const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
@@ -1374,28 +1222,27 @@ function useAppController() {
     else if (action.type === 'keyboard') label = `[TYPE] "${action.text}"`;
     else if (action.type === 'hotkey') label = `[HOTKEY] ${action.keys.join('+').toUpperCase()}`;
     appendSystemActionLogEntry(systemActionLogRef, { time, label });
-  });
+  }
 
-  const handleDiagnosticAlert = React.useEffectEvent((active) => {
+  function handleDiagnosticAlert(active) {
     setIsDiagnosticActive(active);
-  });
-  void handleSystemActionEvent;
+  }
 
-  const handleIntruderSnapshots = React.useEffectEvent((data) => {
+  function handleIntruderSnapshots(data) {
     if (data.snapshots) intruderSnapshotsRef.current = data.snapshots;
-  });
+  }
 
-  const handleSystemMetrics = React.useEffectEvent((metrics) => {
+  function handleSystemMetrics(metrics) {
     setLiveMetrics(prev => ({ ...prev, ...metrics }));
-  });
+  }
 
-  const handleSpecialistDataPayload = React.useEffectEvent(({ data }) => {
+  function handleSpecialistDataPayload({ data }) {
     setSpecialistData(data);
-  });
+  }
 
-  const handleZaireActionFeed = React.useEffectEvent((actions) => {
+  function handleZaireActionFeed(actions) {
     setZaireActionFeed(actions);
-  });
+  }
 
   const socketHandlerRefs = useRef({});
 
@@ -1412,7 +1259,7 @@ function useAppController() {
   const darwinResetTimeoutRef = useRef(null);
   const customIdRef = useRef(1);
 
-  const syncForgeTelemetryState = React.useEffectEvent(() => {
+  function syncForgeTelemetryState() {
     if (specialistData?.forge_telemetry?.darwin_results) {
       setDarwinResults(specialistData.forge_telemetry.darwin_results);
       if (specialistData.status === 'OK') {
@@ -1430,7 +1277,7 @@ function useAppController() {
         setManifestedFiles(newFiles);
       }
     }
-  });
+  }
 
   useEffect(() => {
     syncForgeTelemetryState();
@@ -1805,7 +1652,7 @@ function useAppController() {
   }, [liveMetrics, timeStr]);
 
   // Function to fetch TTS audio via HTTP
-  const fetchTTSAudio = React.useEffectEvent(async (text) => {
+  async function fetchTTSAudio(text) {
     try {
       const response = await fetch(`${API_BASE_URL}/tts`, {
         method: 'POST',
@@ -1827,9 +1674,9 @@ function useAppController() {
       }
       return null;
     }
-  });
+  }
 
-  const playNextAudioChunk = React.useEffectEvent(async () => {
+  async function playNextAudioChunk() {
     if (isPlayingAudioRef.current) return;
 
     const nextIndex = nextExpectedIndexRef.current;
@@ -1911,7 +1758,7 @@ function useAppController() {
       nextExpectedIndexRef.current++;
       playNextAudioChunk();
     }
-  });
+  }
 
   useEffect(() => {
     fetchChatSessions();
@@ -2049,48 +1896,48 @@ function useAppController() {
     syncDesktopProfile
   ]);
 
-  const handleSocketConnect = React.useEffectEvent(() => {
+  function handleSocketConnect() {
     socketTimeoutLoggedRef.current = false;
     console.log('[SOCKET] Connected to backend');
     socketRef.current.emit('REQUEST_SYNC');
-  });
+  }
 
-  const handleModeSyncEvent = React.useEffectEvent((data) => {
+  function handleModeSyncEvent(data) {
     console.log('[SOCKET] System Sync:', data.mode);
     if (data.mode) handleModeSync(data.mode);
-  });
+  }
 
-  const handleSessionStarted = React.useEffectEvent((data) => {
+  function handleSessionStarted(data) {
     setCurrentSessionId(data.sessionId);
     fetchChatSessions();
-  });
+  }
 
-  const handleSessionRenamed = React.useEffectEvent(({ sessionId }) => {
+  function handleSessionRenamed({ sessionId }) {
     fetchChatSessions();
     if (currentSessionId === sessionId) {
       // Optional: update anything else related to current session
     }
-  });
+  }
 
-  const handleSessionLoaded = React.useEffectEvent((session) => {
+  function handleSessionLoaded(session) {
     setCurrentSessionId(session.id);
     const historyText = session.messages
       .map(m => `${m.role === 'user' ? 'USER' : 'ZAIRE'}: ${m.content}`)
       .join('\n\n');
     setZaireResponseStream(historyText);
     setShowResponsePanel(true);
-  });
+  }
 
-  const handleSocketAiError = React.useEffectEvent((err) => {
+  function handleSocketAiError(err) {
     const msg = typeof err === 'string' ? err : (err.message || "Unknown neural link error");
     console.error('[SOCKET] AI Error:', msg);
     appendSystemActionLogEntry(systemActionLogRef, {
       time: new Date().toLocaleTimeString(),
       message: `ERR: ${msg}`
     });
-  });
+  }
 
-  const handleTextDelta = React.useEffectEvent((delta) => {
+  function handleTextDelta(delta) {
     setZaireResponseStream(prev => {
       if (pendingActivationLineRef.current && delta === pendingActivationLineRef.current) {
         const currentActivationLine = pendingActivationLineRef.current;
@@ -2142,29 +1989,30 @@ function useAppController() {
       setShowResponsePanel(false);
       setZaireResponseStream('');
     }, 12000);
-  });
+  }
 
-  const handleZaireStatus = React.useEffectEvent((status) => {
+  function handleZaireStatus(status) {
     setZaireStatus(status);
     setIsVisionScanning(status === 'scanning');
-  });
+  }
 
-  const handleMemoryStored = React.useEffectEvent(({ text }) => {
+  function handleMemoryStored({ text }) {
     const ts = new Date().toISOString();
     setStoredMemories(prev => [{ id: Date.now(), timestamp: ts, text }, ...prev].slice(0, 5));
     setMemoryFlash(true);
     setTimeout(() => setMemoryFlash(false), 2000);
-  });
+  }
 
-  const handleNeuralLog = React.useEffectEvent((data) => {
+  function handleNeuralLog(data) {
     if (data && data.content) {
       const now = new Date();
       const time = [now.getHours(), now.getMinutes()].map(n => String(n).padStart(2, '0')).join(':');
       setZaireActionFeed(prev => [{ time, message: data.content }, ...prev].slice(0, 5));
     }
-  });
+  }
 
-  const handleSystemAction = React.useEffectEvent((action) => {
+  function handleSystemAction(action) {
+    recordSystemAction(action);
     lastSystemActionRef.current = action;
     const now = new Date();
     const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
@@ -2173,10 +2021,9 @@ function useAppController() {
     else if (action.type === 'keyboard') label = `[TYPE] "${action.text}"`;
     else if (action.type === 'hotkey') label = `[HOTKEY] ${action.keys.join('+').toUpperCase()}`;
     appendSystemActionLogEntry(systemActionLogRef, { time, label });
-  });
-  void handleSystemAction;
+  }
 
-  const handleNeuralInterrupt = React.useEffectEvent((data) => {
+  function handleNeuralInterrupt(data) {
     const { text, type } = data;
     console.log(`[PROACTIVE] ${type}: ${text}`);
     setZaireResponseStream(text);
@@ -2188,9 +2035,9 @@ function useAppController() {
       setZaireResponseStream('');
       setIsNeuralInterruptActive(false);
     }, 10000);
-  });
+  }
 
-  const handleIntruderDetected = React.useEffectEvent((data) => {
+  function handleIntruderDetected(data) {
     console.log('[SECURITY] 🚨 INTRUDER DETECTED!!', data);
     dispatchSecurityState({ type: 'INTRUDER_DETECTED', intruder: data });
     setZaireResponseStream('🚨 SECURITY ALERT: UNKNOWN USER DETECTED AT YOUR SYSTEM! SNAPSHOT CAPTURED.');
@@ -2198,7 +2045,7 @@ function useAppController() {
     setTimeout(() => {
       dispatchSecurityState({ type: 'HIDE_SECURITY_OVERLAY' });
     }, 10000);
-  });
+  }
 
   socketHandlerRefs.current = {
     handleSocketConnect,
@@ -2218,6 +2065,7 @@ function useAppController() {
     handleNeuralLog,
     handleSpecialistTelemetry,
     handleDiagnosticAlert,
+    handleSystemAction,
     handleNeuralInterrupt,
     handleIntruderDetected,
     handleIntruderSnapshots,
@@ -2317,7 +2165,7 @@ function useAppController() {
     return () => { };
   }, []);
 
-  const pollBiometrics = React.useEffectEvent(async () => {
+  async function pollBiometrics() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/security/status`);
       const data = await res.json();
@@ -2327,7 +2175,7 @@ function useAppController() {
     } catch (e) {
       // Security daemon offline?
     }
-  });
+  }
 
   const toggleSecuritySystem = useCallback(async (disabled) => {
     try {
@@ -4974,12 +4822,16 @@ function useAppController() {
                       <div className="log-line">
                         <span style={{color: '#c586c0'}}>System:</span> Connected to local neural daemon.
                       </div>
-                      {specialistData?.forge_build_log?.map((log, i) => (
-                        <div key={i} className="log-line" style={{marginTop: '5px'}}>
+                      {mapWithStableKeys(
+                        specialistData?.forge_build_log || [],
+                        (log) => `${log.status}-${log.activity}`,
+                        (log, stableKey) => (
+                        <div key={stableKey} className="log-line" style={{marginTop: '5px'}}>
                           <span style={{color: log.status === 'OK' ? '#4caf50' : '#f48771'}}>{log.status === 'OK' ? '✓' : '⚠'}</span>
                           <span style={{marginLeft: '8px'}}>{log.activity}</span>
                         </div>
-                      ))}
+                        )
+                      )}
                     </div>
                     <div className="claude-input-row">
                       <span className="claude-prompt">claude&gt;</span>
@@ -5109,11 +4961,15 @@ function useAppController() {
                         <div style={{fontSize: '10px', color: '#888', marginBottom: '8px'}}>TASK: {visionTaskStatus.task}</div>
                         <div style={{fontSize: '11px', color: '#fff', marginBottom: '8px'}}>STATUS: {visionTaskStatus.status}</div>
                         <div style={{maxHeight: '100px', overflowY: 'auto', borderTop: '1px solid #333', paddingTop: '4px'}}>
-                          {visionTaskStatus.steps && visionTaskStatus.steps.map((s, idx) => (
-                            <div key={idx} style={{fontSize: '10px', marginBottom: '4px'}}>
+                          {mapWithStableKeys(
+                            visionTaskStatus.steps || [],
+                            (s) => `${s.step}-${s.action}-${s.result}-${s.reasoning}`,
+                            (s, stableKey) => (
+                            <div key={stableKey} style={{fontSize: '10px', marginBottom: '4px'}}>
                               <span style={{color: '#0f0'}}>[{s.step}]</span> {s.action}: {s.reasoning} <span style={{color: '#aaa'}}>-&gt; {s.result}</span>
                             </div>
-                          ))}
+                            )
+                          )}
                         </div>
                         <button className="c-btn" style={{marginTop: '8px'}} onClick={stopVisionTask}>ABORT TASK</button>
                       </div>

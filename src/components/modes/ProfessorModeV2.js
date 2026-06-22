@@ -14,9 +14,9 @@ const ProfessorModeV2 = () => {
   ];
 
   const questions = [
-    { time: '10:15 AM', user: 'How does decoherence break the wave function?', avatar: 'A' },
-    { time: '10:22 AM', user: "Can you show me the math behind Shor's algorithm?", avatar: 'M' },
-    { time: '10:25 AM', user: "What's the difference between T1 and T2 relaxation?", avatar: 'S' }
+    { id: 'question-a-1015', time: '10:15 AM', user: 'How does decoherence break the wave function?', avatar: 'A' },
+    { id: 'question-m-1022', time: '10:22 AM', user: "Can you show me the math behind Shor's algorithm?", avatar: 'M' },
+    { id: 'question-s-1025', time: '10:25 AM', user: "What's the difference between T1 and T2 relaxation?", avatar: 'S' }
   ];
 
   return (
@@ -122,8 +122,8 @@ const ProfessorModeV2 = () => {
         <div className="professor-v2-bottom">
           <div className="p-bottom-header"><MessageSquare size={14} /> LIVE STUDENT QUESTIONS</div>
           <div className="p-questions-feed">
-            {questions.map((q, i) => (
-              <div key={i} className="p-question-item">
+            {questions.map((q) => (
+              <div key={q.id} className="p-question-item">
                 <div className="q-avatar">{q.avatar}</div>
                 <div className="q-content">
                   <div className="q-meta">

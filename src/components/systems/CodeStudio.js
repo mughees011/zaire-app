@@ -11,17 +11,23 @@ const FILES = [
 ];
 
 const CODE = [
-  { indent: 0, tokens: [{ t: 'import', c: '#c678dd' }, { t: ' numpy ', c: '#abb2bf' }, { t: 'as', c: '#c678dd' }, { t: ' np', c: '#abb2bf' }] },
-  { indent: 0, tokens: [{ t: 'from', c: '#c678dd' }, { t: ' typing ', c: '#abb2bf' }, { t: 'import', c: '#c678dd' }, { t: ' List, Dict', c: '#e5c07b' }] },
-  { indent: 0, tokens: [] },
-  { indent: 0, tokens: [{ t: 'class ', c: '#c678dd' }, { t: 'VectorDatabase', c: '#e5c07b' }, { t: ':', c: '#abb2bf' }] },
-  { indent: 1, tokens: [{ t: 'def ', c: '#c678dd' }, { t: '__init__', c: '#61afef' }, { t: '(self, dims: ', c: '#abb2bf' }, { t: 'int', c: '#e5c07b' }, { t: ' = ', c: '#abb2bf' }, { t: '1536', c: '#d19a66' }, { t: '):', c: '#abb2bf' }] },
-  { indent: 2, tokens: [{ t: 'self', c: '#e06c75' }, { t: '.dims = dims', c: '#abb2bf' }] },
-  { indent: 2, tokens: [{ t: 'self', c: '#e06c75' }, { t: '.index = []', c: '#abb2bf' }] },
-  { indent: 0, tokens: [] },
-  { indent: 1, tokens: [{ t: 'def ', c: '#c678dd' }, { t: 'search', c: '#61afef' }, { t: '(self, query, k=', c: '#abb2bf' }, { t: '5', c: '#d19a66' }, { t: '):', c: '#abb2bf' }] },
-  { indent: 2, tokens: [{ t: '# Cosine similarity search', c: '#5c6370' }] },
-  { indent: 2, tokens: [{ t: 'return', c: '#c678dd' }, { t: ' self._compute(query, k)', c: '#abb2bf' }] },
+  { id: 'code-import-numpy', indent: 0, tokens: [{ t: 'import', c: '#c678dd' }, { t: ' numpy ', c: '#abb2bf' }, { t: 'as', c: '#c678dd' }, { t: ' np', c: '#abb2bf' }] },
+  { id: 'code-import-typing', indent: 0, tokens: [{ t: 'from', c: '#c678dd' }, { t: ' typing ', c: '#abb2bf' }, { t: 'import', c: '#c678dd' }, { t: ' List, Dict', c: '#e5c07b' }] },
+  { id: 'code-gap-1', indent: 0, tokens: [] },
+  { id: 'code-class', indent: 0, tokens: [{ t: 'class ', c: '#c678dd' }, { t: 'VectorDatabase', c: '#e5c07b' }, { t: ':', c: '#abb2bf' }] },
+  { id: 'code-init', indent: 1, tokens: [{ t: 'def ', c: '#c678dd' }, { t: '__init__', c: '#61afef' }, { t: '(self, dims: ', c: '#abb2bf' }, { t: 'int', c: '#e5c07b' }, { t: ' = ', c: '#abb2bf' }, { t: '1536', c: '#d19a66' }, { t: '):', c: '#abb2bf' }] },
+  { id: 'code-init-dims', indent: 2, tokens: [{ t: 'self', c: '#e06c75' }, { t: '.dims = dims', c: '#abb2bf' }] },
+  { id: 'code-init-index', indent: 2, tokens: [{ t: 'self', c: '#e06c75' }, { t: '.index = []', c: '#abb2bf' }] },
+  { id: 'code-gap-2', indent: 0, tokens: [] },
+  { id: 'code-search', indent: 1, tokens: [{ t: 'def ', c: '#c678dd' }, { t: 'search', c: '#61afef' }, { t: '(self, query, k=', c: '#abb2bf' }, { t: '5', c: '#d19a66' }, { t: '):', c: '#abb2bf' }] },
+  { id: 'code-search-comment', indent: 2, tokens: [{ t: '# Cosine similarity search', c: '#5c6370' }] },
+  { id: 'code-search-return', indent: 2, tokens: [{ t: 'return', c: '#c678dd' }, { t: ' self._compute(query, k)', c: '#abb2bf' }] },
+];
+
+const TEST_CASES = [
+  { id: 'test-init-dimensions', name: 'test_init_dimensions', pass: true },
+  { id: 'test-search-similarity', name: 'test_search_similarity', pass: true },
+  { id: 'test-empty-query', name: 'test_empty_query', pass: false }
 ];
 
 const TABS = ['Editor', 'Architecture', 'Terminal', 'Tests'];
@@ -106,9 +112,9 @@ export default function CodeStudio({ accent = '#3b82f6' }) {
               {/* Code editor */}
               <div className="flex-1 overflow-y-auto p-3 bg-[#000] font-mono text-[11px] leading-relaxed min-h-0"
                 style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                {CODE.map((line, i) => (
-                  <div key={i} className="flex hover:bg-[#0a0a0a] rounded px-1">
-                    <span className="text-[#333] w-6 shrink-0 select-none text-right mr-3">{i + 1}</span>
+                {CODE.map((line, index) => (
+                  <div key={line.id} className="flex hover:bg-[#0a0a0a] rounded px-1">
+                    <span className="text-[#333] w-6 shrink-0 select-none text-right mr-3">{index + 1}</span>
                     <span style={{ paddingLeft: `${line.indent * 16}px` }}>
                       {line.tokens.map((tok, j) => (
                         <span key={j} style={{ color: tok.c }}>{tok.t}</span>
@@ -137,8 +143,8 @@ export default function CodeStudio({ accent = '#3b82f6' }) {
 
           {activeTab === 'Tests' && (
             <div className="flex-1 p-3 flex flex-col gap-2 overflow-y-auto bg-[#000]">
-              {[{ name: 'test_init_dimensions', pass: true }, { name: 'test_search_similarity', pass: true }, { name: 'test_empty_query', pass: false }].map(t => (
-                <div key={t.name} className="flex items-center gap-3 px-3 py-2 rounded border border-[#1a1a1a] bg-[#0a0a0a]">
+              {TEST_CASES.map(t => (
+                <div key={t.id} className="flex items-center gap-3 px-3 py-2 rounded border border-[#1a1a1a] bg-[#0a0a0a]">
                   <CheckCircle2 size={12} style={{ color: t.pass ? '#10b981' : '#ef4444' }} />
                   <span className="text-[11px] font-mono" style={{ color: t.pass ? '#a0a0a0' : '#ef4444' }}>{t.name}</span>
                   <span className="ml-auto text-[9px] font-mono" style={{ color: t.pass ? '#10b981' : '#ef4444' }}>{t.pass ? 'PASS' : 'FAIL'}</span>

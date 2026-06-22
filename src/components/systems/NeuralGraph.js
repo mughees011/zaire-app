@@ -48,7 +48,7 @@ function ZaireNode({ data }) {
 
 export default function NeuralGraph({ accent = '#00d4ff' }) {
   const [nodes, setNodes] = useState(INITIAL_NODES);
-  const [edges, setEdges] = useState(BASE_EDGES);
+  const [graphEdges, setGraphEdges] = useState(BASE_EDGES);
   const [activeView, setActiveView] = useState('Agents');
   const [search, setSearch] = useState('');
   const { agents, neuralEvents } = useZaireOS();
@@ -64,18 +64,31 @@ export default function NeuralGraph({ accent = '#00d4ff' }) {
     }));
   }, [agents]);
 
-  // Animate edges on neural events
-  useEffect(() => {
-    if (!neuralEvents.length) { setEdges(BASE_EDGES); return; }
-    setEdges(BASE_EDGES.map(e => {
-      const match = neuralEvents.find(ev => (ev.source === e.source && ev.target === e.target) || (ev.source === e.target && ev.target === e.source));
-      return match ? { ...e, animated: true, style: { stroke: accent, strokeWidth: 2 } } : e;
-    }));
-  }, [neuralEvents, accent]);
+  const edges = useMemo(() => {
+    if (!neuralEvents.length) return graphEdges;
+    return graphEdges.map((edge) => {
+      const match = neuralEvents.find((ev) =>
+        (ev.source === edge.source && ev.target === edge.target) ||
+        (ev.source === edge.target && ev.target === edge.source)
+      );
+      if (!match) {
+        return {
+          ...edge,
+          animated: false,
+          style: edge.style || { stroke: '#222', strokeWidth: 1.5 }
+        };
+      }
+      return {
+        ...edge,
+        animated: true,
+        style: { stroke: accent, strokeWidth: 2 }
+      };
+    });
+  }, [graphEdges, neuralEvents, accent]);
 
   const onNodesChange = useCallback(c => setNodes(n => applyNodeChanges(c, n)), []);
-  const onEdgesChange = useCallback(c => setEdges(e => applyEdgeChanges(c, e)), []);
-  const onConnect = useCallback(p => setEdges(e => addEdge({ ...p, style: { stroke: '#333' } }, e)), []);
+  const onEdgesChange = useCallback(c => setGraphEdges(e => applyEdgeChanges(c, e)), []);
+  const onConnect = useCallback(p => setGraphEdges(e => addEdge({ ...p, style: { stroke: '#333' } }, e)), []);
 
   const filteredNodes = search
     ? nodes.map(n => ({ ...n, hidden: !n.data.label.toLowerCase().includes(search.toLowerCase()) }))

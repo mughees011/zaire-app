@@ -2,6 +2,13 @@ import React, { useCallback, useEffect, useReducer } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import './SettingsModal.css';
 import { resolveApiBase } from './apiBase';
+import MiniPreview from './components/settings/MiniPreview';
+import Toggle from './components/settings/Toggle';
+import Slider from './components/settings/Slider';
+import Section from './components/settings/Section';
+import SettingRow from './components/settings/SettingRow';
+import Segment from './components/settings/Segment';
+import ApiSlot from './components/settings/ApiSlot';
 
 /* eslint-disable react-hooks/exhaustive-deps */
 
@@ -276,179 +283,6 @@ const normalizeMemoryDashboard = (stats, memories) => ({
       }))
     : []
 });
-
-function MiniPreview({ type, color = '#00d4ff' }) {
-  const isFinance = type.includes('Market') || type.includes('Scanner') || type.includes('Chart') || type.includes('Grid') || type.includes('Finance');
-  const isTerminal = type.includes('Terminal') || type.includes('Console') || type.includes('Shell') || type.includes('Logs');
-  const isMemory = type.includes('Memory') || type.includes('Graph') || type.includes('Vault');
-  const isCode = type.includes('File') || type.includes('Code') || type.includes('Builder') || type.includes('Preview') || type.includes('Canvas');
-  const isTask = type.includes('Task') || type.includes('Planner') || type.includes('Roadmap') || type.includes('Board') || type.includes('Timeline') || type.includes('Queue');
-  const baseContainer = {
-    background: '#0a0a0a',
-    border: '1px solid #1f1f1f',
-    borderRadius: '4px',
-    height: '100%',
-    width: '100%',
-    overflow: 'hidden',
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    fontFamily: "'JetBrains Mono', monospace"
-  };
-
-  const headerStyle = {
-    padding: '4px 6px',
-    background: '#000000',
-    borderBottom: '1px solid #1f1f1f',
-    fontSize: '7px',
-    color: '#888',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: '1px'
-  };
-
-  if (isFinance) {
-    return (
-      <div style={baseContainer}>
-        <div style={headerStyle}>
-          <span style={{ color: color }}>QUANTUM_FIN</span>
-          <span className="animate-pulse" style={{ background: color, width: '4px', height: '4px', borderRadius: '50%' }}></span>
-        </div>
-        <div style={{ flex: 1, padding: '6px', position: 'relative' }}>
-          {/* Sonar / Radar effect */}
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '30px', height: '30px', border: `1px solid ${color}40`, borderRadius: '50%' }}></div>
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '15px', height: '15px', border: `1px solid ${color}80`, borderRadius: '50%' }}></div>
-          <div style={{ position: 'absolute', top: '20%', left: '30%', width: '2px', height: '2px', background: '#ef4444', borderRadius: '50%', boxShadow: '0 0 4px #ef4444' }}></div>
-          <div style={{ position: 'absolute', bottom: '30%', right: '20%', width: '2px', height: '2px', background: '#10b981', borderRadius: '50%', boxShadow: '0 0 4px #10b981' }}></div>
-        </div>
-        {/* Sparkline block */}
-        <div style={{ height: '15px', display: 'flex', alignItems: 'flex-end', gap: '1px', padding: '2px 4px', borderTop: '1px solid #1f1f1f', background: '#000000' }}>
-          {[...Array(8)].map((_, i) => (
-            <div key={i} style={{ flex: 1, background: i === 7 ? color : '#333', height: `${Math.max(10, Math.random() * 100)}%` }}></div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (isMemory) {
-    return (
-      <div style={baseContainer}>
-        <div style={headerStyle}>
-          <span>VECTOR_DB</span>
-          <span style={{ color: color }}>1536_DIM</span>
-        </div>
-        <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
-          {/* Isometric grid mockup */}
-          <div style={{ transform: 'rotateX(60deg) rotateZ(45deg)', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', width: '40px', height: '40px' }}>
-            {[...Array(16)].map((_, i) => (
-              <div key={i} style={{ background: Math.random() > 0.7 ? `${color}40` : `${color}10`, border: `1px solid ${color}30` }}></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isTerminal) {
-    return (
-      <div style={baseContainer}>
-        <div style={headerStyle}>
-          <span>root@zaire</span>
-          <span>TTY1</span>
-        </div>
-        <div style={{ flex: 1, padding: '4px', background: '#000', fontSize: '6px', color: '#555', lineHeight: '1.4' }}>
-          <div style={{ color: color }}>$ init_sequence()</div>
-          <div>[OK] Kernel loaded</div>
-          <div>[OK] Neuro-link active</div>
-          <div style={{ color: color, marginTop: '2px' }}>$ <span className="animate-pulse">_</span></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isCode) {
-    return (
-      <div style={baseContainer}>
-        <div style={headerStyle}>
-          <span>AST_WORKSPACE</span>
-          <span style={{ color: '#f59e0b' }}>MODIFIED</span>
-        </div>
-        <div style={{ flex: 1, display: 'flex' }}>
-          {/* File tree */}
-          <div style={{ width: '20px', borderRight: '1px solid #1f1f1f', padding: '4px 2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <div style={{ width: '100%', height: '2px', background: '#444' }}></div>
-            <div style={{ width: '70%', height: '2px', background: color }}></div>
-            <div style={{ width: '80%', height: '2px', background: '#444' }}></div>
-          </div>
-          {/* Code block */}
-          <div style={{ flex: 1, padding: '4px', display: 'flex', flexDirection: 'column', gap: '2px', background: '#000' }}>
-            <div style={{ width: '40%', height: '3px', background: '#c678dd' }}></div>
-            <div style={{ width: '60%', height: '3px', background: '#61afef' }}></div>
-            <div style={{ width: '80%', height: '3px', background: '#98c379', marginLeft: '4px' }}></div>
-            <div style={{ width: '50%', height: '3px', background: '#e5c07b', marginLeft: '4px' }}></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isTask) {
-    return (
-      <div style={baseContainer}>
-        <div style={headerStyle}>
-          <span>TELEMETRY</span>
-          <span style={{ color: '#10b981' }}>NOMINAL</span>
-        </div>
-        <div style={{ flex: 1, padding: '4px', display: 'flex', flexDirection: 'column', gap: '3px', background: '#000' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{ width: '4px', height: '4px', borderRadius: '50%', border: '1px solid #10b981' }}></div>
-            <div style={{ flex: 1, height: '1px', background: '#1f1f1f', position: 'relative' }}>
-               <div style={{ position: 'absolute', left: 0, top: 0, height: '1px', width: '100%', background: '#10b981' }}></div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{ width: '4px', height: '4px', borderRadius: '50%', border: '1px solid #444' }}></div>
-            <div style={{ flex: 1, height: '1px', background: '#1f1f1f', position: 'relative' }}>
-               <div className="animate-[scanning-laser_1.5s_infinite]" style={{ position: 'absolute', left: 0, top: 0, height: '1px', width: '40%', background: color }}></div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{ width: '4px', height: '4px', borderRadius: '50%', border: '1px solid #444' }}></div>
-            <div style={{ flex: 1, height: '1px', background: '#1f1f1f' }}></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Default to Composer Block (isChat / others)
-  return (
-    <div style={baseContainer}>
-      <div style={headerStyle}>
-        <span>COMPOSER</span>
-        <span style={{ color: color }}>IDLE</span>
-      </div>
-      <div style={{ flex: 1, padding: '4px', background: '#000', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        {/* User Block */}
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <div style={{ width: '4px', height: '4px', background: '#555', marginTop: '1px' }}></div>
-          <div style={{ width: '100%', height: '2px', background: '#444', marginTop: '2px' }}></div>
-        </div>
-        {/* AI Block */}
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <div style={{ width: '4px', height: '4px', background: color, borderRadius: '50%', marginTop: '1px' }}></div>
-          <div style={{ flex: 1, border: '1px solid #1f1f1f', borderRadius: '2px', padding: '2px', background: '#0a0a0a' }}>
-            <div style={{ width: '80%', height: '2px', background: '#666', marginBottom: '2px' }}></div>
-            <div style={{ width: '60%', height: '2px', background: '#666' }}></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const AI_SYSTEMS_LIBRARY = [
   {
@@ -766,149 +600,6 @@ const navGroups = [
     ],
   },
 ];
-
-function Toggle({ checked, onChange }) {
-  return (
-    <button
-      type="button"
-      className={`toggle ${checked ? 'on' : ''}`}
-      onClick={() => onChange(!checked)}
-      aria-pressed={checked}
-    >
-      <span className="toggle-thumb" />
-    </button>
-  );
-}
-
-function Slider({ min, max, step, value, onChange, suffix = '%', format, id, name }) {
-  const display = format ? format(value) : `${value}${suffix}`;
-
-  return (
-    <div className="slider-wrap">
-      <input
-        id={id}
-        name={name || id}
-        type="range"
-        className="slider"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-      <span className="slider-val">{display}</span>
-    </div>
-  );
-}
-
-function Section({ title, children }) {
-  return (
-    <div className="setting-section">
-      <div className="section-title">{title}</div>
-      {children}
-    </div>
-  );
-}
-
-function SettingRow({ name, desc, children, muted = false }) {
-  return (
-    <div className="setting-row" style={muted ? { opacity: 0.42 } : undefined}>
-      <div className="setting-info">
-        <div className="setting-name">{name}</div>
-        <div className="setting-desc">{desc}</div>
-      </div>
-      <div className="setting-control">{children}</div>
-    </div>
-  );
-}
-
-function Segment({ value, options, onChange }) {
-  return (
-    <div className="segment">
-      {options.map((option) => (
-        <button
-          type="button"
-          key={option}
-          className={`seg-btn ${value === option ? 'active' : ''}`}
-          onClick={() => onChange(option)}
-        >
-          {option}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empty = false, onChange, mask }) {
-  const baseId = `api-slot-${slot}`;
-  return (
-    <div className="api-slot">
-      <div className="api-slot-header">
-        <span className="api-provider">SLOT {slot}</span>
-        <span className={`api-status ${empty ? 'empty' : status === 'PENDING' ? 'pending' : 'connected'}`}>
-          {status}
-        </span>
-      </div>
-      <select
-        id={`${baseId}-provider`}
-        name={`${baseId}-provider`}
-        className="api-provider-select"
-        value={provider}
-        onChange={(e) => onChange({ provider: e.target.value })}
-        style={{ width: '100%', marginBottom: 6 }}
-      >
-        <option>OpenAI</option>
-        <option>OpenRouter</option>
-        <option>Groq</option>
-        <option>Anthropic</option>
-        <option>Google Gemini</option>
-        <option>DeepSeek</option>
-        <option>Azure OpenAI</option>
-        <option>Cohere</option>
-        <option>Mistral</option>
-        <option>SiliconFlow</option>
-        <option>Empty</option>
-      </select>
-      <input
-        id={`${baseId}-key`}
-        name={`${baseId}-key`}
-        className="api-key-input"
-        type="password"
-        value={apiKey || ''}
-        onChange={(e) => onChange({ apiKey: e.target.value, hasKey: Boolean(e.target.value), mask: '' })}
-        placeholder={mask ? `Stored securely: ${mask}` : (empty ? 'Paste provider key...' : 'Paste provider key...')}
-      />
-      <input
-        id={`${baseId}-base-url`}
-        name={`${baseId}-base-url`}
-        className="api-key-input"
-        type="text"
-        value={baseUrl || ''}
-        onChange={(e) => onChange({ baseUrl: e.target.value })}
-        placeholder="Optional custom base URL (OpenAI-compatible)"
-      />
-      <input
-        id={`${baseId}-model`}
-        name={`${baseId}-model`}
-        className="api-key-input"
-        type="text"
-        value={model || ''}
-        onChange={(e) => onChange({ model: e.target.value })}
-        placeholder="Optional exact model ID from your provider account"
-      />
-      <div className="api-row">
-        <select id={`${baseId}-purpose`} name={`${baseId}-purpose`} className="api-purpose" value={purpose} onChange={(e) => onChange({ purpose: e.target.value })}>
-          <option>Primary</option>
-          <option>Coding</option>
-          <option>Research</option>
-          <option>Vision</option>
-          <option>Fallback</option>
-        </select>
-        <button type="button" className="api-test-btn" onClick={() => onChange({ enabled: provider !== 'Empty' })}>SET</button>
-      </div>
-    </div>
-  );
-}
 
 function useSettingsModalController({
   isOpen,
@@ -1339,26 +1030,33 @@ function useSettingsModalController({
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const vault = data?.vault_status;
-      if (vault) {
+      const slotStatuses = Array.isArray(data?.slots) ? data.slots : [];
+      if (vault || slotStatuses.length > 0) {
         setAiSlots((previousSlots) => {
           const slots = Array.isArray(previousSlots) && previousSlots.length
             ? previousSlots
             : buildInitialSettingsLocalState([]).aiSlots;
 
-          return slots.map((slot) => {
+          return slots.map((slot, index) => {
+            const matchingSlot = slotStatuses.find((entry) => Number(entry.slot) === index + 1);
             const providerKey = String(slot.provider || '').toLowerCase();
             let providerStatus = null;
-            if (providerKey.includes('groq')) providerStatus = vault.groq;
-            else if (providerKey.includes('openrouter')) providerStatus = vault.openrouter;
-            else if (providerKey.includes('openai') && !providerKey.includes('azure')) providerStatus = vault.openai;
-            else if (providerKey.includes('gemini')) providerStatus = vault.gemini;
+            if (providerKey.includes('groq')) providerStatus = vault?.groq;
+            else if (providerKey.includes('openrouter')) providerStatus = vault?.openrouter;
+            else if (providerKey.includes('openai') && !providerKey.includes('azure')) providerStatus = vault?.openai;
+            else if (providerKey.includes('gemini')) providerStatus = vault?.gemini;
+            else if (providerKey.includes('anthropic')) providerStatus = vault?.anthropic;
+            else if (providerKey.includes('deepseek')) providerStatus = vault?.deepseek;
+            else if (providerKey.includes('cohere')) providerStatus = vault?.cohere;
+            else if (providerKey.includes('mistral')) providerStatus = vault?.mistral;
+            else if (providerKey.includes('siliconflow')) providerStatus = vault?.siliconflow;
 
-            if (!providerStatus) return slot;
+            if (!providerStatus && !matchingSlot) return slot;
 
             return {
               ...slot,
-              hasKey: Boolean(slot.hasKey || providerStatus.configured),
-              mask: providerStatus.mask || slot.mask || ''
+              hasKey: Boolean(slot.hasKey || providerStatus?.configured || matchingSlot?.hasKey),
+              mask: matchingSlot?.mask || providerStatus?.mask || slot.mask || ''
             };
           });
         });
@@ -1630,17 +1328,19 @@ function useSettingsModalController({
 
       const token = await getToken();
       if (token) {
-        const vaultPayload = {};
-        aiSlots.forEach(slot => {
-          if (!slot.apiKey) return;
-          const p = slot.provider.toLowerCase();
-          if (p.includes('groq')) vaultPayload.groq_key = slot.apiKey;
-          else if (p.includes('openai') && !p.includes('azure')) vaultPayload.openai_key = slot.apiKey;
-          else if (p.includes('gemini')) vaultPayload.gemini_key = slot.apiKey;
-          else if (p.includes('openrouter')) vaultPayload.openrouter_key = slot.apiKey;
-        });
+        const vaultPayload = {
+          slots: aiSlots.slice(0, 3).map((slot, index) => ({
+            slot: index + 1,
+            provider: slot.provider || 'Empty',
+            key: slot.apiKey || '',
+            model: slot.model || '',
+            purpose: slot.purpose || (index === 0 ? 'Primary' : index === 1 ? 'Coding' : 'Fallback'),
+            baseUrl: slot.baseUrl || '',
+            enabled: Boolean(slot.enabled)
+          }))
+        };
 
-        if (Object.keys(vaultPayload).length > 0) {
+        if (vaultPayload.slots.some((slot) => slot.provider !== 'Empty' && (slot.key || slot.model))) {
           const vaultResponse = await fetch(`${API_URL}/api/vault/save`, {
             method: 'POST',
             headers: {

@@ -60,6 +60,17 @@ const normalizeProjectName = (value) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'zaire-builder-core';
 
+const mapWithStableKeys = (items, getBaseKey, renderItem) => {
+  const seenKeys = new Map();
+  return items.map((item, itemIndex) => {
+    const baseKey = String(getBaseKey(item, itemIndex));
+    const occurrence = seenKeys.get(baseKey) || 0;
+    seenKeys.set(baseKey, occurrence + 1);
+    const stableKey = occurrence === 0 ? baseKey : `${baseKey}-${occurrence}`;
+    return renderItem(item, stableKey, itemIndex);
+  });
+};
+
 const inferProjectTypeLabel = (projectType) =>
   PROJECT_TYPES.find((item) => item.id === projectType)?.name || 'Custom Project';
 
@@ -1412,9 +1423,13 @@ const EngineerModeV2 = () => {
                       {agentContributions.map((item) => (
                         <div key={item.agent} className="e-term-line e-term-agent">[{item.agent}] {item.summary}</div>
                       ))}
-                      {buildLogs.map((log, index) => (
-                        <div key={index} className={`e-term-line ${log.includes('phase:test') ? 'e-term-info' : log.includes('repair') ? 'e-term-warn' : ''}`}>{log}</div>
-                      ))}
+                      {mapWithStableKeys(
+                        buildLogs,
+                        (log) => log,
+                        (log, stableKey) => (
+                          <div key={stableKey} className={`e-term-line ${log.includes('phase:test') ? 'e-term-info' : log.includes('repair') ? 'e-term-warn' : ''}`}>{log}</div>
+                        )
+                      )}
                       {qaReport.checks.map((check) => (
                         <div key={check.label} className={`e-term-line ${check.status === 'PASSED' ? 'e-term-info' : check.status === 'WARNING' ? 'e-term-warn' : 'e-term-err'}`}>
                           [{check.status}] {check.label}: {check.detail}
@@ -1460,9 +1475,13 @@ const EngineerModeV2 = () => {
                   <div className="e-deploy-logs-box">
                     <div className="e-dl-header flex justify-between"><span>DEPLOYMENT READINESS REPORT</span>{deployLogs.length < 7 && <Loader2 size={10} className="animate-spin text-[var(--e-primary)]" />}</div>
                     <div className="e-dl-body">
-                      {deployLogs.map((log, index) => (
-                        <div key={index} className={log.includes('COMPLETE') ? 'mt-2 text-white font-bold' : ''}>{log}</div>
-                      ))}
+                      {mapWithStableKeys(
+                        deployLogs,
+                        (log) => log,
+                        (log, stableKey) => (
+                          <div key={stableKey} className={log.includes('COMPLETE') ? 'mt-2 text-white font-bold' : ''}>{log}</div>
+                        )
+                      )}
                       <div className="e-report-divider"></div>
                       <div>Phase history: {projectMemory.phaseHistory.join(' -> ')}</div>
                       <div>Generated files: {projectMemory.generatedFiles.join(', ')}</div>

@@ -65,8 +65,8 @@ export function ComponentHeader({ title, icon: Icon, status = 'idle', accent = '
 export function ComponentStatusBar({ items = [], accent = '#00d4ff' }) {
   return (
     <div className="flex items-center gap-4 px-4 py-1.5 border-t border-[#1a1a1a] bg-[#000] shrink-0">
-      {items.map((item, i) => (
-        <div key={i} className="flex items-center gap-1.5">
+      {items.map((item) => (
+        <div key={item.label} className="flex items-center gap-1.5">
           <span className="text-[8px] font-mono text-[#555] uppercase tracking-widest">{item.label}:</span>
           <span className="text-[9px] font-mono" style={{ color: item.color || '#888' }}>{item.value}</span>
         </div>
@@ -105,10 +105,11 @@ export function ComponentEmptyState({ icon: Icon, title, description, action, ac
    COMPONENT SKELETON
 ───────────────────────────────────────────── */
 export function ComponentSkeleton({ rows = 4 }) {
+  const skeletonRows = Array.from({ length: rows }, (_, rowIndex) => `skeleton-row-${rowIndex}`);
   return (
     <div className="flex-1 p-4 flex flex-col gap-3 overflow-hidden">
-      {[...Array(rows)].map((_, i) => (
-        <div key={i} className="flex gap-3 items-center">
+      {skeletonRows.map((rowId) => (
+        <div key={rowId} className="flex gap-3 items-center">
           <div className="w-8 h-8 rounded bg-[#111] skeleton-pulse shrink-0"></div>
           <div className="flex-1 flex flex-col gap-1.5">
             <div className="h-2.5 rounded skeleton-pulse" style={{ width: `${60 + Math.random() * 30}%` }}></div>
