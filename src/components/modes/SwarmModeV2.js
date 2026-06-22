@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Network, Activity, Cpu, BrainCircuit, Zap, ShieldAlert, FileSearch, TerminalSquare, Server, Database, Target, BookOpen, Layers, CheckCircle2, Clock, Search, Code2, Cpu as CpuIcon, HardDrive, PlayCircle } from 'lucide-react';
+import { Network, Activity, Cpu, BrainCircuit, Zap, ShieldAlert, FileSearch, TerminalSquare, Server, Database, Target, Layers, CheckCircle2, Clock, Code2, Cpu as CpuIcon, PlayCircle } from 'lucide-react';
 import './SwarmModeV2.css';
 
 const SwarmModeV2 = () => {

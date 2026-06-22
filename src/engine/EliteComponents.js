@@ -948,7 +948,7 @@ export const TaskQueue = ({ color }) => (
 
 export const CodeEditor = ({ color }) => (
   <div style={{ fontFamily: 'monospace', fontSize: '12px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-    <div style={{ color: '#888', marginBottom: '6px' }}>// Initialize Neural Sequence</div>
+    <div style={{ color: '#888', marginBottom: '6px' }}>{'// Initialize Neural Sequence'}</div>
     <div style={{ color: '#fff' }}><span style={{ color: '#ff3366' }}>const</span> igniteEngine = <span style={{ color: '#00d4ff' }}>async</span> () <span style={{ color: '#ff3366' }}>=&gt;</span> {'{'}</div>
     <div style={{ color: '#fff', marginLeft: '12px' }}>
       <span style={{ color: '#ff3366' }}>await</span> System.<span style={{ color: '#00ff66' }}>boot</span>();<br/>

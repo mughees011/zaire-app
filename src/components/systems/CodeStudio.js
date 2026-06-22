@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Code2, FolderTree, FileCode2, Play, Terminal, Lightbulb, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Code2, FolderTree, FileCode2, Play, Lightbulb, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { ComponentShell, ComponentHeader, ComponentStatusBar, ComponentActionButton } from './ComponentShell';
 import { useZaireOS } from '../../engine/ZaireOSContext';
 

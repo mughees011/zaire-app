@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Network, Cpu, ShieldCheck, X, ChevronRight, Terminal, Target } from 'lucide-react';
+import { Network, Cpu, ShieldCheck, ChevronRight, Terminal, Target } from 'lucide-react';
 import { ComponentShell, ComponentHeader, ComponentStatusBar, ComponentEmptyState } from './ComponentShell';
 import { useZaireOS } from '../../engine/ZaireOSContext';
 

@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useReducer } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import { ZaireComponentRegistry } from './engine/ComponentRegistry';
 import './SettingsModal.css';
 import { resolveApiBase } from './apiBase';
 
+/* eslint-disable react-hooks/exhaustive-deps */
+
 const API_URL = resolveApiBase();
 const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
-const COMPONENT_LIBRARY = ZaireComponentRegistry;
 const CUSTOM_MODE_LOCKED_ZONES = ['Bottom Console'];
 
 const fetchJsonOrThrow = async (url, options = {}) => {
@@ -66,7 +66,10 @@ const INITIAL_MODAL_VIEW_STATE = {
   adaptiveColor: true,
   urgentFlash: true,
   transitionSpeed: 'NORMAL',
+  gridOverlayDensity: '48px',
+  nightModeStart: '21:00',
   responseDepth: 'TURBO',
+  routingPolicy: 'Auto',
   voiceWake: 85,
   faceConfidence: 92,
   intruderSnapshot: true,
@@ -79,6 +82,7 @@ const INITIAL_MODAL_VIEW_STATE = {
   ambientNoise: true,
   privateSession: false,
   missionDigest: true,
+  defaultDnaProfile: 'STARK_FORGE',
   selectedTemplateId: 'lawyer',
   creatorStep: 1,
   voiceActor: 'Nova',
@@ -112,6 +116,17 @@ const settingsLocalStateReducer = (state, action) => {
   }
 };
 
+const blankCustomApiDraft = {
+  id: null,
+  name: '',
+  baseUrl: '',
+  headerKey: '',
+  token: '',
+  hasToken: false,
+  enabled: true,
+  mask: ''
+};
+
 const buildInitialSettingsLocalState = (customModes) => ({
   creatorDraft: blankCreatorDraft,
   localModes: customModes && customModes.length ? customModes : defaultCustomModes,
@@ -129,11 +144,110 @@ const buildInitialSettingsLocalState = (customModes) => ({
   memoryDashboardLoading: false,
   memoryActionStatus: '',
   briefingsData: [],
-  briefingsLoading: false
+  briefingsLoading: false,
+  aiVaultSaveStatus: '',
+  customApis: [],
+  customApiDraft: blankCustomApiDraft,
+  customApiStatus: ''
+});
+
+const buildPersistedSettingsPayload = ({
+  scanlines,
+  adaptiveColor,
+  urgentFlash,
+  transitionSpeed,
+  gridOverlayDensity,
+  nightModeStart,
+  responseDepth,
+  routingPolicy,
+  voiceWake,
+  faceConfidence,
+  intruderSnapshot,
+  memoryDepth,
+  retentionPeriod,
+  gazeMemoryEnabled,
+  crossModeSharing,
+  alertLevel,
+  neuralDarwinism,
+  ambientNoise,
+  privateSession,
+  missionDigest,
+  defaultDnaProfile,
+  voiceActor,
+  baseTone,
+  characteristics,
+  fastAnswers,
+  zaireInstructions,
+  userName,
+  userOccupation,
+  userAbout,
+  halalFilterEnabled,
+  autoLintEnabled
+}) => ({
+  interfaceSettings: {
+    scanlines,
+    adaptiveColor,
+    urgentFlash,
+    transitionSpeed,
+    gridOverlayDensity,
+    nightModeStart
+  },
+  neuralSettings: {
+    responseDepth,
+    routingPolicy,
+    voiceWake,
+    ambientNoise
+  },
+  securitySettings: {
+    faceConfidence,
+    intruderSnapshot
+  },
+  memorySettings: {
+    memoryDepth,
+    retentionPeriod,
+    gazeMemoryEnabled,
+    crossModeSharing,
+    privateSession
+  },
+  alertSettings: {
+    alertLevel,
+    missionDigest
+  },
+  specialistSettings: {
+    neuralDarwinism,
+    defaultDnaProfile,
+    halalFilterEnabled,
+    autoLintEnabled
+  },
+  personalization: {
+    voiceActor,
+    baseTone,
+    characteristics,
+    fastAnswers,
+    zaireInstructions,
+    userName,
+    userOccupation,
+    userAbout
+  }
 });
 
 const createReducerFieldSetter = (dispatch, field) => (value) => {
   dispatch({ type: 'SET_FIELD', field, value });
+};
+
+const createProviderSwitchPatch = (provider, previousSlot = {}) => {
+  const nextProvider = String(provider || 'Empty');
+  const enabled = nextProvider !== 'Empty';
+  return {
+    ...previousSlot,
+    provider: nextProvider,
+    enabled,
+    apiKey: '',
+    hasKey: false,
+    mask: '',
+    model: nextProvider === previousSlot.provider ? previousSlot.model || '' : '',
+    baseUrl: nextProvider === previousSlot.provider ? previousSlot.baseUrl || '' : ''
+  };
 };
 
 const estimateMemoryStatsLabel = (dashboard) => {
@@ -163,23 +277,12 @@ const normalizeMemoryDashboard = (stats, memories) => ({
     : []
 });
 
-const getComponentAccentClass = (componentType = '') => {
-  const normalized = String(componentType).toLowerCase();
-  if (normalized.includes('chat') || normalized.includes('voice')) return 'accent-chat';
-  if (normalized.includes('file') || normalized.includes('research') || normalized.includes('memory')) return 'accent-file';
-  if (normalized.includes('task') || normalized.includes('queue')) return 'accent-neural';
-  if (normalized.includes('terminal') || normalized.includes('status') || normalized.includes('camera')) return 'accent-terminal';
-  return 'accent-neural';
-};
-
 function MiniPreview({ type, color = '#00d4ff' }) {
   const isFinance = type.includes('Market') || type.includes('Scanner') || type.includes('Chart') || type.includes('Grid') || type.includes('Finance');
   const isTerminal = type.includes('Terminal') || type.includes('Console') || type.includes('Shell') || type.includes('Logs');
   const isMemory = type.includes('Memory') || type.includes('Graph') || type.includes('Vault');
   const isCode = type.includes('File') || type.includes('Code') || type.includes('Builder') || type.includes('Preview') || type.includes('Canvas');
   const isTask = type.includes('Task') || type.includes('Planner') || type.includes('Roadmap') || type.includes('Board') || type.includes('Timeline') || type.includes('Queue');
-  const isChat = type.includes('Chat') || type.includes('Voice') || type.includes('Agent') || type.includes('Critic') || type.includes('Surface');
-
   const baseContainer = {
     background: '#0a0a0a',
     border: '1px solid #1f1f1f',
@@ -755,6 +858,7 @@ function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empt
         style={{ width: '100%', marginBottom: 6 }}
       >
         <option>OpenAI</option>
+        <option>OpenRouter</option>
         <option>Groq</option>
         <option>Anthropic</option>
         <option>Google Gemini</option>
@@ -771,8 +875,8 @@ function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empt
         className="api-key-input"
         type="password"
         value={apiKey || ''}
-        onChange={(e) => onChange({ apiKey: e.target.value, hasKey: Boolean(e.target.value) })}
-        placeholder={mask ? `Stored: ${mask}` : (empty ? 'Paste provider key...' : 'sk-... encrypted key stored locally')}
+        onChange={(e) => onChange({ apiKey: e.target.value, hasKey: Boolean(e.target.value), mask: '' })}
+        placeholder={mask ? `Stored securely: ${mask}` : (empty ? 'Paste provider key...' : 'Paste provider key...')}
       />
       <input
         id={`${baseId}-base-url`}
@@ -800,7 +904,7 @@ function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empt
           <option>Vision</option>
           <option>Fallback</option>
         </select>
-        <button type="button" className="api-test-btn" onClick={() => onChange({ enabled: !empty })}>SET</button>
+        <button type="button" className="api-test-btn" onClick={() => onChange({ enabled: provider !== 'Empty' })}>SET</button>
       </div>
     </div>
   );
@@ -843,7 +947,10 @@ function useSettingsModalController({
     adaptiveColor,
     urgentFlash,
     transitionSpeed,
+    gridOverlayDensity,
+    nightModeStart,
     responseDepth,
+    routingPolicy,
     voiceWake,
     faceConfidence,
     intruderSnapshot,
@@ -856,6 +963,7 @@ function useSettingsModalController({
     ambientNoise,
     privateSession,
     missionDigest,
+    defaultDnaProfile,
     selectedTemplateId,
     creatorStep,
     voiceActor,
@@ -885,7 +993,11 @@ function useSettingsModalController({
     memoryDashboardLoading,
     memoryActionStatus,
     briefingsData,
-    briefingsLoading
+    briefingsLoading,
+    aiVaultSaveStatus,
+    customApis,
+    customApiDraft,
+    customApiStatus
   } = settingsLocalState;
   const setCreatorDraft = createReducerFieldSetter(dispatchSettingsLocalState, 'creatorDraft');
   const setLocalModes = createReducerFieldSetter(dispatchSettingsLocalState, 'localModes');
@@ -900,6 +1012,10 @@ function useSettingsModalController({
   const setMemoryActionStatus = createReducerFieldSetter(dispatchSettingsLocalState, 'memoryActionStatus');
   const setBriefingsData = createReducerFieldSetter(dispatchSettingsLocalState, 'briefingsData');
   const setBriefingsLoading = createReducerFieldSetter(dispatchSettingsLocalState, 'briefingsLoading');
+  const setAiVaultSaveStatus = createReducerFieldSetter(dispatchSettingsLocalState, 'aiVaultSaveStatus');
+  const setCustomApis = createReducerFieldSetter(dispatchSettingsLocalState, 'customApis');
+  const setCustomApiDraft = createReducerFieldSetter(dispatchSettingsLocalState, 'customApiDraft');
+  const setCustomApiStatus = createReducerFieldSetter(dispatchSettingsLocalState, 'customApiStatus');
   const settingsWarningState = React.useRef({
     briefingsLogged: false,
     memoryLogged: false,
@@ -1008,10 +1124,31 @@ function useSettingsModalController({
     try {
       const data = await fetchJsonOrThrow(`${API_URL}/config`);
       const configRoot = data?.success ? (data.data || {}) : {};
+      const interfaceSettings = configRoot.interfaceSettings || {};
+      const neuralSettings = configRoot.neuralSettings || {};
+      const securitySettings = configRoot.securitySettings || {};
       const memorySettings = configRoot.memorySettings || {};
+      const alertSettings = configRoot.alertSettings || {};
+      const specialistSettings = configRoot.specialistSettings || {};
       const personalization = configRoot.personalization || configRoot.voice || {};
       const desktopProfile = configRoot.desktopProfile || {};
       const slotConfig = Array.isArray(configRoot.aiVault?.slots) ? configRoot.aiVault.slots.slice(0, 3) : [];
+      const externalApis = Array.isArray(configRoot.externalApis) ? configRoot.externalApis : [];
+      if (typeof interfaceSettings.scanlines === 'boolean') dispatchModalView({ type: 'SET_FIELD', field: 'scanlines', value: interfaceSettings.scanlines });
+      if (typeof interfaceSettings.adaptiveColor === 'boolean') dispatchModalView({ type: 'SET_FIELD', field: 'adaptiveColor', value: interfaceSettings.adaptiveColor });
+      if (typeof interfaceSettings.urgentFlash === 'boolean') dispatchModalView({ type: 'SET_FIELD', field: 'urgentFlash', value: interfaceSettings.urgentFlash });
+      if (interfaceSettings.transitionSpeed !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'transitionSpeed', value: interfaceSettings.transitionSpeed });
+      if (interfaceSettings.gridOverlayDensity !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'gridOverlayDensity', value: interfaceSettings.gridOverlayDensity });
+      if (interfaceSettings.nightModeStart !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'nightModeStart', value: interfaceSettings.nightModeStart });
+
+      if (neuralSettings.responseDepth !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'responseDepth', value: neuralSettings.responseDepth });
+      if (neuralSettings.routingPolicy !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'routingPolicy', value: neuralSettings.routingPolicy });
+      if (neuralSettings.voiceWake !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'voiceWake', value: neuralSettings.voiceWake });
+      if (typeof neuralSettings.ambientNoise === 'boolean') dispatchModalView({ type: 'SET_FIELD', field: 'ambientNoise', value: neuralSettings.ambientNoise });
+
+      if (securitySettings.faceConfidence !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'faceConfidence', value: securitySettings.faceConfidence });
+      if (typeof securitySettings.intruderSnapshot === 'boolean') dispatchModalView({ type: 'SET_FIELD', field: 'intruderSnapshot', value: securitySettings.intruderSnapshot });
+
       if (memorySettings.retentionPeriod) {
         dispatchModalView({ type: 'SET_FIELD', field: 'retentionPeriod', value: memorySettings.retentionPeriod });
       }
@@ -1027,6 +1164,14 @@ function useSettingsModalController({
       if (typeof memorySettings.privateSession === 'boolean') {
         dispatchModalView({ type: 'SET_FIELD', field: 'privateSession', value: memorySettings.privateSession });
       }
+
+      if (alertSettings.alertLevel !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'alertLevel', value: alertSettings.alertLevel });
+      if (typeof alertSettings.missionDigest === 'boolean') dispatchModalView({ type: 'SET_FIELD', field: 'missionDigest', value: alertSettings.missionDigest });
+
+      if (typeof specialistSettings.neuralDarwinism === 'boolean') dispatchModalView({ type: 'SET_FIELD', field: 'neuralDarwinism', value: specialistSettings.neuralDarwinism });
+      if (specialistSettings.defaultDnaProfile !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'defaultDnaProfile', value: specialistSettings.defaultDnaProfile });
+      if (typeof specialistSettings.halalFilterEnabled === 'boolean') setHalalFilterEnabled(specialistSettings.halalFilterEnabled);
+      if (typeof specialistSettings.autoLintEnabled === 'boolean') setAutoLintEnabled(specialistSettings.autoLintEnabled);
 
       if (personalization.voiceActor !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'voiceActor', value: personalization.voiceActor });
       if (personalization.baseTone !== undefined) dispatchModalView({ type: 'SET_FIELD', field: 'baseTone', value: personalization.baseTone });
@@ -1061,8 +1206,19 @@ function useSettingsModalController({
         });
         setAiSlots(normalized);
       }
+
+      setCustomApis(externalApis.map((entry, index) => ({
+        id: entry.id || `service-${index + 1}`,
+        name: entry.name || '',
+        baseUrl: entry.baseUrl || '',
+        headerKey: entry.headerKey || '',
+        token: '',
+        hasToken: Boolean(entry.hasToken),
+        enabled: entry.enabled !== false,
+        mask: entry.mask || (entry.hasToken ? 'Saved Locally' : '')
+      })));
     } catch (_) {}
-  }, [setAiSlots, setLicenseKeyInput]);
+  }, [setAiSlots, setAutoLintEnabled, setCustomApis, setHalalFilterEnabled, setLicenseKeyInput]);
 
   useEffect(() => {
     if (isOpen) {
@@ -1177,23 +1333,35 @@ function useSettingsModalController({
 
   const loadAiProviders = useCallback(async () => {
     try {
-      const token = await getToken();
+      const token = await getToken().catch(() => null);
       if (!token) return;
       const data = await fetchJsonOrThrow(`${API_URL}/api/vault/status`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const vault = data?.vault_status;
       if (vault) {
-        const normalized = [
-          { provider: 'Groq', apiKey: '', hasKey: vault.groq?.configured, model: '', purpose: 'Primary', baseUrl: '', enabled: true, mask: vault.groq?.mask },
-          { provider: 'OpenAI', apiKey: '', hasKey: vault.openai?.configured, model: '', purpose: 'Coding', baseUrl: '', enabled: true, mask: vault.openai?.mask },
-          { provider: 'Gemini', apiKey: '', hasKey: vault.gemini?.configured, model: '', purpose: 'Fallback', baseUrl: '', enabled: vault.gemini?.configured, mask: vault.gemini?.mask }
-        ];
-        // Merge OpenRouter if needed, or put it in slot 3
-        if (vault.openrouter?.configured) {
-          normalized[2] = { provider: 'OpenRouter', apiKey: '', hasKey: true, model: '', purpose: 'Fallback', baseUrl: '', enabled: true, mask: vault.openrouter?.mask };
-        }
-        setAiSlots(normalized);
+        setAiSlots((previousSlots) => {
+          const slots = Array.isArray(previousSlots) && previousSlots.length
+            ? previousSlots
+            : buildInitialSettingsLocalState([]).aiSlots;
+
+          return slots.map((slot) => {
+            const providerKey = String(slot.provider || '').toLowerCase();
+            let providerStatus = null;
+            if (providerKey.includes('groq')) providerStatus = vault.groq;
+            else if (providerKey.includes('openrouter')) providerStatus = vault.openrouter;
+            else if (providerKey.includes('openai') && !providerKey.includes('azure')) providerStatus = vault.openai;
+            else if (providerKey.includes('gemini')) providerStatus = vault.gemini;
+
+            if (!providerStatus) return slot;
+
+            return {
+              ...slot,
+              hasKey: Boolean(slot.hasKey || providerStatus.configured),
+              mask: providerStatus.mask || slot.mask || ''
+            };
+          });
+        });
       }
       settingsWarningState.current.vaultLogged = false;
     } catch (err) {
@@ -1217,7 +1385,10 @@ function useSettingsModalController({
   const setAdaptiveColor = useCallback((value) => setModalField('adaptiveColor', value), [setModalField]);
   const setUrgentFlash = useCallback((value) => setModalField('urgentFlash', value), [setModalField]);
   const setTransitionSpeed = useCallback((value) => setModalField('transitionSpeed', value), [setModalField]);
+  const setGridOverlayDensity = useCallback((value) => setModalField('gridOverlayDensity', value), [setModalField]);
+  const setNightModeStart = useCallback((value) => setModalField('nightModeStart', value), [setModalField]);
   const setResponseDepth = useCallback((value) => setModalField('responseDepth', value), [setModalField]);
+  const setRoutingPolicy = useCallback((value) => setModalField('routingPolicy', value), [setModalField]);
   const setVoiceWake = useCallback((value) => setModalField('voiceWake', value), [setModalField]);
   const setFaceConfidence = useCallback((value) => setModalField('faceConfidence', value), [setModalField]);
   const setIntruderSnapshot = useCallback((value) => setModalField('intruderSnapshot', value), [setModalField]);
@@ -1230,6 +1401,7 @@ function useSettingsModalController({
   const setAmbientNoise = useCallback((value) => setModalField('ambientNoise', value), [setModalField]);
   const setPrivateSession = useCallback((value) => setModalField('privateSession', value), [setModalField]);
   const setMissionDigest = useCallback((value) => setModalField('missionDigest', value), [setModalField]);
+  const setDefaultDnaProfile = useCallback((value) => setModalField('defaultDnaProfile', value), [setModalField]);
   const setSelectedTemplateId = useCallback((value) => setModalField('selectedTemplateId', value), [setModalField]);
   const setCreatorStep = useCallback((value) => setModalField('creatorStep', value), [setModalField]);
   const setVoiceActor = useCallback((value) => setModalField('voiceActor', value), [setModalField]);
@@ -1299,11 +1471,305 @@ function useSettingsModalController({
     }
   }, [isOpen]);
 
+  const updateCustomApiDraftField = useCallback((field, value) => {
+    setCustomApiDraft((current) => ({ ...current, [field]: value }));
+  }, [setCustomApiDraft]);
+
+  const addOrUpdateCustomApi = useCallback(() => {
+    const name = String(customApiDraft.name || '').trim();
+    const baseUrl = String(customApiDraft.baseUrl || '').trim();
+
+    if (!name || !baseUrl) {
+      setCustomApiStatus('Service name and base URL are required.');
+      return;
+    }
+
+    const entryId = customApiDraft.id || `service-${Date.now()}`;
+    const nextEntry = {
+      id: entryId,
+      name,
+      baseUrl,
+      headerKey: String(customApiDraft.headerKey || '').trim(),
+      token: String(customApiDraft.token || '').trim(),
+      hasToken: Boolean(customApiDraft.token || customApiDraft.hasToken),
+      enabled: customApiDraft.enabled !== false,
+      mask: customApiDraft.token ? '' : (customApiDraft.mask || '')
+    };
+
+    setCustomApis((current) => {
+      const items = Array.isArray(current) ? current : [];
+      const existingIndex = items.findIndex((entry) => entry.id === entryId);
+      if (existingIndex >= 0) {
+        const clone = [...items];
+        clone[existingIndex] = nextEntry;
+        return clone;
+      }
+      return [...items, nextEntry];
+    });
+
+    setCustomApiDraft(blankCustomApiDraft);
+    setCustomApiStatus(`${name} queued for secure save.`);
+  }, [customApiDraft, setCustomApiDraft, setCustomApis, setCustomApiStatus]);
+
+  const editCustomApi = useCallback((entry) => {
+    setCustomApiDraft({
+      id: entry.id,
+      name: entry.name || '',
+      baseUrl: entry.baseUrl || '',
+      headerKey: entry.headerKey || '',
+      token: '',
+      hasToken: Boolean(entry.hasToken),
+      enabled: entry.enabled !== false,
+      mask: entry.mask || ''
+    });
+    setCustomApiStatus(`Editing ${entry.name}. Paste a new token only if you want to replace the saved one.`);
+  }, [setCustomApiDraft, setCustomApiStatus]);
+
+  const removeCustomApi = useCallback((entryId) => {
+    setCustomApis((current) => (Array.isArray(current) ? current.filter((entry) => entry.id !== entryId) : []));
+    setCustomApiDraft((current) => (current.id === entryId ? blankCustomApiDraft : current));
+    setCustomApiStatus('Integration removed. Apply CORE_SYNC to persist the change.');
+  }, [setCustomApiDraft, setCustomApis, setCustomApiStatus]);
+
+  const verifyCustomApi = useCallback(async () => {
+    const payload = {
+      name: String(customApiDraft.name || '').trim(),
+      baseUrl: String(customApiDraft.baseUrl || '').trim(),
+      headerKey: String(customApiDraft.headerKey || '').trim(),
+      token: String(customApiDraft.token || '').trim()
+    };
+
+    if (!payload.name || !payload.baseUrl) {
+      setCustomApiStatus('Enter a service name and base URL before verification.');
+      return;
+    }
+
+    setCustomApiStatus(`Verifying ${payload.name}...`);
+    try {
+      const result = await fetchJsonOrThrow(`${API_URL}/llm/external-services/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      setCustomApiStatus(result.message || `${payload.name} verification complete.`);
+    } catch (err) {
+      setCustomApiStatus(`Verification failed: ${err.message || err}`);
+    }
+  }, [customApiDraft, setCustomApiStatus]);
+
+  const openBriefingAsset = useCallback((assetPath) => {
+    const normalizedPath = String(assetPath || '').trim();
+    if (!normalizedPath) return;
+    const assetUrl = `${API_URL}/api/briefings/asset?path=${encodeURIComponent(normalizedPath)}`;
+    window.open(assetUrl, '_blank', 'noopener,noreferrer');
+  }, []);
+
+  const applyCoreSync = useCallback(async () => {
+    setAiVaultSaveStatus('Saving AI Vault and system configuration...');
+
+    const persistedSettings = buildPersistedSettingsPayload({
+      scanlines,
+      adaptiveColor,
+      urgentFlash,
+      transitionSpeed,
+      gridOverlayDensity,
+      nightModeStart,
+      responseDepth,
+      routingPolicy,
+      voiceWake,
+      faceConfidence,
+      intruderSnapshot,
+      memoryDepth,
+      retentionPeriod,
+      gazeMemoryEnabled,
+      crossModeSharing,
+      alertLevel,
+      neuralDarwinism,
+      ambientNoise,
+      privateSession,
+      missionDigest,
+      defaultDnaProfile,
+      voiceActor,
+      baseTone,
+      characteristics,
+      fastAnswers,
+      zaireInstructions,
+      userName,
+      userOccupation,
+      userAbout,
+      halalFilterEnabled,
+      autoLintEnabled
+    });
+
+    const configPayload = {
+      aiVault: {
+        slots: aiSlots.slice(0, 3)
+      },
+      externalApis: customApis,
+      ...persistedSettings,
+      desktopProfile: {
+        specialistToggles: {
+          halalFilterEnabled,
+          autoLintEnabled
+        },
+        licensing: {
+          cachedLicenseKey: licenseKeyInput.trim() || localStorage.getItem('zaire_license_key') || ''
+        }
+      }
+    };
+
+    try {
+      const configResponse = await fetch(`${API_URL}/config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(configPayload)
+      });
+      await ensureOk(configResponse, 'Desktop config save');
+
+      const token = await getToken();
+      if (token) {
+        const vaultPayload = {};
+        aiSlots.forEach(slot => {
+          if (!slot.apiKey) return;
+          const p = slot.provider.toLowerCase();
+          if (p.includes('groq')) vaultPayload.groq_key = slot.apiKey;
+          else if (p.includes('openai') && !p.includes('azure')) vaultPayload.openai_key = slot.apiKey;
+          else if (p.includes('gemini')) vaultPayload.gemini_key = slot.apiKey;
+          else if (p.includes('openrouter')) vaultPayload.openrouter_key = slot.apiKey;
+        });
+
+        if (Object.keys(vaultPayload).length > 0) {
+          const vaultResponse = await fetch(`${API_URL}/api/vault/save`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(vaultPayload)
+          });
+          await ensureOk(vaultResponse, 'Vault save');
+        }
+
+        const settingsResponse = await fetch(`${API_URL}/api/settings`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            agent: {
+              ...persistedSettings.memorySettings,
+              ...persistedSettings.neuralSettings,
+              ...persistedSettings.specialistSettings,
+              ...persistedSettings.securitySettings,
+              ...persistedSettings.alertSettings,
+              interfaceSettings: persistedSettings.interfaceSettings
+            },
+            voice: persistedSettings.personalization
+          })
+        });
+        await ensureOk(settingsResponse, 'Settings save');
+      }
+
+      setAiSlots((previousSlots) =>
+        previousSlots.map((slot) => ({
+          ...slot,
+          apiKey: '',
+          hasKey: Boolean(slot.hasKey || slot.apiKey),
+          mask: slot.mask || (slot.hasKey || slot.apiKey ? 'Saved Locally' : '')
+        }))
+      );
+      setCustomApis((previousEntries) =>
+        previousEntries.map((entry) => ({
+          ...entry,
+          token: '',
+          hasToken: Boolean(entry.hasToken || entry.token),
+          mask: entry.mask || (entry.hasToken || entry.token ? 'Saved Locally' : '')
+        }))
+      );
+      setCustomApiDraft(blankCustomApiDraft);
+      setCustomApiStatus('External integrations saved securely.');
+      setAiVaultSaveStatus('AI Vault and settings saved securely.');
+      window.dispatchEvent(new CustomEvent('ZAIRE_PERSIST_CONFIG', {
+        detail: {
+          ...configPayload,
+          personalization: persistedSettings.personalization,
+          memorySettings: persistedSettings.memorySettings,
+          specialistSettings: persistedSettings.specialistSettings,
+          alertSettings: persistedSettings.alertSettings
+        }
+      }));
+      onClose();
+    } catch (err) {
+      const message = err?.message || 'Unknown save failure';
+      setAiVaultSaveStatus(`Save failed: ${message}`);
+      console.warn('Failed to save config remotely:', message);
+    }
+  }, [
+    adaptiveColor,
+    aiSlots,
+    alertLevel,
+    ambientNoise,
+    autoLintEnabled,
+    baseTone,
+    characteristics,
+    crossModeSharing,
+    customApis,
+    defaultDnaProfile,
+    faceConfidence,
+    fastAnswers,
+    gazeMemoryEnabled,
+    getToken,
+    gridOverlayDensity,
+    halalFilterEnabled,
+    intruderSnapshot,
+    licenseKeyInput,
+    memoryDepth,
+    missionDigest,
+    neuralDarwinism,
+    nightModeStart,
+    onClose,
+    privateSession,
+    responseDepth,
+    retentionPeriod,
+    routingPolicy,
+    scanlines,
+    setAiVaultSaveStatus,
+    setAiSlots,
+    setCustomApiDraft,
+    setCustomApiStatus,
+    setCustomApis,
+    transitionSpeed,
+    urgentFlash,
+    userAbout,
+    userName,
+    userOccupation,
+    voiceActor,
+    voiceWake,
+    zaireInstructions
+  ]);
+
+  const factoryReset = useCallback(async () => {
+    if (!window.confirm('WIPE ALL SYSTEM PREFERENCES? This clears local settings, saved vault masks, and desktop profile data.')) {
+      return;
+    }
+
+    try {
+      await fetchJsonOrThrow(`${API_URL}/config/reset`, { method: 'POST' });
+    } catch (_) {
+      // Local reset should still proceed if backend reset is unavailable.
+    }
+
+    localStorage.clear();
+    window.location.reload();
+  }, []);
+
   if (!isOpen) return () => null;
 
   const hudOpacityPercent = Math.round(hudOpacity * 100);
   const setHudOpacityPercent = (value) => setHudOpacity(value / 100);
-  const selectedTemplate = modeTemplates.find((template) => template.id === selectedTemplateId) || modeTemplates[0];
   const modeCount = localModes.length;
   const filteredMemoryResults = (memoryDashboard?.memories || []).filter((memory) => {
     const query = memorySearchQuery.trim().toLowerCase();
@@ -1464,21 +1930,6 @@ function useSettingsModalController({
     setSelectedTemplateId(template.id);
     setCreatorStep(1);
     setActivePage('creator');
-  };
-
-  const toggleDraftCapability = (capability) => {
-    setCreatorDraft((draft) => {
-      const hasCapability = draft.intelligence.capabilities.includes(capability);
-      return {
-        ...draft,
-        intelligence: {
-          ...draft.intelligence,
-          capabilities: hasCapability
-            ? draft.intelligence.capabilities.filter((item) => item !== capability)
-            : [...draft.intelligence.capabilities, capability],
-        }
-      };
-    });
   };
 
   const handleAddComponentToZone = (compType, zone) => {
@@ -1642,7 +2093,7 @@ function useSettingsModalController({
                   </select>
                 </SettingRow>
                 <SettingRow name="GRID OVERLAY DENSITY" desc="Background tactical grid line spacing">
-                  <select className="hud-select" defaultValue="48px">
+                  <select id="settings-grid-overlay-density" name="settings-grid-overlay-density" className="hud-select" value={gridOverlayDensity} onChange={(event) => setGridOverlayDensity(event.target.value)}>
                     <option>40px</option>
                     <option>48px</option>
                     <option>64px</option>
@@ -1656,7 +2107,7 @@ function useSettingsModalController({
                   <Toggle checked={adaptiveColor} onChange={setAdaptiveColor} />
                 </SettingRow>
                 <SettingRow name="NIGHT MODE START" desc="Hour when ZAIRE dims to deep dark mode">
-                  <select className="hud-select" defaultValue="21:00">
+                  <select id="settings-night-mode-start" name="settings-night-mode-start" className="hud-select" value={nightModeStart} onChange={(event) => setNightModeStart(event.target.value)}>
                     <option>20:00</option>
                     <option>21:00</option>
                     <option>22:00</option>
@@ -1707,7 +2158,7 @@ function useSettingsModalController({
                   <Toggle checked={neuralDarwinism} onChange={setNeuralDarwinism} />
                 </SettingRow>
                 <SettingRow name="DEFAULT DNA PROFILE" desc="Starting aesthetic for new projects">
-                  <select className="hud-select" defaultValue="STARK_FORGE">
+                  <select id="settings-default-dna-profile" name="settings-default-dna-profile" className="hud-select" value={defaultDnaProfile} onChange={(event) => setDefaultDnaProfile(event.target.value)}>
                     <option>STARK_FORGE</option>
                     <option>LUXURY_DARK</option>
                     <option>MINIMAL_LUXURY</option>
@@ -1733,7 +2184,13 @@ function useSettingsModalController({
                   baseUrl={aiSlots[0]?.baseUrl || ''}
                   mask={aiSlots[0]?.mask}
                   empty={(aiSlots[0]?.provider || 'Empty') === 'Empty'}
-                  onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => i === 0 ? { ...s, ...patch } : s))}
+                  onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => {
+                    if (i !== 0) return s;
+                    if (Object.prototype.hasOwnProperty.call(patch, 'provider')) {
+                      return createProviderSwitchPatch(patch.provider, s);
+                    }
+                    return { ...s, ...patch };
+                  }))}
                 />
                 <ApiSlot
                   slot="2 - CODING"
@@ -1745,7 +2202,13 @@ function useSettingsModalController({
                   baseUrl={aiSlots[1]?.baseUrl || ''}
                   mask={aiSlots[1]?.mask}
                   empty={(aiSlots[1]?.provider || 'Empty') === 'Empty'}
-                  onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => i === 1 ? { ...s, ...patch } : s))}
+                  onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => {
+                    if (i !== 1) return s;
+                    if (Object.prototype.hasOwnProperty.call(patch, 'provider')) {
+                      return createProviderSwitchPatch(patch.provider, s);
+                    }
+                    return { ...s, ...patch };
+                  }))}
                 />
                 <ApiSlot
                   slot="3 - FALLBACK"
@@ -1757,9 +2220,18 @@ function useSettingsModalController({
                   baseUrl={aiSlots[2]?.baseUrl || ''}
                   mask={aiSlots[2]?.mask}
                   empty={(aiSlots[2]?.provider || 'Empty') === 'Empty'}
-                  onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => i === 2 ? { ...s, ...patch } : s))}
+                  onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => {
+                    if (i !== 2) return s;
+                    if (Object.prototype.hasOwnProperty.call(patch, 'provider')) {
+                      return createProviderSwitchPatch(patch.provider, s);
+                    }
+                    return { ...s, ...patch };
+                  }))}
                 />
                 <div className="api-limit-note">Keys are saved securely on your local server.</div>
+                <div className="memory-action-status" style={{ marginTop: '10px' }}>
+                  {aiVaultSaveStatus || 'Choose a provider, paste its key, optionally set model/base URL, then apply CORE_SYNC.'}
+                </div>
               </Section>
             </div>
           )}
@@ -1770,14 +2242,71 @@ function useSettingsModalController({
               <div className="page-sub">Register external services used by specialist modes</div>
               <Section title="CUSTOM API ENDPOINTS">
                 <div className="custom-api-row">
-                  <input id="custom-api-service-name" name="custom-api-service-name" className="custom-api-input" placeholder="Service name" />
-                  <input id="custom-api-base-url" name="custom-api-base-url" className="custom-api-input" placeholder="https://api.example.com" />
-                  <button type="button" className="add-btn">ADD</button>
+                  <input
+                    id="custom-api-service-name"
+                    name="custom-api-service-name"
+                    className="custom-api-input"
+                    placeholder="Service name"
+                    value={customApiDraft.name}
+                    onChange={(e) => updateCustomApiDraftField('name', e.target.value)}
+                  />
+                  <input
+                    id="custom-api-base-url"
+                    name="custom-api-base-url"
+                    className="custom-api-input"
+                    placeholder="https://api.example.com"
+                    value={customApiDraft.baseUrl}
+                    onChange={(e) => updateCustomApiDraftField('baseUrl', e.target.value)}
+                  />
+                  <button type="button" className="add-btn" onClick={addOrUpdateCustomApi}>
+                    {customApiDraft.id ? 'UPDATE' : 'ADD'}
+                  </button>
                 </div>
                 <div className="custom-api-row">
-                  <input id="custom-api-header-key" name="custom-api-header-key" className="custom-api-input" placeholder="Header key" />
-                  <input id="custom-api-token" name="custom-api-token" className="custom-api-input" placeholder="Encrypted token" type="password" />
-                  <button type="button" className="api-test-btn">VERIFY</button>
+                  <input
+                    id="custom-api-header-key"
+                    name="custom-api-header-key"
+                    className="custom-api-input"
+                    placeholder="Header key"
+                    value={customApiDraft.headerKey}
+                    onChange={(e) => updateCustomApiDraftField('headerKey', e.target.value)}
+                  />
+                  <input
+                    id="custom-api-token"
+                    name="custom-api-token"
+                    className="custom-api-input"
+                    placeholder={customApiDraft.mask ? `Stored securely: ${customApiDraft.mask}` : 'Optional secret / token'}
+                    type="password"
+                    value={customApiDraft.token}
+                    onChange={(e) => updateCustomApiDraftField('token', e.target.value)}
+                  />
+                  <button type="button" className="api-test-btn" onClick={verifyCustomApi}>VERIFY</button>
+                </div>
+                <div className="memory-action-status" style={{ marginTop: '10px' }}>
+                  {customApiStatus || 'Add external integrations here. Tokens are stored privately and masked after save.'}
+                </div>
+                <div className="memory-search-results" style={{ marginTop: '12px' }}>
+                  {customApis.length === 0 ? (
+                    <div className="memory-empty-copy">No external integrations registered yet.</div>
+                  ) : (
+                    customApis.map((entry) => (
+                      <div className="memory-result-card" key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
+                        <div>
+                          <div className="memory-result-meta">
+                            <span>{entry.name}</span>
+                            <span>{entry.baseUrl}</span>
+                          </div>
+                          <div className="memory-result-text" style={{ marginTop: '8px' }}>
+                            HEADER: {entry.headerKey || 'none'} {entry.hasToken ? '· TOKEN SAVED' : '· NO TOKEN'}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button type="button" className="footer-btn" onClick={() => editCustomApi(entry)}>EDIT</button>
+                          <button type="button" className="footer-btn footer-btn-reset" onClick={() => removeCustomApi(entry.id)}>REMOVE</button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </Section>
             </div>
@@ -1792,7 +2321,7 @@ function useSettingsModalController({
                   <Segment value={responseDepth} options={['TURBO', 'THINKER', 'DEEP']} onChange={setResponseDepth} />
                 </SettingRow>
                 <SettingRow name="ROUTING POLICY" desc="Select the model handoff strategy for complex requests">
-                  <select className="hud-select" defaultValue="Auto">
+                  <select id="settings-routing-policy" name="settings-routing-policy" className="hud-select" value={routingPolicy} onChange={(event) => setRoutingPolicy(event.target.value)}>
                     <option>Auto</option>
                     <option>Fastest</option>
                     <option>Most Accurate</option>
@@ -2425,12 +2954,12 @@ function useSettingsModalController({
                         {b.status === 'finished' && (
                           <div style={{ display: 'flex', gap: '10px' }}>
                             {b.pdf_url && (
-                              <button className="footer-btn" onClick={() => window.open(`http://127.0.0.1:3088${b.pdf_url}`, '_blank')}>
+                              <button className="footer-btn" onClick={() => openBriefingAsset(b.pdf_url)}>
                                 VIEW PDF
                               </button>
                             )}
                             {b.audio_url && (
-                              <button className="footer-btn" onClick={() => window.open(`http://127.0.0.1:3088${b.audio_url}`, '_blank')}>
+                              <button className="footer-btn" onClick={() => openBriefingAsset(b.audio_url)}>
                                 PLAY AUDIO
                               </button>
                             )}
@@ -2498,6 +3027,8 @@ function useSettingsModalController({
               <Section title="MEMORY SEARCH">
                 <div className="memory-search-stack">
                   <input
+                    id="memory-search-input"
+                    name="memory-search-input"
                     className="custom-api-input memory-search-input"
                     placeholder="Query stored memories, tags, or facts..."
                     value={memorySearchQuery}
@@ -2546,6 +3077,8 @@ function useSettingsModalController({
               <Section title="LICENSE ACTIVATION">
                 <div style={{ display: 'flex', gap: 10, marginBottom: 15 }}>
                   <input
+                    id="settings-license-key"
+                    name="settings-license-key"
                     className="wf-input"
                     placeholder="e.g. ZAIRE-XXXX-XXXX-XXXX-XXXX"
                     value={licenseKeyInput}
@@ -2662,9 +3195,7 @@ function useSettingsModalController({
             <button
               type="button"
               className="footer-btn footer-btn-reset"
-              onClick={() => {
-                if (window.confirm('WIPE ALL SYSTEM PREFERENCES?')) localStorage.clear();
-              }}
+              onClick={factoryReset}
             >
               FACTORY RESET
             </button>
@@ -2672,97 +3203,7 @@ function useSettingsModalController({
             <button
               type="button"
               className="footer-btn footer-btn-apply"
-              onClick={async () => {
-                const configPayload = {
-                  aiVault: {
-                    slots: aiSlots.slice(0, 3)
-                  },
-                  memorySettings: {
-                    memoryDepth,
-                    retentionPeriod,
-                    gazeMemoryEnabled,
-                    crossModeSharing,
-                    privateSession
-                  },
-                  personalization: {
-                    voiceActor,
-                    baseTone,
-                    characteristics,
-                    fastAnswers,
-                    zaireInstructions,
-                    userName,
-                    userOccupation,
-                    userAbout
-                  }
-                };
-
-                try {
-                  const configResponse = await fetch(`${API_URL}/config`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                      aiVault: configPayload.aiVault,
-                      memorySettings: configPayload.memorySettings,
-                      personalization: configPayload.personalization,
-                      desktopProfile: {
-                        licensing: {
-                          cachedLicenseKey: licenseKeyInput.trim() || localStorage.getItem('zaire_license_key') || ''
-                        }
-                      }
-                    })
-                  });
-                  await ensureOk(configResponse, 'Desktop config save');
-
-                  const token = await getToken();
-                  if (token) {
-                    const vaultPayload = {};
-                    aiSlots.forEach(slot => {
-                      if (!slot.apiKey) return;
-                      const p = slot.provider.toLowerCase();
-                      if (p.includes('groq')) vaultPayload.groq_key = slot.apiKey;
-                      else if (p.includes('openai') && !p.includes('azure')) vaultPayload.openai_key = slot.apiKey;
-                      else if (p.includes('gemini')) vaultPayload.gemini_key = slot.apiKey;
-                      else if (p.includes('openrouter')) vaultPayload.openrouter_key = slot.apiKey;
-                    });
-
-                    if (Object.keys(vaultPayload).length > 0) {
-                      const vaultResponse = await fetch(`${API_URL}/api/vault/save`, {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify(vaultPayload)
-                      });
-                      await ensureOk(vaultResponse, 'Vault save');
-                    }
-
-                    const settingsResponse = await fetch(`${API_URL}/api/settings`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                      },
-                      body: JSON.stringify({
-                        agent: configPayload.memorySettings,
-                        voice: configPayload.personalization
-                      })
-                    });
-                    await ensureOk(settingsResponse, 'Settings save');
-                  }
-                } catch (err) {
-                  if (!isNetworkFetchError(err)) {
-                    console.warn('Failed to save config remotely:', err.message || err);
-                  }
-                }
-
-                window.dispatchEvent(new CustomEvent('ZAIRE_PERSIST_CONFIG', {
-                  detail: configPayload
-                }));
-                onClose();
-              }}
+              onClick={applyCoreSync}
             >
               APPLY CORE_SYNC
             </button>

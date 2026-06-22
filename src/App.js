@@ -7,18 +7,19 @@ import GroqSpeechService from './groqSpeechService';
 import { io } from 'socket.io-client';
 import './App.css';
 import ShadowAssistant from './components/ShadowAssistant';
-import GoalExecutionHUD from './components/GoalExecutionHUD';
 import EngineerModeV2 from './components/modes/EngineerModeV2';
 import ProfessorModeV2 from './components/modes/ProfessorModeV2';
 import TraderModeV2 from './components/modes/TraderModeV2';
 import SwarmModeV2 from './components/modes/SwarmModeV2';
 import CustomModeRenderer from './components/CustomModeRenderer';
-import { GhostTranscript, GhostTranscriptionService } from './GhostTranscript';
-import { ClerkProvider, SignedIn, SignedOut, UserButton, useUser, useAuth, SignIn, SignUp } from '@clerk/clerk-react';
+import { UserButton, useUser, useAuth } from '@clerk/clerk-react';
 import { ZaireComponentRegistry, getComponentBlueprintByType } from './engine/ComponentRegistry';
 import * as EliteComponents from './engine/EliteComponents';
 import EliteHUDWrapper from './engine/EliteHUDWrapper';
 import { resolveApiBase } from './apiBase';
+
+/* eslint-disable react-hooks/exhaustive-deps */
+
 const DEFAULT_BLOB_COLOR = '#00b4ff';
 const API_BASE_URL = resolveApiBase();
 const MODE_STORAGE_KEY = 'zaire_custom_modes_v1';
@@ -553,20 +554,6 @@ const DEFAULT_CUSTOM_KANBAN_CARDS = [
   { id: 3, title: 'Database Migration', status: 'done' }
 ];
 
-const DEFAULT_ACTIVITY_FEED = [
-  { time: '15:47', message: 'System boot complete' },
-  { time: '15:46', message: 'Neural core initialized' },
-  { time: '15:45', message: 'Voice synthesis online' },
-  { time: '15:44', message: 'Loading ZAIRE protocol' },
-  { time: '15:43', message: 'Mounting file system' },
-];
-
-const PROFESSOR_SLIDES = [
-  { title: 'Neural Architectures', content: 'Understanding multi-head attention mechanisms in Transformers.', image: null },
-  { title: 'Latent Space', content: 'Visualizing high-dimensional embeddings in vector databases.', image: null },
-  { title: 'Optimization', content: 'Stochastic Gradient Descent vs Adam: A comparative analysis.', image: null }
-];
-
 const DEFAULT_MODE_LAYOUTS = {
   'ZAIRE': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
   'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
@@ -622,7 +609,6 @@ const buildInitialAppState = () => {
     holographicTiltEnabled: localStorage.getItem('zaire_holographic_tilt') !== 'false',
     halalFilterEnabled: true,
     autoLintEnabled: true,
-    authView: window.location.hash.includes('sign-up') ? 'signup' : 'signin',
     zaireResponseStream: '',
     showResponsePanel: false,
     isNeuralInterruptActive: false,
@@ -663,13 +649,11 @@ const buildInitialAppState = () => {
     groqStatus: '',
     isVisionScanning: false,
     visionTaskStatus: null,
-    visionTaskPrompt: '',
     storedMemories: [],
     memoryFlash: false,
     isDiagnosticActive: false,
     chatSessions: [],
     currentSessionId: null,
-    isChatHistoryLoading: false,
     chatSearch: '',
     editingSessionId: null,
     editingTitle: '',
@@ -700,7 +684,6 @@ const buildInitialAppState = () => {
     gameNodes: [],
     neuralVideoData: null,
     isVideoPlaying: false,
-    currentVideoScene: null,
     isNeuralPulseActive: false,
     particles: [],
     cameraStatus: 'pending',
@@ -727,7 +710,6 @@ function useAppController() {
     holographicTiltEnabled,
     halalFilterEnabled,
     autoLintEnabled,
-    authView,
     zaireResponseStream,
     showResponsePanel,
     isNeuralInterruptActive,
@@ -768,13 +750,11 @@ function useAppController() {
     groqStatus,
     isVisionScanning,
     visionTaskStatus,
-    visionTaskPrompt,
     storedMemories,
     memoryFlash,
     isDiagnosticActive,
     chatSessions,
     currentSessionId,
-    isChatHistoryLoading,
     chatSearch,
     editingSessionId,
     editingTitle,
@@ -805,7 +785,6 @@ function useAppController() {
     gameNodes,
     neuralVideoData,
     isVideoPlaying,
-    currentVideoScene,
     isNeuralPulseActive,
     particles,
     cameraStatus,
@@ -817,7 +796,6 @@ function useAppController() {
   const setHolographicTiltEnabled = createAppFieldSetter(dispatchAppState, 'holographicTiltEnabled');
   const setHalalFilterEnabled = createAppFieldSetter(dispatchAppState, 'halalFilterEnabled');
   const setAutoLintEnabled = createAppFieldSetter(dispatchAppState, 'autoLintEnabled');
-  const setAuthView = createAppFieldSetter(dispatchAppState, 'authView');
   const setZaireResponseStream = createAppFieldSetter(dispatchAppState, 'zaireResponseStream');
   const setShowResponsePanel = createAppFieldSetter(dispatchAppState, 'showResponsePanel');
   const setIsNeuralInterruptActive = createAppFieldSetter(dispatchAppState, 'isNeuralInterruptActive');
@@ -858,13 +836,11 @@ function useAppController() {
   const setGroqStatus = createAppFieldSetter(dispatchAppState, 'groqStatus');
   const setIsVisionScanning = createAppFieldSetter(dispatchAppState, 'isVisionScanning');
   const setVisionTaskStatus = createAppFieldSetter(dispatchAppState, 'visionTaskStatus');
-  const setVisionTaskPrompt = createAppFieldSetter(dispatchAppState, 'visionTaskPrompt');
   const setStoredMemories = createAppFieldSetter(dispatchAppState, 'storedMemories');
   const setMemoryFlash = createAppFieldSetter(dispatchAppState, 'memoryFlash');
   const setIsDiagnosticActive = createAppFieldSetter(dispatchAppState, 'isDiagnosticActive');
   const setChatSessions = createAppFieldSetter(dispatchAppState, 'chatSessions');
   const setCurrentSessionId = createAppFieldSetter(dispatchAppState, 'currentSessionId');
-  const setIsChatHistoryLoading = createAppFieldSetter(dispatchAppState, 'isChatHistoryLoading');
   const setChatSearch = createAppFieldSetter(dispatchAppState, 'chatSearch');
   const setEditingSessionId = createAppFieldSetter(dispatchAppState, 'editingSessionId');
   const setEditingTitle = createAppFieldSetter(dispatchAppState, 'editingTitle');
@@ -873,15 +849,12 @@ function useAppController() {
   const setArchiveSessionCache = createAppFieldSetter(dispatchAppState, 'archiveSessionCache');
   const setArchiveReactions = createAppFieldSetter(dispatchAppState, 'archiveReactions');
   const setIsTransitioning = createAppFieldSetter(dispatchAppState, 'isTransitioning');
-  const setForgeCode = createAppFieldSetter(dispatchAppState, 'forgeCode');
   const setProfessorSubMode = createAppFieldSetter(dispatchAppState, 'professorSubMode');
-  const setProfessorTopic = createAppFieldSetter(dispatchAppState, 'professorTopic');
   const setProfessorNoteInput = createAppFieldSetter(dispatchAppState, 'professorNoteInput');
   const setTraderSubMode = createAppFieldSetter(dispatchAppState, 'traderSubMode');
   const setSpecialistData = createAppFieldSetter(dispatchAppState, 'specialistData');
   const setPreviewUrl = createAppFieldSetter(dispatchAppState, 'previewUrl');
   const setShowDiff = createAppFieldSetter(dispatchAppState, 'showDiff');
-  const setDiffData = createAppFieldSetter(dispatchAppState, 'diffData');
   const setShowMatrix = createAppFieldSetter(dispatchAppState, 'showMatrix');
   const setActiveTab = createAppFieldSetter(dispatchAppState, 'activeTab');
   const setManifestedFiles = createAppFieldSetter(dispatchAppState, 'manifestedFiles');
@@ -895,7 +868,6 @@ function useAppController() {
   const setGameNodes = createAppFieldSetter(dispatchAppState, 'gameNodes');
   const setNeuralVideoData = createAppFieldSetter(dispatchAppState, 'neuralVideoData');
   const setIsVideoPlaying = createAppFieldSetter(dispatchAppState, 'isVideoPlaying');
-  const setCurrentVideoScene = createAppFieldSetter(dispatchAppState, 'currentVideoScene');
   const setIsNeuralPulseActive = createAppFieldSetter(dispatchAppState, 'isNeuralPulseActive');
   const setParticles = createAppFieldSetter(dispatchAppState, 'particles');
   const setCameraStatus = createAppFieldSetter(dispatchAppState, 'cameraStatus');
@@ -903,15 +875,6 @@ function useAppController() {
   // ── HUD Customization States ──
 
   // ── Mode-Specific Advanced Toggles ──
-
-  useEffect(() => {
-    const handleHash = () => {
-      if (window.location.hash.includes('sign-up')) setAuthView('signup');
-      else setAuthView('signin');
-    };
-    window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
-  }, []);
 
   // Real-time Socket states
   const socketRef = useRef(null);
@@ -921,6 +884,8 @@ function useAppController() {
     chatsLogged: false,
     specialistLogged: false
   });
+  const socketTimeoutLoggedRef = useRef(false);
+  const hudRestoreLoggedRef = useRef(false);
 
 
   // Biometric State
@@ -1104,6 +1069,10 @@ function useAppController() {
           blobSize,
           blobPosition: blobPositionRef.current
         },
+        specialistToggles: {
+          halalFilterEnabled,
+          autoLintEnabled
+        },
         licensing: {
           cachedLicenseKey: localStorage.getItem('zaire_license_key') || ''
         }
@@ -1149,6 +1118,14 @@ function useAppController() {
     if (desktopProfile.archiveReactions && typeof desktopProfile.archiveReactions === 'object') {
       setArchiveReactions(desktopProfile.archiveReactions);
       localStorage.setItem('zaire_archive_reactions_v1', JSON.stringify(desktopProfile.archiveReactions));
+    }
+    if (desktopProfile.specialistToggles && typeof desktopProfile.specialistToggles === 'object') {
+      if (desktopProfile.specialistToggles.halalFilterEnabled !== undefined) {
+        setHalalFilterEnabled(Boolean(desktopProfile.specialistToggles.halalFilterEnabled));
+      }
+      if (desktopProfile.specialistToggles.autoLintEnabled !== undefined) {
+        setAutoLintEnabled(Boolean(desktopProfile.specialistToggles.autoLintEnabled));
+      }
     }
 
     const cachedLicenseKey = desktopProfile?.licensing?.cachedLicenseKey;
@@ -1227,8 +1204,6 @@ function useAppController() {
     blobPositionRef.current = savedBlobPosition ? JSON.parse(savedBlobPosition) : { x: 0, y: 0 };
   }
 
-  const activityFeed = DEFAULT_ACTIVITY_FEED;
-
   const mainGroupRef = useRef(null);
   const blobSizeRef = useRef(blobSize);
   const blobColorRef = useRef(blobColor);
@@ -1274,7 +1249,6 @@ function useAppController() {
       });
       const data = await response.json();
       if (data.success) {
-        setVisionTaskPrompt(taskText);
         setVisionTaskStatus({ running: true, status: 'started', steps: [] });
       } else {
         alert(data.error);
@@ -1345,7 +1319,15 @@ function useAppController() {
   }, [activeMode]);
 
   const handleSocketConnectError = React.useEffectEvent((err) => {
-    console.error('[SOCKET] Connection error:', err.message);
+    const message = err?.message || 'unknown socket error';
+    if (/timeout/i.test(message)) {
+      if (!socketTimeoutLoggedRef.current) {
+        console.warn('[SOCKET] Backend connection is taking longer than expected. Retrying...');
+        socketTimeoutLoggedRef.current = true;
+      }
+      return;
+    }
+    console.error('[SOCKET] Connection error:', message);
   });
 
   const handleAudioChunk = React.useEffectEvent((data) => {
@@ -1397,6 +1379,7 @@ function useAppController() {
   const handleDiagnosticAlert = React.useEffectEvent((active) => {
     setIsDiagnosticActive(active);
   });
+  void handleSystemActionEvent;
 
   const handleIntruderSnapshots = React.useEffectEvent((data) => {
     if (data.snapshots) intruderSnapshotsRef.current = data.snapshots;
@@ -1429,20 +1412,6 @@ function useAppController() {
   const darwinResetTimeoutRef = useRef(null);
   const customIdRef = useRef(1);
 
-  const fetchDiff = async (filename) => {
-    try {
-      const res = await fetch(`http://localhost:3002/agent/specialist_action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'ENGINEER', action: 'GIT_DIFF', payload: { filename } })
-      });
-      const data = await res.json();
-      if (data.success) setDiffData(data.result.diff);
-    } catch (e) {
-      console.error("Diff fetch failed:", e);
-    }
-  };
-
   const syncForgeTelemetryState = React.useEffectEvent(() => {
     if (specialistData?.forge_telemetry?.darwin_results) {
       setDarwinResults(specialistData.forge_telemetry.darwin_results);
@@ -1472,7 +1441,6 @@ function useAppController() {
   }, [specialistData, activeMode, forgeCode]);
 
   const liveCodeStreamRef = useRef('');
-  const professorSlides = PROFESSOR_SLIDES;
 
   useEffect(() => {
     localStorage.setItem('zaire_mode_layouts_v1', JSON.stringify(modeLayouts));
@@ -1576,15 +1544,6 @@ function useAppController() {
     const nextId = customIdRef.current;
     customIdRef.current += 1;
     return nextId;
-  }, []);
-
-  const handleOpenEngineerFile = React.useCallback((node) => {
-    if (!socketRef.current) return;
-    socketRef.current.emit('SPECIALIST_ACTION', {
-      mode: 'ENGINEER',
-      action: 'OPEN_FILE',
-      payload: { filename: node.name }
-    });
   }, []);
 
   const addCustomTask = React.useCallback(() => {
@@ -1848,7 +1807,7 @@ function useAppController() {
   // Function to fetch TTS audio via HTTP
   const fetchTTSAudio = React.useEffectEvent(async (text) => {
     try {
-      const response = await fetch('/tts', {
+      const response = await fetch(`${API_BASE_URL}/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, pitch: '+0Hz', rate: '+5%' })
@@ -1862,7 +1821,7 @@ function useAppController() {
       ttsWarningLoggedRef.current = false;
       return new Uint8Array(arrayBuffer);
     } catch (err) {
-      if (!isNetworkFetchError(err) && !ttsWarningLoggedRef.current) {
+      if (!ttsWarningLoggedRef.current) {
         console.warn('[TTS HTTP] Voice synthesis unavailable, continuing with text only.', err?.message || err);
         ttsWarningLoggedRef.current = true;
       }
@@ -1997,13 +1956,6 @@ function useAppController() {
     }
   };
 
-  const handleLoadSession = (sessionId) => {
-    if (socketRef.current) {
-      socketRef.current.emit('load_session', { sessionId });
-      setIsArchivesPageOpen(false);
-    }
-  };
-
   const loadArchiveSessionDetail = React.useCallback(async (sessionId) => {
     if (!sessionId || archiveSessionCache[sessionId]) return archiveSessionCache[sessionId];
     try {
@@ -2025,52 +1977,6 @@ function useAppController() {
       loadArchiveSessionDetail(chatSessions[0].id);
     }
   }, [isArchivesPageOpen, chatSessions, selectedArchiveId, loadArchiveSessionDetail]);
-
-  const transcriptFromSession = (session) => {
-    if (!session?.messages) return '';
-    return session.messages
-      .map(m => `${m.role === 'user' ? 'USER' : 'ZAIRE'}: ${m.content}`)
-      .join('\n\n');
-  };
-
-  const handleArchiveCopy = async (sessionId) => {
-    const detail = await loadArchiveSessionDetail(sessionId);
-    if (!detail) return;
-    const transcript = transcriptFromSession(detail);
-    if (!transcript) return;
-    try {
-      await navigator.clipboard.writeText(transcript);
-      appendSystemActionLogEntry(systemActionLogRef, {
-        time: new Date().toLocaleTimeString(),
-        message: `ARCHIVE COPIED: ${detail.title || sessionId}`
-      });
-    } catch (e) {
-      console.error('Copy failed:', e);
-    }
-  };
-
-  const handleArchiveShare = async (sessionId) => {
-    const detail = await loadArchiveSessionDetail(sessionId);
-    if (!detail) return;
-    const transcript = transcriptFromSession(detail);
-    const payload = {
-      title: `ZAIRE Archive: ${detail.title || 'Untitled Chat'}`,
-      text: transcript.slice(0, 4000)
-    };
-    try {
-      if (navigator.share) {
-        await navigator.share(payload);
-      } else {
-        await navigator.clipboard.writeText(payload.text);
-      }
-      appendSystemActionLogEntry(systemActionLogRef, {
-        time: new Date().toLocaleTimeString(),
-        message: `ARCHIVE SHARED: ${detail.title || sessionId}`
-      });
-    } catch (e) {
-      console.error('Share failed:', e);
-    }
-  };
 
   const handleArchiveReaction = (sessionId, reaction) => {
     setArchiveReactions(prev => ({ ...prev, [sessionId]: reaction }));
@@ -2107,7 +2013,10 @@ function useAppController() {
     fetchJsonOrThrow(`${API_BASE_URL}/config`)
       .then(res => {
         if (res.success && res.data) {
-          console.log('[SYSTEM] Restored HUD config from core.');
+          if (!hudRestoreLoggedRef.current) {
+            console.log('[SYSTEM] Restored HUD config from core.');
+            hudRestoreLoggedRef.current = true;
+          }
           applyDesktopProfile(res.data);
         }
       })
@@ -2141,6 +2050,7 @@ function useAppController() {
   ]);
 
   const handleSocketConnect = React.useEffectEvent(() => {
+    socketTimeoutLoggedRef.current = false;
     console.log('[SOCKET] Connected to backend');
     socketRef.current.emit('REQUEST_SYNC');
   });
@@ -2264,6 +2174,7 @@ function useAppController() {
     else if (action.type === 'hotkey') label = `[HOTKEY] ${action.keys.join('+').toUpperCase()}`;
     appendSystemActionLogEntry(systemActionLogRef, { time, label });
   });
+  void handleSystemAction;
 
   const handleNeuralInterrupt = React.useEffectEvent((data) => {
     const { text, type } = data;
@@ -6226,21 +6137,6 @@ function useAppController() {
           <ZaireSplash onComplete={() => setIsSystemEngaged(true)} />
         )}
       </>
-
-      {false && (
-        <SignedOut>
-          <div className="zaire-auth-container-glass">
-            <div className="auth-box-wrapper">
-              <h1 className="auth-brand-title">ZAIRE OS</h1>
-              {authView === 'signin' ? (
-                <SignIn routing="hash" signUpUrl="#sign-up" forceRedirectUrl="/" />
-              ) : (
-                <SignUp routing="hash" signInUrl="#sign-in" forceRedirectUrl="/" />
-              )}
-            </div>
-          </div>
-        </SignedOut>
-      )}
     </div>
   );
 

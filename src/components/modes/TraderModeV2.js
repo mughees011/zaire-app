@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Bell, List, AlertTriangle, Crosshair, Users, ArrowUpRight, ArrowDownRight, RefreshCcw, TrendingUp, Cpu, Radar, Network, ShieldCheck } from 'lucide-react';
+import { Activity, List, Network, ShieldCheck } from 'lucide-react';
 import './TraderModeV2.css';
 
 const TraderModeV2 = () => {
@@ -37,7 +37,7 @@ const TraderModeV2 = () => {
         
         {/* Left: The Ultimate Recommendation */}
         <div className="t-decision-action">
-          <div className="d-asset-name">{activeAsset} // ZAIRE AI PREDICTION</div>
+          <div className="d-asset-name">{activeAsset}{' // '}ZAIRE AI PREDICTION</div>
           <div className="d-action-title">TARGET ACTION</div>
           <div className="d-action-val">STRONG BUY</div>
         </div>

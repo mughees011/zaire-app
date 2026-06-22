@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Terminal, AlertTriangle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Terminal, AlertTriangle, RefreshCw } from 'lucide-react';
 import { ComponentShell, ComponentHeader, ComponentStatusBar, ComponentEmptyState, ComponentActionButton } from './ComponentShell';
 import { useZaireOS } from '../../engine/ZaireOSContext';
 

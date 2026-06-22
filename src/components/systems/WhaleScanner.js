@@ -12,7 +12,7 @@ const MOCK_ALERTS = [
 const TYPE_COLORS = { DUMP_WARNING: '#ef4444', ACCUMULATION: '#10b981', LIQUIDATION: '#f59e0b' };
 
 export default function WhaleScanner({ accent = '#ef4444' }) {
-  const [alerts, setAlerts] = useState(MOCK_ALERTS);
+  const [alerts] = useState(MOCK_ALERTS);
   const [alertSet, setAlertSet] = useState(new Set());
 
   const toggleAlert = (id) => setAlertSet(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, TrendingUp, TrendingDown, DollarSign, Star, Plus } from 'lucide-react';
-import { ComponentShell, ComponentHeader, ComponentStatusBar, ComponentActionButton } from './ComponentShell';
+import { Activity, TrendingUp, TrendingDown, DollarSign, Star } from 'lucide-react';
+import { ComponentShell, ComponentHeader, ComponentStatusBar } from './ComponentShell';
 
 const INITIAL_ASSETS = [
   { symbol: 'BTC', name: 'Bitcoin',  price: 64230.00, change: +2.4, signal: 'STRONG BUY', score: 98, risk: 'Medium', vol: '42B',  watchlist: true },

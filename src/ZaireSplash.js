@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import './ZaireSplash.css';
+/* eslint-disable react-hooks/exhaustive-deps */
 
 /* ── Exact same params as App.js main orb ── */
 const PARAMS = {
@@ -75,10 +76,7 @@ const NOISE_GLSL = `
 /* ── Timing constants (seconds) ── */
 const T_ORB_RISE_END   = 0.5;   // frame 15
 const T_HEX_FADE_END   = 1.5;   // frame 45
-const T_TEXT_APPEAR    = 1.5;   // frame 45
-const T_SCAN_END       = 2.2;   // frame 65
 const T_FLASH_START    = 2.2;   // frame 65
-const T_TOTAL          = 2.5;   // frame 75 — cut
 const T_EXIT_BUFFER    = 0.3;   // CSS exit animation
 
 export default function ZaireSplash({ onComplete, isReady = true }) {

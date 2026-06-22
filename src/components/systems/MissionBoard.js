@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, CheckCircle2, Clock, AlertCircle, PlayCircle, Plus, ChevronRight, Activity, Zap } from 'lucide-react';
-import { ComponentShell, ComponentHeader, ComponentStatusBar, ComponentEmptyState, ComponentActionButton, ComponentMetricCard } from './ComponentShell';
+import { Target, CheckCircle2, Clock, AlertCircle, PlayCircle, Plus, ChevronRight } from 'lucide-react';
+import { ComponentShell, ComponentHeader, ComponentStatusBar, ComponentEmptyState, ComponentActionButton } from './ComponentShell';
 import { useZaireOS } from '../../engine/ZaireOSContext';
 
 // SVG Progress Ring

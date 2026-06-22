@@ -4,7 +4,6 @@ import './ProfessorModeV2.css';
 
 const ProfessorModeV2 = () => {
   const [activeLeft, setActiveLeft] = useState('courses');
-  const [activeRight, setActiveRight] = useState('graph');
 
   // Dummy State
   const subjects = [

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SquareTerminal, Send, Mic, Zap, ChevronRight, Bot, User, Sparkles, AlertCircle } from 'lucide-react';
-import { ComponentShell, ComponentHeader, ComponentStatusBar, ComponentEmptyState, ComponentActionButton } from './ComponentShell';
+import { SquareTerminal, Send, Mic, ChevronRight, Bot, User, Sparkles } from 'lucide-react';
+import { ComponentShell, ComponentHeader, ComponentStatusBar, ComponentEmptyState } from './ComponentShell';
 import { useZaireOS } from '../../engine/ZaireOSContext';
 
 const SUGGESTED_ACTIONS = [

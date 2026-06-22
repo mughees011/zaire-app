@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import ReactFlow, { Background, Controls, applyNodeChanges, applyEdgeChanges, addEdge } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Network, Cpu, Server, Database, Cloud, Search, ZoomIn, ZoomOut } from 'lucide-react';
+import { Network, Cpu, Server, Database, Cloud, Search } from 'lucide-react';
 import { ComponentShell, ComponentHeader, ComponentStatusBar } from './ComponentShell';
 import { useZaireOS } from '../../engine/ZaireOSContext';
 

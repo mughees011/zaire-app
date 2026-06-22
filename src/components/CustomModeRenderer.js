@@ -43,7 +43,7 @@ function buildDefaultLayout(components) {
 
   components.forEach((comp) => {
     const zone = (comp.zone || 'Main Workspace').toLowerCase();
-    let x = 3, w = 6, h = 12;
+    let x = 3, w = 6;
 
     if (zone.includes('left')) {
       x = 0; w = 3;
@@ -147,7 +147,7 @@ export default function CustomModeRenderer({ mode }) {
     // Build fresh default layout
     setLayout(buildDefaultLayout(mode.components));
     setMounted(true);
-  }, [mode?.id]);
+  }, [mode?.id, mode?.components, storageKey]);
 
   const handleLayoutChange = useCallback((newLayout) => {
     setLayout(newLayout);
