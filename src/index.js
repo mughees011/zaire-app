@@ -6,26 +6,14 @@ import ErrorBoundary from './ErrorBoundary';
 import NetworkStatus from './NetworkStatus';
 import reportWebVitals from './reportWebVitals';
 import { ClerkProvider } from '@clerk/clerk-react';
+import { ClerkAuthBridge, isClerkEnabled, LocalAuthProvider } from './authAdapter';
 import { resolveApiBase } from './apiBase';
 
-const DEV_PUBLISHABLE_KEY = "pk_test_dHJ1c3RpbmctZ25hdC0yMS5jbGVyay5hY2NvdW50cy5kZXYk";
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
-const isLocalRuntime = typeof window !== 'undefined' && LOCAL_HOSTS.has(window.location.hostname);
 const ENV_PUBLISHABLE_KEY = process.env.REACT_APP_CLERK_PUBLISHABLE_KEY || '';
-const PUBLISHABLE_KEY = ENV_PUBLISHABLE_KEY || (isLocalRuntime ? DEV_PUBLISHABLE_KEY : '');
+const PUBLISHABLE_KEY = ENV_PUBLISHABLE_KEY;
 const API_BASE_URL = resolveApiBase();
 
-if (PUBLISHABLE_KEY && PUBLISHABLE_KEY.startsWith('pk_test_')) {
-  console.warn(
-    '[ZAIRE] Clerk is using a development publishable key. Set REACT_APP_CLERK_PUBLISHABLE_KEY to your production Clerk key before launch.'
-  );
-}
 
-if (!PUBLISHABLE_KEY) {
-  console.warn(
-    '[ZAIRE] Clerk publishable key is not configured. Authentication UI is disabled until REACT_APP_CLERK_PUBLISHABLE_KEY is set.'
-  );
-}
 
 const originalFetch = window.fetch;
 window.fetch = async (url, options = {}) => {
@@ -61,7 +49,7 @@ const appTree = (
   </ErrorBoundary>
 );
 
-const rootTree = PUBLISHABLE_KEY ? (
+const rootTree = isClerkEnabled ? (
   <ClerkProvider
     publishableKey={PUBLISHABLE_KEY}
     afterSignOutUrl="/"
@@ -97,9 +85,9 @@ const rootTree = PUBLISHABLE_KEY ? (
       }
     }}
   >
-    {appTree}
+    <ClerkAuthBridge>{appTree}</ClerkAuthBridge>
   </ClerkProvider>
-) : appTree;
+) : <LocalAuthProvider>{appTree}</LocalAuthProvider>;
 
 root.render(
   <React.StrictMode>

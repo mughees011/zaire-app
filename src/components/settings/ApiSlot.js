@@ -1,12 +1,33 @@
 import React from 'react';
 
-export default function ApiSlot({ slot, status, provider, purpose, model, apiKey, baseUrl, empty = false, onChange, mask }) {
+export default function ApiSlot({
+  slot,
+  status,
+  provider,
+  purpose,
+  model,
+  apiKey,
+  baseUrl,
+  empty = false,
+  onChange,
+  mask,
+  helperText,
+  onTest,
+  onClear
+}) {
   const baseId = `api-slot-${slot}`;
+  const statusClass = empty
+    ? 'empty'
+    : status === 'READY'
+      ? 'connected'
+      : status === 'NEEDS KEY'
+        ? 'pending'
+        : 'pending';
   return (
     <div className="api-slot">
       <div className="api-slot-header">
         <span className="api-provider">SLOT {slot}</span>
-        <span className={`api-status ${empty ? 'empty' : status === 'PENDING' ? 'pending' : 'connected'}`}>
+        <span className={`api-status ${statusClass}`}>
           {status}
         </span>
       </div>
@@ -66,6 +87,11 @@ export default function ApiSlot({ slot, status, provider, purpose, model, apiKey
           <option>Fallback</option>
         </select>
         <button type="button" className="api-test-btn" onClick={() => onChange({ enabled: provider !== 'Empty' })}>SET</button>
+        <button type="button" className="api-test-btn" onClick={onTest}>TEST</button>
+        <button type="button" className="api-test-btn" onClick={onClear}>CLEAR</button>
+      </div>
+      <div className="memory-action-status" style={{ marginTop: '8px' }}>
+        {helperText || (mask ? `Saved state detected: ${mask}` : 'Paste a provider key, then test or save this slot.')}
       </div>
     </div>
   );

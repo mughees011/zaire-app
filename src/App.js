@@ -12,7 +12,7 @@ import ProfessorModeV2 from './components/modes/ProfessorModeV2';
 import TraderModeV2 from './components/modes/TraderModeV2';
 import SwarmModeV2 from './components/modes/SwarmModeV2';
 import CustomModeRenderer from './components/CustomModeRenderer';
-import { UserButton, useUser, useAuth } from '@clerk/clerk-react';
+import { OptionalUserButton as UserButton, useOptionalUser as useUser, useOptionalAuth as useAuth } from './authAdapter';
 import { ZaireComponentRegistry, getComponentBlueprintByType } from './engine/ComponentRegistry';
 import * as EliteComponents from './engine/EliteComponents';
 import EliteHUDWrapper from './engine/EliteHUDWrapper';
@@ -451,7 +451,7 @@ const buildInitialAppState = () => {
     isOmniBoxOpen: false,
     omniInput: '',
     isSystemEngaged: false,
-    activeMode: 'ENGINEER',
+    activeMode: 'ZAIRE',
     coreModeVisibility: normalizeCoreModeVisibility(storedCoreModeVisibility),
     customModes: Array.isArray(storedModes) ? storedModes.map(sanitizeCustomModeRecord) : [],
     activeCustomMode: null,
@@ -524,8 +524,10 @@ const buildInitialAppState = () => {
   };
 };
 
-const createAppFieldSetter = (dispatch, field) => (value) => {
-  dispatch({ type: 'SET_FIELD', field, value });
+const useAppFieldSetter = (dispatch, field) => {
+  return useCallback((value) => {
+    dispatch({ type: 'SET_FIELD', field, value });
+  }, [dispatch, field]);
 };
 
 function useAppController() {
@@ -623,87 +625,87 @@ function useAppController() {
     cameraStatus,
     billingStatus
   } = appState;
-  const setBillingStatus = createAppFieldSetter(dispatchAppState, 'billingStatus');
-  const setHudOpacity = createAppFieldSetter(dispatchAppState, 'hudOpacity');
-  const setNeuralGlowEnabled = createAppFieldSetter(dispatchAppState, 'neuralGlowEnabled');
-  const setHolographicTiltEnabled = createAppFieldSetter(dispatchAppState, 'holographicTiltEnabled');
-  const setHalalFilterEnabled = createAppFieldSetter(dispatchAppState, 'halalFilterEnabled');
-  const setAutoLintEnabled = createAppFieldSetter(dispatchAppState, 'autoLintEnabled');
-  const setZaireResponseStream = createAppFieldSetter(dispatchAppState, 'zaireResponseStream');
-  const setShowResponsePanel = createAppFieldSetter(dispatchAppState, 'showResponsePanel');
-  const setIsNeuralInterruptActive = createAppFieldSetter(dispatchAppState, 'isNeuralInterruptActive');
-  const setZaireActionFeed = createAppFieldSetter(dispatchAppState, 'zaireActionFeed');
-  const setIsUpgradeLoading = createAppFieldSetter(dispatchAppState, 'isUpgradeLoading');
-  const setLiveMetrics = createAppFieldSetter(dispatchAppState, 'liveMetrics');
-  const setIsOmniBoxOpen = createAppFieldSetter(dispatchAppState, 'isOmniBoxOpen');
-  const setOmniInput = createAppFieldSetter(dispatchAppState, 'omniInput');
-  const setIsSystemEngaged = createAppFieldSetter(dispatchAppState, 'isSystemEngaged');
-  const setActiveMode = createAppFieldSetter(dispatchAppState, 'activeMode');
-  const setCoreModeVisibility = createAppFieldSetter(dispatchAppState, 'coreModeVisibility');
-  const setCustomModes = createAppFieldSetter(dispatchAppState, 'customModes');
-  const setActiveCustomMode = createAppFieldSetter(dispatchAppState, 'activeCustomMode');
-  const setCustomTasks = createAppFieldSetter(dispatchAppState, 'customTasks');
-  const setCustomNotes = createAppFieldSetter(dispatchAppState, 'customNotes');
-  const setCustomChatInput = createAppFieldSetter(dispatchAppState, 'customChatInput');
-  const setCustomTerminalInput = createAppFieldSetter(dispatchAppState, 'customTerminalInput');
-  const setCustomTerminalLines = createAppFieldSetter(dispatchAppState, 'customTerminalLines');
-  const setCustomEditorText = createAppFieldSetter(dispatchAppState, 'customEditorText');
-  const setCustomKanbanCards = createAppFieldSetter(dispatchAppState, 'customKanbanCards');
-  const setZaireStatus = createAppFieldSetter(dispatchAppState, 'zaireStatus');
-  const setTimeStr = createAppFieldSetter(dispatchAppState, 'timeStr');
-  const setNavItem = createAppFieldSetter(dispatchAppState, 'navItem');
-  const setIsSettingsOpen = createAppFieldSetter(dispatchAppState, 'isSettingsOpen');
-  const setIsDragging = createAppFieldSetter(dispatchAppState, 'isDragging');
-  const setIsMicrophoneActive = createAppFieldSetter(dispatchAppState, 'isMicrophoneActive');
-  const setFocusModeEnabled = createAppFieldSetter(dispatchAppState, 'focusModeEnabled');
-  const setPerformanceProfile = createAppFieldSetter(dispatchAppState, 'performanceProfile');
-  const setAudioFrequency = createAppFieldSetter(dispatchAppState, 'audioFrequency');
-  const setBlobColor = createAppFieldSetter(dispatchAppState, 'blobColor');
-  const setBlobSize = createAppFieldSetter(dispatchAppState, 'blobSize');
-  const setLastCommand = createAppFieldSetter(dispatchAppState, 'lastCommand');
-  const setRecognizedText = createAppFieldSetter(dispatchAppState, 'recognizedText');
-  const setFinalRecognizedText = createAppFieldSetter(dispatchAppState, 'finalRecognizedText');
-  const setInputValue = createAppFieldSetter(dispatchAppState, 'inputValue');
-  const setIsTyping = createAppFieldSetter(dispatchAppState, 'isTyping');
-  const setUseGroqSpeech = createAppFieldSetter(dispatchAppState, 'useGroqSpeech');
-  const setGroqStatus = createAppFieldSetter(dispatchAppState, 'groqStatus');
-  const setIsVisionScanning = createAppFieldSetter(dispatchAppState, 'isVisionScanning');
-  const setVisionTaskStatus = createAppFieldSetter(dispatchAppState, 'visionTaskStatus');
-  const setStoredMemories = createAppFieldSetter(dispatchAppState, 'storedMemories');
-  const setMemoryFlash = createAppFieldSetter(dispatchAppState, 'memoryFlash');
-  const setIsDiagnosticActive = createAppFieldSetter(dispatchAppState, 'isDiagnosticActive');
-  const setChatSessions = createAppFieldSetter(dispatchAppState, 'chatSessions');
-  const setCurrentSessionId = createAppFieldSetter(dispatchAppState, 'currentSessionId');
-  const setChatSearch = createAppFieldSetter(dispatchAppState, 'chatSearch');
-  const setEditingSessionId = createAppFieldSetter(dispatchAppState, 'editingSessionId');
-  const setEditingTitle = createAppFieldSetter(dispatchAppState, 'editingTitle');
-  const setIsArchivesPageOpen = createAppFieldSetter(dispatchAppState, 'isArchivesPageOpen');
-  const setSelectedArchiveId = createAppFieldSetter(dispatchAppState, 'selectedArchiveId');
-  const setArchiveSessionCache = createAppFieldSetter(dispatchAppState, 'archiveSessionCache');
-  const setArchiveReactions = createAppFieldSetter(dispatchAppState, 'archiveReactions');
-  const setIsTransitioning = createAppFieldSetter(dispatchAppState, 'isTransitioning');
-  const setProfessorSubMode = createAppFieldSetter(dispatchAppState, 'professorSubMode');
-  const setProfessorNoteInput = createAppFieldSetter(dispatchAppState, 'professorNoteInput');
-  const setTraderSubMode = createAppFieldSetter(dispatchAppState, 'traderSubMode');
-  const setSpecialistData = createAppFieldSetter(dispatchAppState, 'specialistData');
-  const setPreviewUrl = createAppFieldSetter(dispatchAppState, 'previewUrl');
-  const setShowDiff = createAppFieldSetter(dispatchAppState, 'showDiff');
-  const setShowMatrix = createAppFieldSetter(dispatchAppState, 'showMatrix');
-  const setActiveTab = createAppFieldSetter(dispatchAppState, 'activeTab');
-  const setManifestedFiles = createAppFieldSetter(dispatchAppState, 'manifestedFiles');
-  const setDarwinResults = createAppFieldSetter(dispatchAppState, 'darwinResults');
-  const setThermalActive = createAppFieldSetter(dispatchAppState, 'thermalActive');
-  const setModeLayouts = createAppFieldSetter(dispatchAppState, 'modeLayouts');
-  const setComponentNudges = createAppFieldSetter(dispatchAppState, 'componentNudges');
-  const setSelectedComponent = createAppFieldSetter(dispatchAppState, 'selectedComponent');
-  const setIsMinigameActive = createAppFieldSetter(dispatchAppState, 'isMinigameActive');
-  const setMinigameScore = createAppFieldSetter(dispatchAppState, 'minigameScore');
-  const setGameNodes = createAppFieldSetter(dispatchAppState, 'gameNodes');
-  const setNeuralVideoData = createAppFieldSetter(dispatchAppState, 'neuralVideoData');
-  const setIsVideoPlaying = createAppFieldSetter(dispatchAppState, 'isVideoPlaying');
-  const setIsNeuralPulseActive = createAppFieldSetter(dispatchAppState, 'isNeuralPulseActive');
-  const setParticles = createAppFieldSetter(dispatchAppState, 'particles');
-  const setCameraStatus = createAppFieldSetter(dispatchAppState, 'cameraStatus');
+  const setBillingStatus = useAppFieldSetter(dispatchAppState, 'billingStatus');
+  const setHudOpacity = useAppFieldSetter(dispatchAppState, 'hudOpacity');
+  const setNeuralGlowEnabled = useAppFieldSetter(dispatchAppState, 'neuralGlowEnabled');
+  const setHolographicTiltEnabled = useAppFieldSetter(dispatchAppState, 'holographicTiltEnabled');
+  const setHalalFilterEnabled = useAppFieldSetter(dispatchAppState, 'halalFilterEnabled');
+  const setAutoLintEnabled = useAppFieldSetter(dispatchAppState, 'autoLintEnabled');
+  const setZaireResponseStream = useAppFieldSetter(dispatchAppState, 'zaireResponseStream');
+  const setShowResponsePanel = useAppFieldSetter(dispatchAppState, 'showResponsePanel');
+  const setIsNeuralInterruptActive = useAppFieldSetter(dispatchAppState, 'isNeuralInterruptActive');
+  const setZaireActionFeed = useAppFieldSetter(dispatchAppState, 'zaireActionFeed');
+  const setIsUpgradeLoading = useAppFieldSetter(dispatchAppState, 'isUpgradeLoading');
+  const setLiveMetrics = useAppFieldSetter(dispatchAppState, 'liveMetrics');
+  const setIsOmniBoxOpen = useAppFieldSetter(dispatchAppState, 'isOmniBoxOpen');
+  const setOmniInput = useAppFieldSetter(dispatchAppState, 'omniInput');
+  const setIsSystemEngaged = useAppFieldSetter(dispatchAppState, 'isSystemEngaged');
+  const setActiveMode = useAppFieldSetter(dispatchAppState, 'activeMode');
+  const setCoreModeVisibility = useAppFieldSetter(dispatchAppState, 'coreModeVisibility');
+  const setCustomModes = useAppFieldSetter(dispatchAppState, 'customModes');
+  const setActiveCustomMode = useAppFieldSetter(dispatchAppState, 'activeCustomMode');
+  const setCustomTasks = useAppFieldSetter(dispatchAppState, 'customTasks');
+  const setCustomNotes = useAppFieldSetter(dispatchAppState, 'customNotes');
+  const setCustomChatInput = useAppFieldSetter(dispatchAppState, 'customChatInput');
+  const setCustomTerminalInput = useAppFieldSetter(dispatchAppState, 'customTerminalInput');
+  const setCustomTerminalLines = useAppFieldSetter(dispatchAppState, 'customTerminalLines');
+  const setCustomEditorText = useAppFieldSetter(dispatchAppState, 'customEditorText');
+  const setCustomKanbanCards = useAppFieldSetter(dispatchAppState, 'customKanbanCards');
+  const setZaireStatus = useAppFieldSetter(dispatchAppState, 'zaireStatus');
+  const setTimeStr = useAppFieldSetter(dispatchAppState, 'timeStr');
+  const setNavItem = useAppFieldSetter(dispatchAppState, 'navItem');
+  const setIsSettingsOpen = useAppFieldSetter(dispatchAppState, 'isSettingsOpen');
+  const setIsDragging = useAppFieldSetter(dispatchAppState, 'isDragging');
+  const setIsMicrophoneActive = useAppFieldSetter(dispatchAppState, 'isMicrophoneActive');
+  const setFocusModeEnabled = useAppFieldSetter(dispatchAppState, 'focusModeEnabled');
+  const setPerformanceProfile = useAppFieldSetter(dispatchAppState, 'performanceProfile');
+  const setAudioFrequency = useAppFieldSetter(dispatchAppState, 'audioFrequency');
+  const setBlobColor = useAppFieldSetter(dispatchAppState, 'blobColor');
+  const setBlobSize = useAppFieldSetter(dispatchAppState, 'blobSize');
+  const setLastCommand = useAppFieldSetter(dispatchAppState, 'lastCommand');
+  const setRecognizedText = useAppFieldSetter(dispatchAppState, 'recognizedText');
+  const setFinalRecognizedText = useAppFieldSetter(dispatchAppState, 'finalRecognizedText');
+  const setInputValue = useAppFieldSetter(dispatchAppState, 'inputValue');
+  const setIsTyping = useAppFieldSetter(dispatchAppState, 'isTyping');
+  const setUseGroqSpeech = useAppFieldSetter(dispatchAppState, 'useGroqSpeech');
+  const setGroqStatus = useAppFieldSetter(dispatchAppState, 'groqStatus');
+  const setIsVisionScanning = useAppFieldSetter(dispatchAppState, 'isVisionScanning');
+  const setVisionTaskStatus = useAppFieldSetter(dispatchAppState, 'visionTaskStatus');
+  const setStoredMemories = useAppFieldSetter(dispatchAppState, 'storedMemories');
+  const setMemoryFlash = useAppFieldSetter(dispatchAppState, 'memoryFlash');
+  const setIsDiagnosticActive = useAppFieldSetter(dispatchAppState, 'isDiagnosticActive');
+  const setChatSessions = useAppFieldSetter(dispatchAppState, 'chatSessions');
+  const setCurrentSessionId = useAppFieldSetter(dispatchAppState, 'currentSessionId');
+  const setChatSearch = useAppFieldSetter(dispatchAppState, 'chatSearch');
+  const setEditingSessionId = useAppFieldSetter(dispatchAppState, 'editingSessionId');
+  const setEditingTitle = useAppFieldSetter(dispatchAppState, 'editingTitle');
+  const setIsArchivesPageOpen = useAppFieldSetter(dispatchAppState, 'isArchivesPageOpen');
+  const setSelectedArchiveId = useAppFieldSetter(dispatchAppState, 'selectedArchiveId');
+  const setArchiveSessionCache = useAppFieldSetter(dispatchAppState, 'archiveSessionCache');
+  const setArchiveReactions = useAppFieldSetter(dispatchAppState, 'archiveReactions');
+  const setIsTransitioning = useAppFieldSetter(dispatchAppState, 'isTransitioning');
+  const setProfessorSubMode = useAppFieldSetter(dispatchAppState, 'professorSubMode');
+  const setProfessorNoteInput = useAppFieldSetter(dispatchAppState, 'professorNoteInput');
+  const setTraderSubMode = useAppFieldSetter(dispatchAppState, 'traderSubMode');
+  const setSpecialistData = useAppFieldSetter(dispatchAppState, 'specialistData');
+  const setPreviewUrl = useAppFieldSetter(dispatchAppState, 'previewUrl');
+  const setShowDiff = useAppFieldSetter(dispatchAppState, 'showDiff');
+  const setShowMatrix = useAppFieldSetter(dispatchAppState, 'showMatrix');
+  const setActiveTab = useAppFieldSetter(dispatchAppState, 'activeTab');
+  const setManifestedFiles = useAppFieldSetter(dispatchAppState, 'manifestedFiles');
+  const setDarwinResults = useAppFieldSetter(dispatchAppState, 'darwinResults');
+  const setThermalActive = useAppFieldSetter(dispatchAppState, 'thermalActive');
+  const setModeLayouts = useAppFieldSetter(dispatchAppState, 'modeLayouts');
+  const setComponentNudges = useAppFieldSetter(dispatchAppState, 'componentNudges');
+  const setSelectedComponent = useAppFieldSetter(dispatchAppState, 'selectedComponent');
+  const setIsMinigameActive = useAppFieldSetter(dispatchAppState, 'isMinigameActive');
+  const setMinigameScore = useAppFieldSetter(dispatchAppState, 'minigameScore');
+  const setGameNodes = useAppFieldSetter(dispatchAppState, 'gameNodes');
+  const setNeuralVideoData = useAppFieldSetter(dispatchAppState, 'neuralVideoData');
+  const setIsVideoPlaying = useAppFieldSetter(dispatchAppState, 'isVideoPlaying');
+  const setIsNeuralPulseActive = useAppFieldSetter(dispatchAppState, 'isNeuralPulseActive');
+  const setParticles = useAppFieldSetter(dispatchAppState, 'particles');
+  const setCameraStatus = useAppFieldSetter(dispatchAppState, 'cameraStatus');
 
   // ── HUD Customization States ──
 
@@ -718,6 +720,7 @@ function useAppController() {
     specialistLogged: false
   });
   const socketTimeoutLoggedRef = useRef(false);
+  const socketConnectedOnceRef = useRef(false);
   const hudRestoreLoggedRef = useRef(false);
 
 
@@ -767,7 +770,7 @@ function useAppController() {
       setPerformanceProfile(nextProfile);
       if (syncTimeout) clearTimeout(syncTimeout);
       syncTimeout = setTimeout(() => {
-        fetch('/api/system/power', {
+        fetch(`${API_BASE_URL}/api/system/power`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ state: nextProfile, focusMode: focusModeEnabled })
@@ -1067,6 +1070,8 @@ function useAppController() {
   const outputDataArrayRef = useRef(null);
   const audioStreamRef = useRef(null);
   const recognitionRef = useRef(null);
+  const speechLastErrorRef = useRef(null);
+  const speechRestartTimeoutRef = useRef(null);
   const sessionUptimeRef = useRef(0);
   const groqSpeechRef = useRef(null);
 
@@ -1132,6 +1137,9 @@ function useAppController() {
     return () => clearInterval(interval);
   }, [visionTaskStatus?.running]);
 
+  // BUG 1 FIX: Guard against data.result being undefined when backend returns a
+  // graceful fallback (sidecar offline). Previously this would throw a TypeError
+  // that was swallowed silently, making every specialist action appear to do nothing.
   const handleSpecialistAction = async (mode, action, payload = {}) => {
     try {
       const response = await fetch(`${API_BASE_URL}/agent/specialist_action`, {
@@ -1141,10 +1149,16 @@ function useAppController() {
       });
       const data = await response.json();
       if (data.success) {
+        const message = data.result?.message || `${action} acknowledged.`;
         appendSystemActionLogEntry(systemActionLogRef, {
           time: new Date().toLocaleTimeString(),
-          message: data.result.message
+          message
         });
+        if (data.fallback) {
+          console.warn(`[SPECIALIST] Action "${action}" handled in fallback mode. Sidecar offline.`);
+        }
+      } else {
+        console.warn(`[SPECIALIST] Action "${action}" failed:`, data.error || 'Unknown error');
       }
     } catch (err) {
       console.error("Specialist action failed:", err);
@@ -1167,6 +1181,7 @@ function useAppController() {
   }, [activeMode]);
 
   function handleSocketConnectError(err) {
+    if (socketConnectedOnceRef.current) return;
     const message = err?.message || 'unknown socket error';
     if (/timeout/i.test(message)) {
       if (!socketTimeoutLoggedRef.current) {
@@ -1175,31 +1190,102 @@ function useAppController() {
       }
       return;
     }
-    console.error('[SOCKET] Connection error:', message);
+    if (!socketTimeoutLoggedRef.current) {
+      console.warn('[SOCKET] Backend realtime polling unavailable. Running in HTTP fallback mode.');
+      socketTimeoutLoggedRef.current = true;
+    }
   }
 
-  function handleAudioChunk(data) {
-    console.log('[SOCKET] Received audio_chunk:', data.index);
-    if (data.index === 0) {
+  function handleAudioChunk(data = {}) {
+    const index = Number.isInteger(data.index) ? data.index : 0;
+    console.log('[SOCKET] Received audio_chunk:', index);
+    if (preferBrowserVoicePrimaryRef.current) {
+      return;
+    }
+    if (index === 0) {
       console.log('[TTS] Sequence Reset detected (index 0)');
       nextExpectedIndexRef.current = 0;
     }
-    audioQueueRef.current[data.index] = data;
+    if (voiceWatchdogTimeoutRef.current) {
+      clearTimeout(voiceWatchdogTimeoutRef.current);
+      voiceWatchdogTimeoutRef.current = null;
+    }
+    audioQueueRef.current[index] = { ...data, index };
     playNextAudioChunk();
   }
 
-  function handleAiTextComplete() {
+  function handleAiTextComplete(payload = {}) {
+    const fullText = String(payload?.fullText || '').trim();
+    lastCompletedReplyRef.current = fullText;
     fetchChatSessions();
+    if (!fullText) return;
+
+    if (preferBrowserVoicePrimaryRef.current) {
+      handleStopAudio();
+      speakWithBrowserVoice(fullText);
+      return;
+    }
+
+    if (voiceWatchdogTimeoutRef.current) {
+      clearTimeout(voiceWatchdogTimeoutRef.current);
+    }
+
+    const runVoiceFallbackCheck = () => {
+      if (pendingTtsFetchCountRef.current > 0) {
+        voiceWatchdogTimeoutRef.current = setTimeout(runVoiceFallbackCheck, 1000);
+        return;
+      }
+
+      const audioRecentlyStarted = (Date.now() - lastAudioStartAtRef.current) < 2500;
+      if (!isPlayingAudioRef.current && !audioRecentlyStarted) {
+        audioQueueRef.current = {};
+        nextExpectedIndexRef.current = 0;
+        speakWithBrowserVoice(fullText);
+      }
+      voiceWatchdogTimeoutRef.current = null;
+    };
+
+    voiceWatchdogTimeoutRef.current = setTimeout(runVoiceFallbackCheck, 1200);
   }
 
-  async function handleTextChunks({ chunks }) {
-    console.log('[SOCKET] Received text_chunks:', chunks.length);
+  function handleStopAudio() {
+    audioQueueRef.current = {};
     nextExpectedIndexRef.current = 0;
+    isPlayingAudioRef.current = false;
+    if (voiceWatchdogTimeoutRef.current) {
+      clearTimeout(voiceWatchdogTimeoutRef.current);
+      voiceWatchdogTimeoutRef.current = null;
+    }
+    try {
+      if (persistentAudioRef.current) {
+        persistentAudioRef.current.pause();
+        persistentAudioRef.current.currentTime = 0;
+      }
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    } catch (_) {}
+  }
+
+  async function handleTextChunks({ chunks = [] } = {}) {
+    console.log('[SOCKET] Received text_chunks:', chunks.length);
+    if (preferBrowserVoicePrimaryRef.current) {
+      return;
+    }
+    nextExpectedIndexRef.current = 0;
+    pendingTtsFetchCountRef.current += chunks.length;
     await Promise.all(chunks.map(async (chunk) => {
-      const audioData = await fetchTTSAudio(chunk.text);
-      if (audioData) {
-        audioQueueRef.current[chunk.index] = { index: chunk.index, audio: audioData, isBase64: false };
+      try {
+        const audioData = await fetchTTSAudio(chunk.text);
+        audioQueueRef.current[chunk.index] = {
+          index: chunk.index,
+          audio: audioData,
+          isBase64: false,
+          text: chunk.text
+        };
         playNextAudioChunk();
+      } finally {
+        pendingTtsFetchCountRef.current = Math.max(0, pendingTtsFetchCountRef.current - 1);
       }
     }));
   }
@@ -1372,7 +1458,6 @@ function useAppController() {
       transition: 'transform 0.3s ease'
     };
   };
-
   const artifactTokensRef = useRef([]);
   const pendingArtifactTokensRef = useRef([]);
 
@@ -1382,10 +1467,34 @@ function useAppController() {
 
 
   const audioQueueRef = useRef({}); // Using object keyed by index for O(1) lookups
+  const persistentAudioRef = useRef(null);
+  const mediaSourceRef = useRef(null);
   const isPlayingAudioRef = useRef(false);
   const nextExpectedIndexRef = useRef(0);
   const ttsWarningLoggedRef = useRef(false);
   const desktopProfileReadyRef = useRef(false);
+  const speechFallbackLoggedRef = useRef(false);
+  const lastAudioStartAtRef = useRef(0);
+  const voiceWatchdogTimeoutRef = useRef(null);
+  const pendingTtsFetchCountRef = useRef(0);
+  const audioUnlockedRef = useRef(false);
+  const lastCompletedReplyRef = useRef('');
+  const preferBrowserVoicePrimaryRef = useRef(false);
+  // Tracks the active ZAIRE voice actor (id) selected in Settings — read by fetchTTSAudio
+  const activeVoiceActorRef = useRef(
+    localStorage.getItem('zaire_voice_actor') || 'AVA'
+  );
+
+  // Voice actor catalog — mirrors the backend ZAIRE_VOICE_ACTORS
+  const ZAIRE_VOICE_ACTORS_CLIENT = React.useMemo(() => ([
+    { id: 'AVA',   voiceName: 'en-US-AvaNeural',   pitch: '+0Hz',  rate: '+5%'  },
+    { id: 'ARIA',  voiceName: 'en-US-AriaNeural',  pitch: '+0Hz',  rate: '+10%' },
+    { id: 'JENNY', voiceName: 'en-US-JennyNeural', pitch: '-5Hz',  rate: '+0%'  },
+    { id: 'GUY',   voiceName: 'en-US-GuyNeural',   pitch: '+0Hz',  rate: '+5%'  },
+    { id: 'ERIC',  voiceName: 'en-US-EricNeural',  pitch: '+0Hz',  rate: '+0%'  },
+    { id: 'SARA',  voiceName: 'en-US-SaraNeural',  pitch: '+5Hz',  rate: '+8%'  },
+    { id: 'DAVIS', voiceName: 'en-US-DavisNeural', pitch: '-10Hz', rate: '+0%'  },
+  ]), []);
 
   const getNextCustomId = React.useCallback(() => {
     const nextId = customIdRef.current;
@@ -1442,6 +1551,74 @@ function useAppController() {
       osc.start();
       osc.stop(audioContextRef.current.currentTime + 0.15);
     }
+  }, []);
+
+  const speakWithBrowserVoice = React.useCallback((text) => {
+    const cleanText = String(text || '').trim();
+    if (!cleanText || typeof window === 'undefined' || !window.speechSynthesis) {
+      return false;
+    }
+
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      const availableVoices = window.speechSynthesis.getVoices?.() || [];
+      const preferredVoice = availableVoices.find((voice) => /en-US/i.test(voice.lang) && /female|ava|aria|jenny|sara/i.test(voice.name))
+        || availableVoices.find((voice) => /en-US/i.test(voice.lang))
+        || availableVoices[0];
+
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+      }
+
+      utterance.rate = 1.03;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      window.speechSynthesis.speak(utterance);
+      return true;
+    } catch (err) {
+      if (!speechFallbackLoggedRef.current) {
+        console.warn('[TTS] Browser speech fallback failed.', err?.message || err);
+        speechFallbackLoggedRef.current = true;
+      }
+      return false;
+    }
+  }, []);
+
+  const inferAudioMimeType = React.useCallback((bytes, declaredMimeType = '') => {
+    if (declaredMimeType) return declaredMimeType;
+    if (!bytes || bytes.length < 12) return 'audio/mpeg';
+    const isRiff =
+      bytes[0] === 0x52 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46 &&
+      bytes[3] === 0x46 &&
+      bytes[8] === 0x57 &&
+      bytes[9] === 0x41 &&
+      bytes[10] === 0x56 &&
+      bytes[11] === 0x45;
+    return isRiff ? 'audio/wav' : 'audio/mpeg';
+  }, []);
+
+  const ensureUnlockedAudioContext = React.useCallback(async () => {
+    if (typeof window === 'undefined') return null;
+
+    if (!audioContextRef.current) {
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextCtor) return null;
+      audioContextRef.current = new AudioContextCtor();
+    }
+
+    if (audioContextRef.current.state === 'suspended') {
+      try {
+        await audioContextRef.current.resume();
+      } catch (e) {
+        return audioContextRef.current;
+      }
+    }
+
+    audioUnlockedRef.current = audioContextRef.current.state === 'running';
+    return audioContextRef.current;
   }, []);
 
   const handleModeChange = React.useCallback((newMode, options = {}) => {
@@ -1654,10 +1831,20 @@ function useAppController() {
   // Function to fetch TTS audio via HTTP
   async function fetchTTSAudio(text) {
     try {
+      // Look up voice actor params from the client-side catalog
+      const actorId = activeVoiceActorRef.current || 'AVA';
+      const actor = ZAIRE_VOICE_ACTORS_CLIENT.find(v => v.id === actorId)
+        || ZAIRE_VOICE_ACTORS_CLIENT[0];
+
       const response = await fetch(`${API_BASE_URL}/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, pitch: '+0Hz', rate: '+5%' })
+        body: JSON.stringify({
+          text,
+          pitch: actor.pitch,
+          rate: actor.rate,
+          voiceName: actor.voiceName
+        })
       });
 
       if (!response.ok) {
@@ -1666,16 +1853,16 @@ function useAppController() {
 
       const arrayBuffer = await response.arrayBuffer();
       ttsWarningLoggedRef.current = false;
+      speechFallbackLoggedRef.current = false;
       return new Uint8Array(arrayBuffer);
     } catch (err) {
       if (!ttsWarningLoggedRef.current) {
-        console.warn('[TTS HTTP] Voice synthesis unavailable, continuing with text only.', err?.message || err);
+        console.warn('[TTS HTTP] Voice synthesis unavailable, falling back to browser voice.', err?.message || err);
         ttsWarningLoggedRef.current = true;
       }
       return null;
     }
   }
-
   async function playNextAudioChunk() {
     if (isPlayingAudioRef.current) return;
 
@@ -1687,9 +1874,11 @@ function useAppController() {
       return;
     }
 
-    // Safety check for valid audio data
     if (!chunk.audio) {
       console.error('[TTS] Null audio in chunk, skipping:', nextIndex);
+      if (chunk.text) {
+        speakWithBrowserVoice(chunk.text);
+      }
       delete audioQueueRef.current[nextIndex];
       nextExpectedIndexRef.current++;
       playNextAudioChunk();
@@ -1705,31 +1894,51 @@ function useAppController() {
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
       audioData = bytes;
+    } else if (chunk.audio?.data && Array.isArray(chunk.audio.data)) {
+      audioData = new Uint8Array(chunk.audio.data);
+    } else if (ArrayBuffer.isView(chunk.audio)) {
+      audioData = new Uint8Array(chunk.audio.buffer, chunk.audio.byteOffset, chunk.audio.byteLength);
+    } else if (chunk.audio instanceof ArrayBuffer) {
+      audioData = new Uint8Array(chunk.audio);
     } else {
       audioData = new Uint8Array(chunk.audio);
     }
 
     let url = null;
     try {
-      const blob = new Blob([audioData], { type: 'audio/mpeg' });
+      const mimeType = inferAudioMimeType(audioData, chunk.mimeType || '');
+      const blob = new Blob([audioData], { type: mimeType });
       url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
 
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (!outputAnalyserRef.current) {
-        outputAnalyserRef.current = audioContextRef.current.createAnalyser();
+      const audioContext = audioUnlockedRef.current ? await ensureUnlockedAudioContext() : null;
+      if (audioContext && !outputAnalyserRef.current) {
+        outputAnalyserRef.current = audioContext.createAnalyser();
         outputAnalyserRef.current.fftSize = 256;
         outputDataArrayRef.current = new Uint8Array(outputAnalyserRef.current.frequencyBinCount);
       }
 
-      try {
-        const source = audioContextRef.current.createMediaElementSource(audio);
-        source.connect(outputAnalyserRef.current);
-        outputAnalyserRef.current.connect(audioContextRef.current.destination);
-      } catch (e) {
-        // MediaElementSource might already be created if using same audio element, but we create new Audio() above.
+      // Re-use a single Audio element to avoid Web Audio resource exhaustion & GC bugs
+      if (!persistentAudioRef.current) {
+        persistentAudioRef.current = new Audio();
+        persistentAudioRef.current.crossOrigin = "anonymous";
+        persistentAudioRef.current.muted = false;
+        persistentAudioRef.current.volume = 1.0;
+        persistentAudioRef.current.playsInline = true;
+        persistentAudioRef.current.preload = 'auto';
+      }
+      const audio = persistentAudioRef.current;
+      audio.src = url;
+      audio.load();
+
+      // Connect source once
+      if (audioContext && outputAnalyserRef.current && !mediaSourceRef.current) {
+        try {
+          mediaSourceRef.current = audioContext.createMediaElementSource(audio);
+          mediaSourceRef.current.connect(outputAnalyserRef.current);
+          outputAnalyserRef.current.connect(audioContext.destination);
+        } catch (e) {
+          console.warn('[TTS] Source connect warn:', e);
+        }
       }
 
       const onFinished = () => {
@@ -1738,22 +1947,39 @@ function useAppController() {
         isPlayingAudioRef.current = false;
         nextExpectedIndexRef.current++;
         console.log(`[TTS] Finished chunk ${nextIndex}, next expected is ${nextExpectedIndexRef.current}`);
+        
+        // Remove listeners to prevent memory leaks on the persistent element
+        audio.removeEventListener('ended', onFinished);
+        audio.removeEventListener('error', onError);
+        audio.removeEventListener('playing', onPlaying);
+        
         playNextAudioChunk();
       };
 
-      audio.onended = onFinished;
-      audio.onerror = (e) => {
+      const onPlaying = () => {
+        lastAudioStartAtRef.current = Date.now();
+      };
+
+      const onError = (e) => {
         console.error(`[TTS] Playback error on chunk ${nextIndex}:`, e);
         onFinished();
       };
 
+      audio.addEventListener('playing', onPlaying);
+      audio.addEventListener('ended', onFinished);
+      audio.addEventListener('error', onError);
+
       await audio.play();
     } catch (err) {
       console.error(`[TTS] Critical error playing chunk ${nextIndex}:`, err);
-      // If error is related to user-gesture, we can flag the system as disengaged
+      if (url) URL.revokeObjectURL(url);
+      if (chunk.text) {
+        speakWithBrowserVoice(chunk.text);
+      }
       if (err.name === 'NotAllowedError') {
         setIsSystemEngaged(false);
       }
+      delete audioQueueRef.current[nextIndex];
       isPlayingAudioRef.current = false;
       nextExpectedIndexRef.current++;
       playNextAudioChunk();
@@ -1762,7 +1988,40 @@ function useAppController() {
 
   useEffect(() => {
     fetchChatSessions();
-  }, []);
+    let handleVoicesChanged = null;
+
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.getVoices();
+        handleVoicesChanged = () => {
+          try {
+            window.speechSynthesis.getVoices();
+          } catch (_) {}
+        };
+        window.speechSynthesis.addEventListener?.('voiceschanged', handleVoicesChanged);
+      } catch (_) {}
+    }
+
+    const unlockAudio = async () => {
+      await ensureUnlockedAudioContext();
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
+
+    return () => {
+      if (handleVoicesChanged && window?.speechSynthesis?.removeEventListener) {
+        window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
+      }
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+  }, [ensureUnlockedAudioContext]);
 
   useEffect(() => {
     localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(customModes));
@@ -1805,6 +2064,13 @@ function useAppController() {
 
   const loadArchiveSessionDetail = React.useCallback(async (sessionId) => {
     if (!sessionId || archiveSessionCache[sessionId]) return archiveSessionCache[sessionId];
+    const fallbackSession = {
+      id: sessionId,
+      title: 'Session unavailable',
+      messages: [],
+      unavailable: true
+    };
+
     try {
       const data = await fetchJsonOrThrow(`${API_BASE_URL}/chats/${sessionId}`);
       if (data.success && data.session) {
@@ -1812,9 +2078,13 @@ function useAppController() {
         return data.session;
       }
     } catch (e) {
-      console.warn('Failed to load archive session detail:', e.message);
+      if (!isNetworkFetchError(e) && !/HTTP 404/i.test(e?.message || '')) {
+        console.debug('Archive session detail unavailable:', e.message || e);
+      }
     }
-    return null;
+
+    setArchiveSessionCache(prev => ({ ...prev, [sessionId]: fallbackSession }));
+    return fallbackSession;
   }, [archiveSessionCache]);
 
   useEffect(() => {
@@ -1897,7 +2167,7 @@ function useAppController() {
   ]);
 
   function handleSocketConnect() {
-    socketTimeoutLoggedRef.current = false;
+    socketConnectedOnceRef.current = true;
     console.log('[SOCKET] Connected to backend');
     socketRef.current.emit('REQUEST_SYNC');
   }
@@ -2058,6 +2328,7 @@ function useAppController() {
     handleTextDelta,
     handleAudioChunk,
     handleAiTextComplete,
+    handleStopAudio,
     handleTextChunks,
     handleZaireStatus,
     handleDeepThinking,
@@ -2076,11 +2347,13 @@ function useAppController() {
 
   useEffect(() => {
     socketRef.current = io(`${API_BASE_URL}`, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       reconnection: true,
-      reconnectionAttempts: 10,
+      upgrade: true,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 2000,
-      timeout: 10000
+      reconnectionDelayMax: 10000,
+      timeout: 20000
     });
 
     socketRef.current.on('connect', (...args) => socketHandlerRefs.current.handleSocketConnect(...args));
@@ -2102,6 +2375,8 @@ function useAppController() {
     socketRef.current.on('audio_chunk', (...args) => socketHandlerRefs.current.handleAudioChunk(...args));
 
     socketRef.current.on('ai_text_complete', (...args) => socketHandlerRefs.current.handleAiTextComplete(...args));
+
+    socketRef.current.on('stop_audio', (...args) => socketHandlerRefs.current.handleStopAudio(...args));
 
     // Handle text chunks - fetch audio via HTTP for each chunk
     socketRef.current.on('text_chunks', (...args) => socketHandlerRefs.current.handleTextChunks(...args));
@@ -2168,8 +2443,11 @@ function useAppController() {
   async function pollBiometrics() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/security/status`);
+      if (!res.ok) return;
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) return;
       const data = await res.json();
-      if (data.success) {
+      if (data.success || data.status === 'online') {
         dispatchSecurityState({ type: 'SYNC_STATUS', data });
       }
     } catch (e) {
@@ -2184,6 +2462,9 @@ function useAppController() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ disabled })
       });
+      if (!res.ok) return;
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) return;
       const data = await res.json();
       if (data.success) {
         dispatchSecurityState({ type: 'SET_DISABLED', disabled });
@@ -2376,9 +2657,7 @@ function useAppController() {
           setUseGroqSpeech(false);
           alert('Groq failed. Using browser speech instead.');
           // Try browser mode
-          if (!audioContextRef.current) {
-            audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-          }
+          await ensureUnlockedAudioContext();
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           audioStreamRef.current = stream;
           startSpeechRecognition();
@@ -2386,17 +2665,15 @@ function useAppController() {
         }
       } else {
         // Use browser Web Speech API (free, real-time)
-        if (!audioContextRef.current) {
-          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-        }
+        const audioContext = await ensureUnlockedAudioContext();
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioStreamRef.current = stream;
 
-        const analyser = audioContextRef.current.createAnalyser();
+        const analyser = audioContext.createAnalyser();
         analyser.fftSize = 256;
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-        const source = audioContextRef.current.createMediaStreamSource(stream);
+        const source = audioContext.createMediaStreamSource(stream);
         source.connect(analyser);
 
         analyserRef.current = analyser;
@@ -2502,35 +2779,42 @@ function useAppController() {
     };
 
     recognition.onerror = (event) => {
+      speechLastErrorRef.current = event.error;
       if (event.error === 'no-speech') {
-        console.log('[SPEECH] Silence detected, re-syncing...');
-      } else {
-        console.error('Speech recognition error:', event.error);
+        return;
       }
+      if (event.error === 'network' || event.error === 'aborted') {
+        setGroqStatus('Browser speech temporarily unavailable');
+        return;
+      }
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        setGroqStatus('Microphone permission blocked');
+        setIsMicrophoneActive(false);
+        return;
+      }
+      console.warn('[SPEECH] Recognition issue:', event.error);
       // We no longer restart here to avoid race conditions with onend
     };
 
     recognition.onend = () => {
-      console.log('[SPEECH] Recognition service disconnected');
+      if (!isMicrophoneActiveRef.current) return;
 
-      // If the microphone should be active, try to restart with a safe delay
-      if (isMicrophoneActiveRef.current) {
-        console.log('[SPEECH] Waiting for stable audio channel before restart...');
-
-        // Use a longer delay to prevent the 'aborted' infinite loop
-        setTimeout(() => {
-          if (isMicrophoneActiveRef.current) {
-            try {
-              recognition.start();
-              console.log('[SPEECH] Voice link re-established.');
-            } catch (e) {
-              // If the object is in a bad state, do a full reset
-              console.warn('[SPEECH] Soft restart failed, attempting full reset...');
-              startSpeechRecognition();
-            }
-          }
-        }, 400); // 400ms is safer for most browser/OS drivers
+      if (speechLastErrorRef.current === 'network') {
+        setGroqStatus('Browser speech offline - retrying quietly');
       }
+
+      if (speechRestartTimeoutRef.current) return;
+      speechRestartTimeoutRef.current = setTimeout(() => {
+        speechRestartTimeoutRef.current = null;
+        if (!isMicrophoneActiveRef.current) return;
+        try {
+          recognition.start();
+          speechLastErrorRef.current = null;
+          setGroqStatus('Voice link re-established');
+        } catch (e) {
+          startSpeechRecognition();
+        }
+      }, speechLastErrorRef.current === 'network' ? 2500 : 700);
     };
 
     recognition.start();
@@ -3469,9 +3753,9 @@ function useAppController() {
                 </div>
                 )
               )}
-              {isAIActive && zaireResponseStream && (
+              {zaireResponseStream && (
                 <div className="custom-chat-bubble assistant">
-                  <span className="bubble-role">ZAIRE [STREAMING]</span>
+                  <span className="bubble-role">{isAIActive ? 'ZAIRE [STREAMING]' : 'ZAIRE'}</span>
                   <div>{zaireResponseStream}</div>
                 </div>
               )}
@@ -3933,7 +4217,7 @@ function useAppController() {
           {/* ROW 2: ENGINEER MODE V2 OVERRIDE */}
           {activeMode === 'ENGINEER' ? (
             <div style={{ gridColumn: '1 / -1', gridRow: '2 / -1', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <EngineerModeV2 />
+              <EngineerModeV2 specialistData={specialistData} />
             </div>
           ) : activeMode === 'PROFESSOR' ? (
             <div style={{ gridColumn: '1 / -1', gridRow: '2 / -1', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -5304,169 +5588,54 @@ function useAppController() {
                         'ENGINEER': ['ACTIVE_PROJECT', 'FILE_TREE', 'FORGE_TELEMETRY', 'MANIFESTATION_SYNC', 'SYSTEM_ACTIONS']
                       })[activeMode] || []).map(id => (
                         <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
-                      ))}
-                    </select>
+                      ))}                    </select>
+
+                    {selectedComponent && (
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', opacity: 0.4 }}>
+                            <label htmlFor="component-nudge-x">X NUDGE</label>
+                            <span>{(componentNudges[selectedComponent]?.x || 0)}px</span>
+                          </div>
+                          <input
+                            id="component-nudge-x"
+                            type="range"
+                            min="-100"
+                            max="100"
+                            value={componentNudges[selectedComponent]?.x || 0}
+                            onChange={(e) => updateComponentNudge(selectedComponent, { x: parseInt(e.target.value, 10) })}
+                            style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}
+                          />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', opacity: 0.4 }}>
+                            <label htmlFor="component-nudge-y">Y NUDGE</label>
+                            <span>{(componentNudges[selectedComponent]?.y || 0)}px</span>
+                          </div>
+                          <input
+                            id="component-nudge-y"
+                            type="range"
+                            min="-100"
+                            max="100"
+                            value={componentNudges[selectedComponent]?.y || 0}
+                            onChange={(e) => updateComponentNudge(selectedComponent, { y: parseInt(e.target.value, 10) })}
+                            style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      className="cmd-btn"
+                      style={{ width: '100%', marginTop: '10px', fontSize: '12px', padding: '4px', opacity: 0.4 }}
+                      onClick={() => setComponentNudges({})}
+                    >
+                      RESET ALL COMPONENTS
+                    </button>
                   </div>
                 </div>
               </>
             )}
-
-            {/* ── PERSISTENT LAYOUT CALIBRATION ── */}
-            <div className="panel-section" style={{ marginTop: 'auto', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <div className="section-label">{activeMode} LAYOUT CALIBRATION</div>
-              <div className="calibration-controls" style={{ padding: '4px' }}>
-                <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
-                    <label htmlFor="layout-left-width">LEFT WIDTH</label>
-                    <span>{layoutOffsets.leftWidth}px</span>
-                  </div>
-                  <input id="layout-left-width" type="range" min="150" max="400" value={layoutOffsets.leftWidth || 200}
-                    onChange={(e) => updateCurrentLayout({ leftWidth: parseInt(e.target.value) })}
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
-                </div>
-                <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
-                    <label htmlFor="layout-right-width">RIGHT WIDTH</label>
-                    <span>{layoutOffsets.rightWidth}px</span>
-                  </div>
-                  <input id="layout-right-width" type="range" min="150" max="400" value={layoutOffsets.rightWidth || 200}
-                    onChange={(e) => updateCurrentLayout({ rightWidth: parseInt(e.target.value) })}
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
-                </div>
-                <div className="calibration-item" style={{ marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' }}>
-                    <label htmlFor="layout-cmd-height">CMD HEIGHT</label>
-                    <span>{layoutOffsets.bottomHeight}px</span>
-                  </div>
-                  <input id="layout-cmd-height" type="range" min="100" max="350" value={layoutOffsets.bottomHeight || 150}
-                    onChange={(e) => updateCurrentLayout({ bottomHeight: parseInt(e.target.value) })}
-                    style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer' }} />
-                </div>
-
-                <div style={{ margin: '10px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                  <div className="cal-col">
-                    <div style={{ fontSize: '12px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>LEFT</div>
-                    <div style={{ marginBottom: '6px' }}>
-                      <div style={{ fontSize: '12px', opacity: 0.3 }}>X: {layoutOffsets.leftX}</div>
-                      <input type="range" min="-100" max="100" value={layoutOffsets.leftX}
-                        onChange={(e) => updateCurrentLayout({ leftX: parseInt(e.target.value) })}
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', opacity: 0.3 }}>Y: {layoutOffsets.leftY}</div>
-                      <input type="range" min="-100" max="100" value={layoutOffsets.leftY}
-                        onChange={(e) => updateCurrentLayout({ leftY: parseInt(e.target.value) })}
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                    </div>
-                  </div>
-
-                  <div className="cal-col">
-                    <div style={{ fontSize: '12px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>RIGHT</div>
-                    <div style={{ marginBottom: '6px' }}>
-                      <div style={{ fontSize: '12px', opacity: 0.3 }}>X: {layoutOffsets.rightX}</div>
-                      <input type="range" min="-100" max="100" value={layoutOffsets.rightX}
-                        onChange={(e) => updateCurrentLayout({ rightX: parseInt(e.target.value) })}
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', opacity: 0.3 }}>Y: {layoutOffsets.rightY}</div>
-                      <input type="range" min="-100" max="100" value={layoutOffsets.rightY}
-                        onChange={(e) => updateCurrentLayout({ rightY: parseInt(e.target.value) })}
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                    </div>
-                  </div>
-
-                  <div className="cal-col">
-                    <div style={{ fontSize: '12px', opacity: 0.4, textAlign: 'center', marginBottom: '4px' }}>CMD</div>
-                    <div style={{ marginBottom: '6px' }}>
-                      <div style={{ fontSize: '12px', opacity: 0.3 }}>X: {layoutOffsets.bottomX}</div>
-                      <input type="range" min="-100" max="100" value={layoutOffsets.bottomX}
-                        onChange={(e) => updateCurrentLayout({ bottomX: parseInt(e.target.value) })}
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', opacity: 0.3 }}>Y: {layoutOffsets.bottomY}</div>
-                      <input type="range" min="-100" max="100" value={layoutOffsets.bottomY}
-                        onChange={(e) => updateCurrentLayout({ bottomY: parseInt(e.target.value) })}
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  className="cmd-btn"
-                  style={{ width: '100%', marginTop: '12px', fontSize: '12px', padding: '4px', opacity: 0.6 }}
-                  onClick={() => {
-                    const defaults = {
-                      'ZAIRE': { leftWidth: 200, rightWidth: 200, bottomHeight: 150, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                      'TRADER': { leftWidth: 200, rightWidth: 220, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                      'PROFESSOR': { leftWidth: 220, rightWidth: 200, bottomHeight: 80, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 },
-                      'ENGINEER': { leftWidth: 200, rightWidth: 260, bottomHeight: 90, leftX: 0, leftY: 0, rightX: 0, rightY: 0, bottomX: 0, bottomY: 0 }
-                    };
-                    updateCurrentLayout(defaults[activeMode]);
-                  }}
-                >
-                  RESET {activeMode} LAYOUT
-                </button>
-              </div>
-            </div>
-
-            {/* ── COMPONENT CALIBRATION ── */}
-            <div className="panel-section" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-              <div className="section-label">COMPONENT CALIBRATION</div>
-              <div className="calibration-controls" style={{ padding: '4px' }}>
-                <select
-                  value={selectedComponent}
-                  onChange={(e) => setSelectedComponent(e.target.value)}
-                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px', padding: '4px', marginBottom: '8px' }}
-                >
-                  <option value="">SELECT COMPONENT…</option>
-                  {(({
-                    'ZAIRE': ['ACTIVE_MODE', 'SYSTEM_VITALS', 'BIOMETRIC_SCAN', 'SCREEN_VISION', 'SYSTEM_METRICS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
-                    'TRADER': ['PORTFOLIO', 'WATCHLIST', 'HALAL_FILTER', 'TOP_OPPORTUNITY', 'MACRO_SIGNALS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
-                    'PROFESSOR': ['CURRICULUM', 'STUDY_METRICS', 'LEARNING_PROGRESS', 'STUDY_GOALS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE'],
-                    'ENGINEER': ['ACTIVE_PROJECT', 'FILE_TREE', 'FORGE_TELEMETRY', 'MANIFESTATION_SYNC', 'SYSTEM_ACTIONS', 'MODULE_STATUS', 'VOICE_MONITOR', 'MEMORY_CORE']
-                  })[activeMode] || []).map(id => (
-                    <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
-                  ))}
-                </select>
-
-                {selectedComponent && (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', opacity: 0.4 }}>
-                        <label htmlFor="component-nudge-x">X NUDGE</label>
-                        <span>{(componentNudges[selectedComponent]?.x || 0)}px</span>
-                      </div>
-                      <input id="component-nudge-x" type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.x || 0}
-                        onChange={(e) => updateComponentNudge(selectedComponent, { x: parseInt(e.target.value) })}
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', opacity: 0.4 }}>
-                        <label htmlFor="component-nudge-y">Y NUDGE</label>
-                        <span>{(componentNudges[selectedComponent]?.y || 0)}px</span>
-                      </div>
-                      <input id="component-nudge-y" type="range" min="-100" max="100" value={componentNudges[selectedComponent]?.y || 0}
-                        onChange={(e) => updateComponentNudge(selectedComponent, { y: parseInt(e.target.value) })}
-                        style={{ width: '100%', height: '2px', appearance: 'none', background: 'rgba(255,255,255,0.1)' }} />
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  className="cmd-btn"
-                  style={{ width: '100%', marginTop: '10px', fontSize: '12px', padding: '4px', opacity: 0.4 }}
-                  onClick={() => {
-                    if (window.confirm('RESET ALL COMPONENT NUDGES?')) setComponentNudges({});
-                  }}
-                >
-                  RESET ALL COMPONENTS
-                </button>
-              </div>
-            </div>
           </>
         )}
       </div>
@@ -5893,6 +6062,10 @@ function useAppController() {
             setIsDragging(true);
             dragStateRef.current.isPointerDown = false;
           }}
+          onVoiceActorChange={(newVoiceId) => {
+            activeVoiceActorRef.current = newVoiceId;
+            localStorage.setItem('zaire_voice_actor', newVoiceId);
+          }}
         />
 
         {isDragging && (
@@ -6005,6 +6178,3 @@ function App() {
 }
 
 export default App;
-
-
-

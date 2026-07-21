@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
+  AlertTriangle,
   Box,
   CheckCircle2,
   Code2,
@@ -397,20 +398,26 @@ const getQaChecks = (plan, intake, repairFlow) => {
   return { checks, passed, warnings, errors };
 };
 
-const getDeployReport = (plan, qa) => ({
-  hostingTarget: plan.deploymentPlan[0].replace('Primary hosting target: ', ''),
-  requiredEnvVariables: plan.requiredEnvVariables,
-  databaseRequired: plan.needsDatabase ? 'YES' : 'NO',
-  authRequired: plan.needsAuth ? 'YES' : 'NO',
-  paymentRequired: plan.needsPayments ? 'YES' : 'NO',
-  readyStatus: qa.errors === 0 ? 'READY' : 'BLOCKED',
-  nextSteps: [
-    'Add required environment variables to the host.',
-    plan.needsDatabase ? 'Run the first Prisma migration and confirm connection pooling.' : 'Confirm persistence can stay out of v1.',
-    plan.needsPayments ? 'Switch billing routes from demo to live Stripe credentials.' : 'No payment setup required.',
-    'Run lint/build checks in CI before launch.'
-  ]
-});
+const getDeployReport = (plan, qa) => {
+  const deploymentPlan = Array.isArray(plan.deploymentPlan) ? plan.deploymentPlan : [];
+  const requiredEnvVariables = Array.isArray(plan.requiredEnvVariables) ? plan.requiredEnvVariables : [];
+  const firstDeploymentLine = deploymentPlan[0] || 'Primary hosting target: Not specified';
+
+  return {
+    hostingTarget: firstDeploymentLine.replace('Primary hosting target: ', ''),
+    requiredEnvVariables,
+    databaseRequired: plan.needsDatabase ? 'YES' : 'NO',
+    authRequired: plan.needsAuth ? 'YES' : 'NO',
+    paymentRequired: plan.needsPayments ? 'YES' : 'NO',
+    readyStatus: qa.errors === 0 ? 'READY' : 'BLOCKED',
+    nextSteps: [
+      'Add required environment variables to the host.',
+      plan.needsDatabase ? 'Run the first Prisma migration and confirm connection pooling.' : 'Confirm persistence can stay out of v1.',
+      plan.needsPayments ? 'Switch billing routes from demo to live Stripe credentials.' : 'No payment setup required.',
+      'Run lint/build checks in CI before launch.'
+    ]
+  };
+};
 
 const skillLevelCopy = (modePreference, beginnerText, proText) =>
   modePreference === 'beginner' ? beginnerText : proText;
@@ -544,11 +551,10 @@ const EngineerModeV2 = () => {
   const [directiveInput, setDirectiveInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [loadingText, setLoadingText] = useState('');
-  const [isTweaking, setIsTweaking] = useState(false);
-  const [tweakInput, setTweakInput] = useState('');
   const [cmdSuccess, setCmdSuccess] = useState(false);
   const [intakeAnswers, setIntakeAnswers] = useState({ ...DEFAULT_INTAKE, ...(persistedMemory.intake || {}) });
-  const [architectureApproved, setArchitectureApproved] = useState(false);
+  const [, setArchitectureApproved] = useState(false);
+  const [designBrief, setDesignBrief] = useState(null);
   const [backendPlan, setBackendPlan] = useState(null);
   const [backendScaffold, setBackendScaffold] = useState(null);
   const [buildSubPhase, setBuildSubPhase] = useState('UNDERSTAND');
@@ -570,7 +576,7 @@ const EngineerModeV2 = () => {
   const [repairFlow, setRepairFlow] = useState(null);
   const [buildLogs, setBuildLogs] = useState([]);
   const [deployLogs, setDeployLogs] = useState([]);
-  const [activeComponent, setActiveComponent] = useState('ShellFrame');
+  const [, setActiveComponent] = useState('ShellFrame');
   const [activeFile, setActiveFile] = useState('app/page.tsx');
   const [openFiles, setOpenFiles] = useState(['app/page.tsx', 'app/(workspace)/dashboard/page.tsx']);
   const buildInterval = useRef(null);
@@ -633,6 +639,46 @@ const EngineerModeV2 = () => {
 
   const activeFileArtifact = fileArtifacts[activeFile] || fileArtifacts[fileNames[0]];
   const activeFileExplanation = activeFileArtifact?.explanation;
+
+  const handleDownloadZip = async () => {
+    if (!fileArtifacts || Object.keys(fileArtifacts).length === 0) return;
+    setIsProcessing(true);
+    setCommandStatus('Generating ZIP file...');
+    try {
+      const filesArr = Object.keys(fileArtifacts).map(path => ({
+        path,
+        content: fileArtifacts[path].content
+      }));
+      const response = await fetch(`${resolveApiBase()}/engineer/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: 'local-test-123',
+          files: filesArr
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Export failed on server');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${intakeAnswers.projectName || 'zaire-project'}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+      setCommandStatus('ZIP downloaded successfully.');
+    } catch (error) {
+      console.error('Download ZIP error:', error);
+      setCommandStatus('Failed to download ZIP: ' + error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const advanceStage = (nextStage, text, nextPhase) => {
     setIsProcessing(true);
@@ -731,7 +777,7 @@ const EngineerModeV2 = () => {
   }, [architecturePlan.components]);
 
   useEffect(() => {
-    setBuildSubPhase(activeStage === 4 ? 'BUILD' : activeStage === 5 ? 'DEPLOY' : activeStage === 3 ? 'SCAFFOLD' : activeStage === 2 ? 'ARCHITECT' : 'UNDERSTAND');
+    setBuildSubPhase(activeStage === 5 ? 'DEPLOY' : activeStage === 4 ? 'BUILD' : activeStage === 3 ? 'DESIGN' : activeStage === 2 ? 'ARCHITECT' : 'UNDERSTAND');
   }, [activeStage]);
 
   useEffect(() => {
@@ -872,40 +918,33 @@ const EngineerModeV2 = () => {
 
   const handleApproveArchitecture = () => {
     const run = async () => {
-      let nextArtifacts = localFileArtifacts;
       let usedFallback = false;
 
       setIsProcessing(true);
       setLoadingText('Scaffolding approved structure...');
 
       try {
-        const result = await postEngineerWorkflow('/engineer/scaffold', {
+        const result = await postEngineerWorkflow('/engineer/design-brief', {
+          projectId: 'local-test-123',
           intake: intakeAnswers,
-          skillLevel,
-          plan: {
-            ...architecturePlan,
-            stack: architecturePlan.techStack,
-            envVars: architecturePlan.requiredEnvVariables
-          }
+          plan: architecturePlan
         });
-        const normalized = normalizeBackendScaffold(result?.scaffold);
-        if (normalized) {
-          nextArtifacts = normalized;
-          setBackendScaffold(normalized);
+        if (result && result.brief) {
+          setDesignBrief(result.brief);
         } else {
           usedFallback = true;
         }
       } catch (error) {
         usedFallback = true;
+        console.error('Design brief generation error:', error);
       }
 
       setArchitectureApproved(true);
       updateMemory({
         approvedArchitecture: architecturePlan,
-        currentPhase: 'SCAFFOLD',
-        phaseHistory: [...projectMemory.phaseHistory, 'SCAFFOLD'].slice(-18),
+        currentPhase: 'DESIGN',
+        phaseHistory: [...projectMemory.phaseHistory, 'DESIGN'].slice(-18),
         agentNotes: agentContributions.map((item) => `${item.agent}: ${item.summary}`),
-        generatedFiles: Object.keys(nextArtifacts),
         deploymentTarget: intakeAnswers.deploymentTarget,
         decisions: [
           ...projectMemory.decisions,
@@ -917,17 +956,100 @@ const EngineerModeV2 = () => {
 
       setTimeout(() => {
         setIsProcessing(false);
-        setBuildSubPhase('SCAFFOLD');
+        setBuildSubPhase('DESIGN');
         setActiveStage(3);
       }, 900);
 
       setCommandStatus(
         usedFallback
-          ? 'Backend scaffold was unavailable. Local scaffold generated as fallback.'
-          : 'Architecture approved. ZAIRE is moving into scaffold and component planning.'
+          ? 'Backend design intelligence was unavailable. Using fallback design logic.'
+          : 'Architecture approved. ZAIRE is generating Design Intelligence Brief.'
       );
     };
 
+    run();
+  };
+
+  const handleApproveDesign = () => {
+    const run = async () => {
+      setIsProcessing(true);
+      setLoadingText('Scaffolding approved structure...');
+      let usedFallback = false;
+
+      try {
+        const result = await postEngineerWorkflow('/engineer/scaffold', {
+          plan: architecturePlan,
+          designBrief: designBrief,
+          intake: intakeAnswers,
+          skillLevel,
+          projectId: 'local-test-123'
+        });
+
+        const normalized = normalizeBackendScaffold(result?.scaffold);
+        if (normalized && Object.keys(normalized).length > 0) {
+          setBackendScaffold(normalized);
+          updateMemory({
+            currentPhase: 'BUILD',
+            phaseHistory: [...projectMemory.phaseHistory, 'BUILD'].slice(-18),
+            generatedFiles: Object.keys(normalized),
+            decisions: [
+              ...projectMemory.decisions,
+              `Design Brief approved.`
+            ]
+          });
+        } else {
+          usedFallback = true;
+        }
+      } catch (error) {
+        usedFallback = true;
+        console.error('Scaffold error:', error);
+      }
+
+      if (usedFallback) {
+        updateMemory({
+          currentPhase: 'BUILD',
+          phaseHistory: [...projectMemory.phaseHistory, 'BUILD'].slice(-18),
+          generatedFiles: Object.keys(localFileArtifacts),
+          decisions: [
+            ...projectMemory.decisions,
+            `Design Brief approved.`
+          ]
+        });
+      }
+
+      setIsProcessing(false);
+      setBuildSubPhase('BUILD');
+      setActiveStage(4);
+
+      setCommandStatus(
+        usedFallback
+          ? 'Backend scaffold was unavailable. Local scaffold generated as fallback.'
+          : 'Design approved. ZAIRE is moving into QA repair phase.'
+      );
+    };
+
+    run();
+  };
+
+  const handleRegenerateDesign = () => {
+    const run = async () => {
+      setIsProcessing(true);
+      setLoadingText('Regenerating Design Intelligence brief...');
+      try {
+        const result = await postEngineerWorkflow('/engineer/design-brief/regenerate', {
+          projectId: 'local-test-123',
+          intake: intakeAnswers
+        });
+        if (result && result.designBrief) {
+          setDesignBrief(result.designBrief);
+          setCommandStatus('Design Brief regenerated. Review and approve to continue.');
+        }
+      } catch (error) {
+        setCommandStatus(`Regeneration failed: ${error.message}`);
+      } finally {
+        setIsProcessing(false);
+      }
+    };
     run();
   };
 
@@ -1008,18 +1130,7 @@ const EngineerModeV2 = () => {
     setTimeout(() => setCmdSuccess(false), 1000);
   };
 
-  const handleTweak = () => {
-    if (!tweakInput.trim()) return;
-    setIsTweaking(true);
-    setTimeout(() => {
-      updateMemory({
-        decisions: [...projectMemory.decisions, `Design tweak requested: ${tweakInput}`]
-      });
-      setCommandStatus('Design tweak captured. UI Engineer will preserve structure and refine presentation in the next pass.');
-      setIsTweaking(false);
-      setTweakInput('');
-    }, 900);
-  };
+  // handleTweak is reserved for the Design tweak panel (coming in next milestone)
 
   const openFile = (fileName) => {
     if (!openFiles.includes(fileName)) {
@@ -1059,9 +1170,6 @@ const EngineerModeV2 = () => {
             <div
               key={stage.num}
               className={`e-stage-step ${activeStage === stage.num ? 'active' : activeStage > stage.num ? 'completed' : ''}`}
-              onClick={() => {
-                if (!isProcessing) setActiveStage(stage.num);
-              }}
             >
               <div className="e-stage-icon">{activeStage > stage.num ? <CheckCircle2 size={12} /> : stage.icon}</div>
               <span className="e-stage-label">{stage.label}</span>
@@ -1229,9 +1337,12 @@ const EngineerModeV2 = () => {
                     </div>
                   )}
                   <div className="e-arch-layer">
-                    <div className="e-arch-layer-header"><span>Summary + Assumptions</span> <Activity size={12} /></div>
+                    <div className="e-arch-layer-header"><span>Mission & Assumptions</span> <Activity size={12} /></div>
                     <div className="e-architecture-list">
-                      <div><span className="e-architecture-key">Summary</span><span className="e-architecture-value">{architecturePlan.summary}</span></div>
+                      <div className="p-3 mb-2 rounded border border-orange-500/30 bg-orange-500/5">
+                        <span className="e-architecture-key text-orange-400 font-semibold mb-1 block flex items-center gap-2"><AlertTriangle size={12} /> RAW USER INTENT</span>
+                        <span className="e-architecture-value italic text-zinc-300">"{architecturePlan.summary}"</span>
+                      </div>
                       <div><span className="e-architecture-key">Assumptions</span><span className="e-architecture-value">{architecturePlan.assumptions.join(' • ')}</span></div>
                     </div>
                   </div>
@@ -1275,81 +1386,84 @@ const EngineerModeV2 = () => {
 
             {activeStage === 3 && (
               <div className="e-dynamic-view e-fade-in e-stage-top-view">
-                <div className="w-full flex justify-between items-center mb-2">
-                  <span className="font-mono text-[9px] text-[var(--e-primary)] tracking-widest flex items-center gap-2"><Activity size={10} className="animate-pulse" /> {skillLevel === 'BEGINNER' ? 'GUIDED SCAFFOLD REVIEW' : 'COMPONENT TREE INSPECTOR'}</span>
-                  <button className="e-cmd-btn" onClick={() => advanceStage(4, 'Building approved scaffold...', 'BUILD')} disabled={isProcessing || !architectureApproved}>
-                    {isProcessing ? <Loader2 size={12} className="animate-spin" /> : 'APPROVE -> BUILD CODE'}
-                  </button>
-                </div>
-                {skillLevel === 'BEGINNER' && <div className="e-stage-help">{getBeginnerPhaseExplanation(currentPhase)}</div>}
-
-                {skillLevel === 'BEGINNER' ? (
-                  <div className="w-full flex flex-col gap-4 max-w-2xl mx-auto e-fade-in items-center">
-                    <div className="text-center mb-2">
-                      <div className="text-[18px] font-bold text-white tracking-wide">Scaffold Ready For Build</div>
-                      <p className="text-gray-400 text-[11px] mt-1">ZAIRE translated your intake into pages, components, routes, and launch checks. Review the simple summary below, then approve the build when you feel comfortable.</p>
-                    </div>
-                    <div className="e-beginner-review">
-                      <div className="e-review-card"><span className="e-review-label">Pages</span><span className="e-review-value">{architecturePlan.pages.join(' • ')}</span></div>
-                      <div className="e-review-card"><span className="e-review-label">Components</span><span className="e-review-value">{architecturePlan.components.join(' • ')}</span></div>
-                      <div className="e-review-card"><span className="e-review-label">Stack</span><span className="e-review-value">{architecturePlan.techStack.join(' • ')}</span></div>
-                    </div>
-                    <div className="w-full max-w-lg flex items-center gap-2 mt-4">
-                      <input
-                        id="beginner-tweak-request"
-                        name="beginner-tweak-request"
-                        type="text"
-                        value={tweakInput}
-                        onChange={(event) => setTweakInput(event.target.value)}
-                        onKeyDown={(event) => event.key === 'Enter' && handleTweak()}
-                        className="flex-1 bg-white/5 border border-white/10 rounded px-4 py-2 text-[11px] text-white outline-none focus:border-[var(--e-primary)] transition-colors"
-                        placeholder="Request a simple change before build..."
-                        disabled={isTweaking}
-                      />
-                      <button
-                        onClick={handleTweak}
-                        disabled={isTweaking || !tweakInput.trim()}
-                        className="bg-white/10 hover:bg-white/20 text-white font-bold w-24 py-2 rounded text-[11px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
-                      >
-                        {isTweaking ? <Loader2 size={14} className="animate-spin text-[var(--e-primary)]" /> : 'TWEAK'}
+                <div className="e-pro-arch-matrix e-fade-in">
+                  <div className="e-pro-matrix-header mb-2">
+                    <div className="e-pro-matrix-title">DESIGN INTELLIGENCE BRIEF</div>
+                    <div className="e-approval-gate">
+                      <button className="e-cmd-btn" style={{ minWidth: 'auto', padding: '0 12px', height: '24px' }} onClick={handleApproveDesign} disabled={isProcessing}>
+                        {isProcessing ? <Loader2 size={10} className="animate-spin" /> : 'APPROVE & SCAFFOLD'}
                       </button>
+                      <button type="button" className="e-ghost-btn" onClick={handleRegenerateDesign} disabled={isProcessing}>REGENERATE</button>
+                      <button type="button" className="e-ghost-btn" onClick={() => { setActiveStage(2); setBuildSubPhase('ARCHITECT'); setDesignBrief(null); }} disabled={isProcessing}>BACK</button>
                     </div>
                   </div>
-                ) : (
-                  <div className="e-pro-design-tree e-fade-in w-full">
-                    <div className="e-tree-sidebar">
-                      <div className="e-tree-header">App Structure</div>
-                      <div className="e-tree-list">
-                        {architecturePlan.components.map((component) => (
-                          <div key={component} className={`e-tree-item ${activeComponent === component ? 'active' : ''}`} onClick={() => setActiveComponent(component)}>
-                            <Box size={10} /> {component}
-                          </div>
-                        ))}
+                  
+                  <div className="e-arch-layer">
+                    <div className="e-arch-layer-header"><span>Summary + Assumptions</span> <Activity size={12} /></div>
+                    <div className="e-architecture-list">
+                      <div>
+                        <span className="e-architecture-key">Summary</span>
+                        <span className="e-architecture-value">{designBrief?.competitive_analysis?.category || 'Dark industrial command-center aesthetic with a single warm accent.'}</span>
                       </div>
-                    </div>
-                    <div className="e-tree-main">
-                      <div className="flex justify-between items-center border-b border-[rgba(255,255,255,0.05)] pb-2">
-                        <span className="font-mono text-[11px] text-white font-bold">{activeComponent}.tsx</span>
-                        <span className="font-mono text-[9px] text-green-400 border border-green-400/30 px-2 py-1 rounded bg-green-400/10">{architecturePlan.techStack[0]} + Tailwind</span>
-                      </div>
-                      <div className="e-comp-preview">
-                        <div className="text-center max-w-sm">
-                          <h1 className="text-[20px] font-bold text-white mb-2 tracking-tight">{activeComponent}</h1>
-                          <p className="text-[11px] text-gray-400">Scaffolded for {architecturePlan.projectTypeLabel.toLowerCase()} and tuned for {intakeAnswers.designStyle.toLowerCase()}.</p>
-                        </div>
-                      </div>
-                      <div className="e-comp-props">
-                        <div className="e-comp-prop"><span className="e-prop-key">page count</span><span className="e-prop-val">{architecturePlan.pages.length}</span></div>
-                        <div className="e-comp-prop"><span className="e-prop-key">api routes</span><span className="e-prop-val">{architecturePlan.apiRoutes.length}</span></div>
-                        <div className="e-comp-prop"><span className="e-prop-key">design style</span><span className="e-prop-val">{intakeAnswers.designStyle}</span></div>
-                        <div className="e-comp-prop"><span className="e-prop-key">deployment</span><span className="e-prop-val">{intakeAnswers.deploymentTarget}</span></div>
+                      <div>
+                        <span className="e-architecture-key">Assumptions</span>
+                        <span className="e-architecture-value">Cyan is reserved for the ZAIRE shell — this project gets its own one-accent identity so it doesn't read as "another ZAIRE screen."</span>
                       </div>
                     </div>
                   </div>
-                )}
+
+                  <div className="e-arch-layer">
+                    <div className="e-arch-layer-header"><span>Resolved Tokens</span> <Layout size={12} /></div>
+                    <div className="e-architecture-list">
+                      <div>
+                        <span className="e-architecture-key">Primary accent</span>
+                        <span className="e-architecture-value" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: designBrief?.visual_tokens?.primary_color || '#FF6A00' }}></span>
+                          {designBrief?.visual_tokens?.primary_color || '#FF6A00'} → used only on CTA + active states
+                        </span>
+                      </div>
+                      <div><span className="e-architecture-key">Neutral scale</span><span className="e-architecture-value">{designBrief?.visual_tokens?.neutral_scale || '#05080A → #F5F6F7 (9 steps)'}</span></div>
+                      <div><span className="e-architecture-key">Display font</span><span className="e-architecture-value">{designBrief?.visual_tokens?.typography?.display || 'Space Grotesk (headings)'}</span></div>
+                      <div><span className="e-architecture-key">Body font</span><span className="e-architecture-value">{designBrief?.visual_tokens?.typography?.body || 'Inter (body/UI text)'}</span></div>
+                      <div><span className="e-architecture-key">Type scale</span><span className="e-architecture-value">1.25 ratio, base 16px</span></div>
+                      <div><span className="e-architecture-key">Radius system</span><span className="e-architecture-value">{designBrief?.visual_tokens?.border_radius || '4px (sharp/industrial — matches "command center" direction)'}</span></div>
+                      <div><span className="e-architecture-key">Spacing grid</span><span className="e-architecture-value">{designBrief?.visual_tokens?.spacing_system || '8px base'}</span></div>
+                    </div>
+                  </div>
+
+                  <div className="e-arch-layer">
+                    <div className="e-arch-layer-header"><span>Competitive Analysis</span> <Search size={12} /></div>
+                    <div className="e-architecture-list">
+                      <div><span className="e-architecture-key">Category</span><span className="e-architecture-value">{designBrief?.competitive_analysis?.category || 'developer/founder portfolio'}</span></div>
+                      <div><span className="e-architecture-key">References Analyzed</span><span className="e-architecture-value">category defaults (none provided in intake)</span></div>
+                      <div><span className="e-architecture-key">Table Stakes</span><span className="e-architecture-value">{designBrief?.competitive_analysis?.table_stakes?.join(', ') || 'one clear "what I build" statement above the fold, visible project list with real outcomes (not just names), one direct contact path'}</span></div>
+                      <div><span className="e-architecture-key">Differentiate</span><span className="e-architecture-value">{designBrief?.competitive_analysis?.differentiation_opportunities?.join(', ') || 'most dev portfolios lead with a bio — lead with proof (a real shipped project) instead'}</span></div>
+                      <div><span className="e-architecture-key">Avoid</span><span className="e-architecture-value">{designBrief?.competitive_analysis?.avoid?.join(', ') || 'generic "Hi, I\'m a passionate developer" opening line, skill-badge walls with no context of what was built'}</span></div>
+                    </div>
+                  </div>
+
+                  <div className="e-arch-layer">
+                    <div className="e-arch-layer-header"><span>Agent Consensus</span> <Cpu size={12} /></div>
+                    <div className="e-architecture-list">
+                      <div><span className="e-architecture-key">Design Agent</span><span className="e-architecture-value">Resolved industrial-orange single-accent system, 4px radius, Space Grotesk / Inter pairing.</span></div>
+                      <div><span className="e-architecture-key">Content Agent</span><span className="e-architecture-value">Rejected literal reuse of intake text as page copy. Drafted outcome-led headline instead of a product description.</span></div>
+                      <div><span className="e-architecture-key">Competitive Agent</span><span className="e-architecture-value">Portfolio category — proof-first structure prioritized over bio-first.</span></div>
+                    </div>
+                  </div>
+
+                  <div className="e-arch-layer">
+                    <div className="e-arch-layer-header"><span>Project Shape</span> <Globe size={12} /></div>
+                    <div className="e-arch-layer-grid">
+                      <div className="e-arch-node"><Activity size={14} className="e-arch-node-icon" /><div className="e-arch-node-text"><span className="e-arch-node-title">1 accent color</span><span className="e-arch-node-sub">{designBrief?.visual_tokens?.primary_color || '#FF6A00'}</span></div></div>
+                      <div className="e-arch-node"><Layout size={14} className="e-arch-node-icon" /><div className="e-arch-node-text"><span className="e-arch-node-title">2 fonts</span><span className="e-arch-node-sub">Display & Body</span></div></div>
+                      <div className="e-arch-node"><Box size={14} className="e-arch-node-icon" /><div className="e-arch-node-text"><span className="e-arch-node-title">{designBrief?.visual_tokens?.border_radius || '4px radius'}</span><span className="e-arch-node-sub">Sharp edges</span></div></div>
+                      <div className="e-arch-node"><Zap size={14} className="e-arch-node-icon" /><div className="e-arch-node-text"><span className="e-arch-node-title">{designBrief?.motion_spec?.level || 'Moderate motion'}</span><span className="e-arch-node-sub">Micro-interactions</span></div></div>
+                    </div>
+                  </div>
+
+                </div>
               </div>
             )}
-
             {activeStage === 4 && (
               <div className="e-code-view e-fade-in">
                 {skillLevel === 'PROFESSIONAL' && (
@@ -1462,7 +1576,12 @@ const EngineerModeV2 = () => {
                         <button type="button" className="e-inline-link">{deployReport.hostingTarget} launch target <ExternalLink size={10} /></button>
                       </div>
                     </div>
-                    <div className="e-dh-right"><button className="e-cmd-btn">MANAGE INFRASTRUCTURE</button></div>
+                    <div className="e-dh-right">
+                      <button className="e-ghost-btn mr-2" onClick={handleDownloadZip} disabled={isProcessing}>
+                        {isProcessing ? <Loader2 size={10} className="animate-spin" /> : 'DOWNLOAD ZIP'}
+                      </button>
+                      <button className="e-cmd-btn">MANAGE INFRASTRUCTURE</button>
+                    </div>
                   </div>
 
                   <div className="e-deploy-metrics-grid">

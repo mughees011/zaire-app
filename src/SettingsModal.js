@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useReducer } from 'react';
-import { useAuth } from '@clerk/clerk-react';
+import React, { useCallback, useEffect, useReducer, useState } from 'react';
+import { useOptionalAuth as useAuth } from './authAdapter';
 import './SettingsModal.css';
 import { resolveApiBase } from './apiBase';
 import MiniPreview from './components/settings/MiniPreview';
@@ -238,8 +238,10 @@ const buildPersistedSettingsPayload = ({
   }
 });
 
-const createReducerFieldSetter = (dispatch, field) => (value) => {
-  dispatch({ type: 'SET_FIELD', field, value });
+const useReducerFieldSetter = (dispatch, field) => {
+  return useCallback((value) => {
+    dispatch({ type: 'SET_FIELD', field, value });
+  }, [dispatch, field]);
 };
 
 const createProviderSwitchPatch = (provider, previousSlot = {}) => {
@@ -628,7 +630,8 @@ function useSettingsModalController({
   biometricData,
   customModes,
   onCustomModesChange,
-  billingStatus
+  billingStatus,
+  onVoiceActorChange
 }) {
   const { getToken } = useAuth();
   const [modalViewState, dispatchModalView] = useReducer(modalViewReducer, INITIAL_MODAL_VIEW_STATE);
@@ -690,23 +693,24 @@ function useSettingsModalController({
     customApiDraft,
     customApiStatus
   } = settingsLocalState;
-  const setCreatorDraft = createReducerFieldSetter(dispatchSettingsLocalState, 'creatorDraft');
-  const setLocalModes = createReducerFieldSetter(dispatchSettingsLocalState, 'localModes');
-  const setAiSlots = createReducerFieldSetter(dispatchSettingsLocalState, 'aiSlots');
-  const setLicenseKeyInput = createReducerFieldSetter(dispatchSettingsLocalState, 'licenseKeyInput');
-  const setLicensingInfo = createReducerFieldSetter(dispatchSettingsLocalState, 'licensingInfo');
-  const setLicensingError = createReducerFieldSetter(dispatchSettingsLocalState, 'licensingError');
-  const setLicensingLoading = createReducerFieldSetter(dispatchSettingsLocalState, 'licensingLoading');
-  const setMemoryDashboard = createReducerFieldSetter(dispatchSettingsLocalState, 'memoryDashboard');
-  const setMemorySearchQuery = createReducerFieldSetter(dispatchSettingsLocalState, 'memorySearchQuery');
-  const setMemoryDashboardLoading = createReducerFieldSetter(dispatchSettingsLocalState, 'memoryDashboardLoading');
-  const setMemoryActionStatus = createReducerFieldSetter(dispatchSettingsLocalState, 'memoryActionStatus');
-  const setBriefingsData = createReducerFieldSetter(dispatchSettingsLocalState, 'briefingsData');
-  const setBriefingsLoading = createReducerFieldSetter(dispatchSettingsLocalState, 'briefingsLoading');
-  const setAiVaultSaveStatus = createReducerFieldSetter(dispatchSettingsLocalState, 'aiVaultSaveStatus');
-  const setCustomApis = createReducerFieldSetter(dispatchSettingsLocalState, 'customApis');
-  const setCustomApiDraft = createReducerFieldSetter(dispatchSettingsLocalState, 'customApiDraft');
-  const setCustomApiStatus = createReducerFieldSetter(dispatchSettingsLocalState, 'customApiStatus');
+  const [aiVaultSlotStatuses, setAiVaultSlotStatuses] = useState(['', '', '']);
+  const setCreatorDraft = useReducerFieldSetter(dispatchSettingsLocalState, 'creatorDraft');
+  const setLocalModes = useReducerFieldSetter(dispatchSettingsLocalState, 'localModes');
+  const setAiSlots = useReducerFieldSetter(dispatchSettingsLocalState, 'aiSlots');
+  const setLicenseKeyInput = useReducerFieldSetter(dispatchSettingsLocalState, 'licenseKeyInput');
+  const setLicensingInfo = useReducerFieldSetter(dispatchSettingsLocalState, 'licensingInfo');
+  const setLicensingError = useReducerFieldSetter(dispatchSettingsLocalState, 'licensingError');
+  const setLicensingLoading = useReducerFieldSetter(dispatchSettingsLocalState, 'licensingLoading');
+  const setMemoryDashboard = useReducerFieldSetter(dispatchSettingsLocalState, 'memoryDashboard');
+  const setMemorySearchQuery = useReducerFieldSetter(dispatchSettingsLocalState, 'memorySearchQuery');
+  const setMemoryDashboardLoading = useReducerFieldSetter(dispatchSettingsLocalState, 'memoryDashboardLoading');
+  const setMemoryActionStatus = useReducerFieldSetter(dispatchSettingsLocalState, 'memoryActionStatus');
+  const setBriefingsData = useReducerFieldSetter(dispatchSettingsLocalState, 'briefingsData');
+  const setBriefingsLoading = useReducerFieldSetter(dispatchSettingsLocalState, 'briefingsLoading');
+  const setAiVaultSaveStatus = useReducerFieldSetter(dispatchSettingsLocalState, 'aiVaultSaveStatus');
+  const setCustomApis = useReducerFieldSetter(dispatchSettingsLocalState, 'customApis');
+  const setCustomApiDraft = useReducerFieldSetter(dispatchSettingsLocalState, 'customApiDraft');
+  const setCustomApiStatus = useReducerFieldSetter(dispatchSettingsLocalState, 'customApiStatus');
   const settingsWarningState = React.useRef({
     briefingsLogged: false,
     memoryLogged: false,
@@ -946,12 +950,12 @@ function useSettingsModalController({
           .catch(() => {});
       });
     }
-  }, [isOpen, getToken]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
     loadMemorySettingsConfig();
-  }, [isOpen, loadMemorySettingsConfig]);
+  }, [isOpen]);
 
   const activateNewKey = async () => {
     if (!licenseKeyInput.trim()) return;
@@ -1073,7 +1077,7 @@ function useSettingsModalController({
   useEffect(() => {
     if (!isOpen) return;
     loadAiProviders();
-  }, [isOpen, loadAiProviders]);
+  }, [isOpen]);
 
   const setModalField = useCallback((field, value) => {
     dispatchModalView({ type: 'SET_FIELD', field, value });
@@ -1102,7 +1106,10 @@ function useSettingsModalController({
   const setDefaultDnaProfile = useCallback((value) => setModalField('defaultDnaProfile', value), [setModalField]);
   const setSelectedTemplateId = useCallback((value) => setModalField('selectedTemplateId', value), [setModalField]);
   const setCreatorStep = useCallback((value) => setModalField('creatorStep', value), [setModalField]);
-  const setVoiceActor = useCallback((value) => setModalField('voiceActor', value), [setModalField]);
+  const setVoiceActor = useCallback((value) => {
+    setModalField('voiceActor', value);
+    if (onVoiceActorChange) onVoiceActorChange(value);
+  }, [setModalField, onVoiceActorChange]);
   const setBaseTone = useCallback((value) => setModalField('baseTone', value), [setModalField]);
   const setCharacteristics = useCallback((value) => setModalField('characteristics', value), [setModalField]);
   const setFastAnswers = useCallback((value) => setModalField('fastAnswers', value), [setModalField]);
@@ -1262,6 +1269,78 @@ function useSettingsModalController({
     window.open(assetUrl, '_blank', 'noopener,noreferrer');
   }, []);
 
+  const clearAiSlot = useCallback((slotIndex) => {
+    setAiSlots((previous) => previous.map((slot, index) => (
+      index === slotIndex ? createProviderSwitchPatch(slot.provider, slot) : slot
+    )));
+    setAiVaultSlotStatuses((previous) => previous.map((message, index) => (
+      index === slotIndex ? 'Slot cleared. Paste a fresh key before saving.' : message
+    )));
+  }, [setAiSlots]);
+
+  const testAiSlot = useCallback(async (slotIndex) => {
+    const slot = aiSlots[slotIndex];
+    if (!slot || slot.provider === 'Empty' || !slot.enabled) {
+      setAiVaultSlotStatuses((previous) => previous.map((message, index) => (
+        index === slotIndex ? 'Choose an active provider before testing this slot.' : message
+      )));
+      return;
+    }
+
+    setAiVaultSlotStatuses((previous) => previous.map((message, index) => (
+      index === slotIndex ? `Testing ${slot.provider}...` : message
+    )));
+
+    try {
+      const token = await getToken().catch(() => null);
+      if (!token) {
+        throw new Error('Sign in is required to test this vault slot.');
+      }
+
+      const result = await fetchJsonOrThrow(`${API_URL}/api/vault/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          slot: slotIndex + 1,
+          provider: slot.provider,
+          key: slot.apiKey || '',
+          model: slot.model || '',
+          purpose: slot.purpose || '',
+          baseUrl: slot.baseUrl || '',
+          enabled: Boolean(slot.enabled)
+        })
+      });
+
+      setAiVaultSlotStatuses((previous) => previous.map((message, index) => (
+        index === slotIndex ? (result.message || `${slot.provider} is ready.`) : message
+      )));
+    } catch (err) {
+      setAiVaultSlotStatuses((previous) => previous.map((message, index) => (
+        index === slotIndex ? (err.message || 'Slot test failed.') : message
+      )));
+    }
+  }, [aiSlots, getToken]);
+
+  const describeAiSlotState = useCallback((slotIndex) => {
+    const slot = aiSlots[slotIndex] || {};
+    const runtimeMessage = aiVaultSlotStatuses[slotIndex];
+    if (runtimeMessage) return runtimeMessage;
+    if (slot.provider === 'Empty' || !slot.enabled) return 'Slot is disabled. Pick a provider to use it.';
+    if (slot.apiKey) return 'Fresh key entered. Test or save this slot to lock it in.';
+    if (slot.hasKey) return `Stored securely for ${slot.provider}. Use TEST to confirm this slot is ready.`;
+    return 'No saved key yet. Paste a fresh provider key before using this slot.';
+  }, [aiSlots, aiVaultSlotStatuses]);
+
+  const getAiSlotStatusLabel = useCallback((slotIndex) => {
+    const slot = aiSlots[slotIndex] || {};
+    if (slot.provider === 'Empty' || !slot.enabled) return 'EMPTY';
+    if (slot.apiKey || slot.hasKey) return 'READY';
+    return 'NEEDS KEY';
+  }, [aiSlots]);
+
   const applyCoreSync = useCallback(async () => {
     setAiVaultSaveStatus('Saving AI Vault and system configuration...');
 
@@ -1381,6 +1460,7 @@ function useSettingsModalController({
           mask: slot.mask || (slot.hasKey || slot.apiKey ? 'Saved Locally' : '')
         }))
       );
+      setAiVaultSlotStatuses(['', '', '']);
       setCustomApis((previousEntries) =>
         previousEntries.map((entry) => ({
           ...entry,
@@ -1404,6 +1484,11 @@ function useSettingsModalController({
       onClose();
     } catch (err) {
       const message = err?.message || 'Unknown save failure';
+      if (isNetworkFetchError(err)) {
+        setAiVaultSaveStatus('Saved locally. Remote backend is currently unavailable.');
+        onClose();
+        return;
+      }
       setAiVaultSaveStatus(`Save failed: ${message}`);
       console.warn('Failed to save config remotely:', message);
     }
@@ -1789,7 +1874,7 @@ function useSettingsModalController({
                     <option value="#00d4ff">Cyan Core</option>
                     <option value="#00ff88">Emerald Sync</option>
                     <option value="#a78bfa">Violet Array</option>
-                    <option value="#fbbf24">Gold Circuit</option>
+                    <option value="#ff9a3d">Gold Circuit</option>
                   </select>
                 </SettingRow>
                 <SettingRow name="GRID OVERLAY DENSITY" desc="Background tactical grid line spacing">
@@ -1876,54 +1961,87 @@ function useSettingsModalController({
               <Section title="PRIMARY INTELLIGENCE SLOTS (MAX 3)">
                 <ApiSlot
                   slot="1 - PRIMARY"
-                  status={(aiSlots[0]?.apiKey || aiSlots[0]?.hasKey) ? 'CONNECTED' : 'PENDING'}
+                  status={getAiSlotStatusLabel(0)}
                   provider={aiSlots[0]?.provider || 'Empty'}
                   purpose={aiSlots[0]?.purpose || 'Primary'}
                   model={aiSlots[0]?.model || ''}
                   apiKey={aiSlots[0]?.apiKey || ''}
                   baseUrl={aiSlots[0]?.baseUrl || ''}
                   mask={aiSlots[0]?.mask}
+                  helperText={describeAiSlotState(0)}
                   empty={(aiSlots[0]?.provider || 'Empty') === 'Empty'}
+                  onTest={() => testAiSlot(0)}
+                  onClear={() => clearAiSlot(0)}
                   onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => {
                     if (i !== 0) return s;
                     if (Object.prototype.hasOwnProperty.call(patch, 'provider')) {
+                      setAiVaultSlotStatuses((previous) => previous.map((message, index) => (
+                        index === 0 ? 'Provider changed. Paste a fresh key for this provider.' : message
+                      )));
                       return createProviderSwitchPatch(patch.provider, s);
+                    }
+                    if (Object.prototype.hasOwnProperty.call(patch, 'apiKey')) {
+                      setAiVaultSlotStatuses((previous) => previous.map((message, index) => (
+                        index === 0 ? 'Fresh key entered. Test or save this slot.' : message
+                      )));
                     }
                     return { ...s, ...patch };
                   }))}
                 />
                 <ApiSlot
                   slot="2 - CODING"
-                  status={(aiSlots[1]?.apiKey || aiSlots[1]?.hasKey) ? 'CONNECTED' : 'PENDING'}
+                  status={getAiSlotStatusLabel(1)}
                   provider={aiSlots[1]?.provider || 'Empty'}
                   purpose={aiSlots[1]?.purpose || 'Coding'}
                   model={aiSlots[1]?.model || ''}
                   apiKey={aiSlots[1]?.apiKey || ''}
                   baseUrl={aiSlots[1]?.baseUrl || ''}
                   mask={aiSlots[1]?.mask}
+                  helperText={describeAiSlotState(1)}
                   empty={(aiSlots[1]?.provider || 'Empty') === 'Empty'}
+                  onTest={() => testAiSlot(1)}
+                  onClear={() => clearAiSlot(1)}
                   onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => {
                     if (i !== 1) return s;
                     if (Object.prototype.hasOwnProperty.call(patch, 'provider')) {
+                      setAiVaultSlotStatuses((previous) => previous.map((message, index) => (
+                        index === 1 ? 'Provider changed. Paste a fresh key for this provider.' : message
+                      )));
                       return createProviderSwitchPatch(patch.provider, s);
+                    }
+                    if (Object.prototype.hasOwnProperty.call(patch, 'apiKey')) {
+                      setAiVaultSlotStatuses((previous) => previous.map((message, index) => (
+                        index === 1 ? 'Fresh key entered. Test or save this slot.' : message
+                      )));
                     }
                     return { ...s, ...patch };
                   }))}
                 />
                 <ApiSlot
                   slot="3 - FALLBACK"
-                  status={(aiSlots[2]?.apiKey || aiSlots[2]?.hasKey) ? 'CONNECTED' : 'EMPTY'}
+                  status={getAiSlotStatusLabel(2)}
                   provider={aiSlots[2]?.provider || 'Empty'}
                   purpose={aiSlots[2]?.purpose || 'Fallback'}
                   model={aiSlots[2]?.model || ''}
                   apiKey={aiSlots[2]?.apiKey || ''}
                   baseUrl={aiSlots[2]?.baseUrl || ''}
                   mask={aiSlots[2]?.mask}
+                  helperText={describeAiSlotState(2)}
                   empty={(aiSlots[2]?.provider || 'Empty') === 'Empty'}
+                  onTest={() => testAiSlot(2)}
+                  onClear={() => clearAiSlot(2)}
                   onChange={(patch) => setAiSlots((prev) => prev.map((s, i) => {
                     if (i !== 2) return s;
                     if (Object.prototype.hasOwnProperty.call(patch, 'provider')) {
+                      setAiVaultSlotStatuses((previous) => previous.map((message, index) => (
+                        index === 2 ? 'Provider changed. Paste a fresh key for this provider.' : message
+                      )));
                       return createProviderSwitchPatch(patch.provider, s);
+                    }
+                    if (Object.prototype.hasOwnProperty.call(patch, 'apiKey')) {
+                      setAiVaultSlotStatuses((previous) => previous.map((message, index) => (
+                        index === 2 ? 'Fresh key entered. Test or save this slot.' : message
+                      )));
                     }
                     return { ...s, ...patch };
                   }))}
@@ -2490,15 +2608,44 @@ function useSettingsModalController({
               <div className="page-title">VOICE & WAKE</div>
               <div className="page-sub">Tune voice activation and command capture</div>
               <Section title="VOICE CONFIGURATION">
-                <SettingRow name="VOICE ACTOR" desc="Select the voice persona for ZAIRE's verbal responses">
-                  <select id="settings-voice-actor" name="settings-voice-actor" className="hud-select" value={voiceActor} onChange={(e) => setVoiceActor(e.target.value)}>
-                    <option>Nova</option>
-                    <option>Echo</option>
-                    <option>Alloy</option>
-                    <option>Onyx</option>
-                    <option>Shimmer</option>
-                  </select>
-                </SettingRow>
+                <div style={{ marginBottom: '16px' }}>
+                  <div className="setting-name">VOICE ACTOR</div>
+                  <div className="setting-desc">Select the voice persona for ZAIRE's verbal responses</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+                  {[
+                    { id: 'AVA', name: 'Ava', persona: 'ZAIRE Standard', tagline: 'Calm, intelligent, and precisely professional.', gender: 'female' },
+                    { id: 'ARIA', name: 'Aria', persona: 'Tactical Officer', tagline: 'Confident, assertive, and mission-critical crisp.', gender: 'female' },
+                    { id: 'JENNY', name: 'Jenny', persona: 'Operations Lead', tagline: 'Warm, grounded, and clear in command.', gender: 'female' },
+                    { id: 'GUY', name: 'Guy', persona: 'Command Voice', tagline: 'Deep, authoritative, and unmistakably in control.', gender: 'male' },
+                    { id: 'ERIC', name: 'Eric', persona: 'Field Analyst', tagline: 'Precise, measured, and direct under pressure.', gender: 'male' },
+                    { id: 'SARA', name: 'Sara', persona: 'Research Intel', tagline: 'Bright, articulate, and composed at high velocity.', gender: 'female' },
+                    { id: 'DAVIS', name: 'Davis', persona: 'Tactical Deep', tagline: 'Low, gravelly, and commanding at all frequencies.', gender: 'male' }
+                  ].map(voice => (
+                    <div 
+                      key={voice.id}
+                      onClick={() => setVoiceActor(voice.id)}
+                      style={{
+                        padding: '12px',
+                        border: `1px solid ${voiceActor === voice.id ? 'var(--accent)' : 'rgba(255,255,255,0.1)'}`,
+                        borderRadius: '6px',
+                        background: voiceActor === voice.id ? 'rgba(0,212,255,0.05)' : 'rgba(0,0,0,0.3)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ color: voiceActor === voice.id ? '#fff' : '#aaa', fontSize: '14px' }}>{voice.name}</strong>
+                        <span style={{ fontSize: '10px', color: '#666', background: '#111', padding: '2px 6px', borderRadius: '4px' }}>{voice.gender.toUpperCase()}</span>
+                      </div>
+                      <div style={{ color: 'var(--accent)', fontSize: '11px', fontWeight: 'bold' }}>{voice.persona}</div>
+                      <div style={{ color: '#888', fontSize: '11px', lineHeight: '1.3', marginTop: '4px' }}>{voice.tagline}</div>
+                    </div>
+                  ))}
+                </div>
               </Section>
               <Section title="WAKE DETECTION">
                 <SettingRow name="VOICE WAKE WORD" desc="Sensitivity for ZAIRE wake detection">
