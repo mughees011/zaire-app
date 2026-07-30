@@ -15,7 +15,7 @@
 ![Supabase](https://img.shields.io/badge/Supabase-Database-3ECF8E?style=for-the-badge\&logo=supabase)
 ![License](https://img.shields.io/badge/License-Apache_2.0-blue?style=for-the-badge)
 
-[Live Demo](#) • [Backend Repository](https://github.com/yourusername/zaire-api) • [Report Bug](../../issues) • [Request Feature](../../issues)
+[Live Demo](#) • [Backend Repository](https://github.com/mughees011/zaire-api) • [Report Bug](../../issues) • [Request Feature](../../issues)
 
 </div>
 
@@ -353,9 +353,9 @@ Special thanks to the open source community for creating the tools that make pro
 
 **Mughees Siddiqui**
 
-GitHub: https://github.com/yourusername
+GitHub: https://github.com/mughees011
 
-LinkedIn: https://linkedin.com/in/yourusername
+LinkedIn: [https://linkedin.com/in/yourusername](https://www.linkedin.com/in/mughees-siddiqui/)
 
 ---
 
