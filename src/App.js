@@ -9,7 +9,7 @@ import './App.css';
 import ShadowAssistant from './components/ShadowAssistant';
 import EngineerModeV2 from './components/modes/EngineerModeV2';
 import ProfessorModeV2 from './components/modes/ProfessorModeV2';
-import TraderModeV2 from './components/modes/TraderModeV2';
+import ZaireTraderHub from './components/modes/ZaireTraderHub';
 import SwarmModeV2 from './components/modes/SwarmModeV2';
 import CustomModeRenderer from './components/CustomModeRenderer';
 import { OptionalUserButton as UserButton, useOptionalUser as useUser, useOptionalAuth as useAuth } from './authAdapter';
@@ -4225,7 +4225,7 @@ function useAppController() {
             </div>
           ) : activeMode === 'TRADER' ? (
             <div style={{ gridColumn: '1 / -1', gridRow: '2 / -1', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <TraderModeV2 />
+              <ZaireTraderHub apiBase={API_BASE_URL} />
             </div>
           ) : activeMode === 'SWARM' ? (
             <div style={{ gridColumn: '1 / -1', gridRow: '2 / -1', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>

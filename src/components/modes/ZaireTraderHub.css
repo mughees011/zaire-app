@@ -1,0 +1,226 @@
+/* ============================================================
+   ZAIRE TRADER HUB — CSS
+   Trader Mode: Green #10B981 accent, JetBrains Mono data font
+   ============================================================ */
+
+/* ---- Base ---- */
+.zth-root {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #020305;
+  color: #F1F5F9;
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow: hidden;
+  position: relative;
+}
+.zth-root * { box-sizing: border-box; }
+.zth-root ::-webkit-scrollbar { width: 3px; height: 3px; }
+.zth-root ::-webkit-scrollbar-thumb { background: rgba(16,185,129,0.3); border-radius: 2px; }
+.zth-mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
+
+/* ---- Grid background ---- */
+.zth-grid-bg {
+  background-image: linear-gradient(rgba(16,185,129,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16,185,129,0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ---- Status Bar ---- */
+.zth-status-bar {
+  background: rgba(16,185,129,0.05);
+  border-bottom: 1px solid rgba(16,185,129,0.15);
+  padding: 4px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  z-index: 20;
+  position: relative;
+}
+.zth-status-left, .zth-status-right { display: flex; align-items: center; gap: 16px; }
+.zth-status-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #10B981;
+  box-shadow: 0 0 8px rgba(16,185,129,0.8);
+  animation: zth-pulse 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.zth-status-dot.red {
+  background: #EF4444;
+  box-shadow: 0 0 8px rgba(239,68,68,0.8);
+  animation: zth-pulse-red 1.2s ease-in-out infinite;
+}
+.zth-status-text { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #94A3B8; }
+.zth-status-text b { color: #10B981; }
+.zth-halal-badge {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  color: #10B981; letter-spacing: 0.1em;
+  background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3);
+  padding: 2px 8px; border-radius: 3px;
+}
+.zth-live-badge {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  color: #10B981; letter-spacing: 0.1em;
+  background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2);
+  padding: 2px 6px; border-radius: 3px;
+}
+.zth-live-badge.offline { color: #F59E0B; border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.05); }
+
+/* ---- Ticker Bar ---- */
+.zth-ticker { overflow: hidden; white-space: nowrap; flex-shrink: 0; }
+.zth-ticker-inner {
+  display: inline-flex; gap: 40px;
+  animation: zth-ticker-scroll 50s linear infinite;
+}
+.zth-ticker-item { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #94A3B8; }
+.zth-ticker-item .up { color: #10B981; }
+.zth-ticker-item .dn { color: #EF4444; }
+.zth-ticker-item .flat { color: #F59E0B; }
+
+/* ---- Main Layout ---- */
+.zth-layout { display: flex; flex: 1; overflow: hidden; position: relative; }
+.zth-sidebar {
+  width: 200px; flex-shrink: 0;
+  background: rgba(2,3,5,0.95);
+  border-right: 1px solid rgba(255,255,255,0.06);
+  display: flex; flex-direction: column;
+  overflow-y: auto; padding: 12px 8px;
+}
+.zth-main { flex: 1; overflow-y: auto; padding: 20px; }
+
+/* ---- Sidebar Identity Card ---- */
+.zth-identity {
+  background: rgba(16,185,129,0.05);
+  border: 1px solid rgba(16,185,129,0.2);
+  border-radius: 10px; padding: 10px;
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 16px;
+  animation: zth-breathe 4s ease-in-out infinite;
+}
+.zth-identity-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3);
+  display: flex; align-items: center; justify-content: center;
+  color: #10B981; font-size: 16px; position: relative;
+}
+.zth-identity-dot {
+  position: absolute; top: -2px; right: -2px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #10B981;
+  box-shadow: 0 0 6px rgba(16,185,129,0.8);
+  animation: zth-pulse 2s ease-in-out infinite;
+}
+.zth-identity-name { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: #10B981; }
+.zth-identity-sub { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #475569; }
+
+/* ---- Nav Items ---- */
+.zth-nav-group-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #334155; letter-spacing: 0.1em; text-transform: uppercase; padding: 0 8px; margin: 12px 0 4px; }
+.zth-nav-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #64748B;
+  cursor: pointer; transition: all 0.15s ease;
+  border-left: 2px solid transparent;
+  margin-bottom: 1px;
+}
+.zth-nav-item:hover { background: rgba(16,185,129,0.07); color: #94A3B8; }
+.zth-nav-item.active { background: rgba(16,185,129,0.1); color: #10B981; border-left-color: #10B981; }
+.zth-nav-item .icon { font-size: 15px; width: 16px; text-align: center; }
+.zth-nav-badge {
+  margin-left: auto; font-size: 8px; font-weight: 700;
+  color: #10B981; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2);
+  padding: 1px 5px; border-radius: 3px;
+}
+
+/* ---- Sidebar Stats ---- */
+.zth-sidebar-stats { margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); }
+.zth-sidebar-stats-inner { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+.zth-brain-btn {
+  width: 100%; padding: 8px; border: 1px solid rgba(16,185,129,0.3);
+  background: rgba(16,185,129,0.08); color: #10B981;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+  border-radius: 8px; cursor: pointer; letter-spacing: 0.05em;
+  transition: all 0.2s;
+}
+.zth-brain-btn:hover { background: rgba(16,185,129,0.15); box-shadow: 0 0 16px rgba(16,185,129,0.2); }
+
+/* ---- Section Header ---- */
+.zth-section-header { margin-bottom: 20px; }
+.zth-section-title { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: #F1F5F9; margin-bottom: 4px; }
+.zth-section-sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #64748B; display: flex; align-items: center; gap: 6px; }
+
+/* ---- Glass Panels ---- */
+.zth-glass {
+  background: rgba(11,19,41,0.7); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 12px;
+}
+.zth-glass-green {
+  background: rgba(16,185,129,0.04); backdrop-filter: blur(12px);
+  border: 1px solid rgba(16,185,129,0.2); border-radius: 12px;
+}
+.zth-ai-border {
+  border: 1px solid transparent;
+  background: linear-gradient(#0b1329, #0b1329) padding-box,
+    linear-gradient(135deg, rgba(16,185,129,0.5), rgba(139,92,246,0.3)) border-box;
+  border-radius: 12px;
+}
+
+/* ---- Progress bars ---- */
+.zth-bar { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.zth-bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #10B981, #34D399); transition: width 0.8s ease; }
+.zth-bar-fill.red { background: linear-gradient(90deg, #EF4444, #F87171); }
+.zth-bar-fill.amber { background: linear-gradient(90deg, #F59E0B, #FCD34D); }
+
+/* ---- Consciousness Terminal ---- */
+.zth-terminal {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.7;
+  color: #64748B; padding: 12px; height: 380px; overflow-y: auto;
+  background: rgba(2,3,5,0.5);
+}
+.zth-terminal-line { animation: zth-fade-up 0.2s ease-out forwards; }
+.zth-terminal-line.green { color: #10B981; }
+.zth-terminal-line.violet { color: #8B5CF6; }
+.zth-terminal-line.amber { color: #F59E0B; }
+.zth-terminal-line.red { color: #EF4444; }
+.zth-terminal-line.dim { color: #334155; }
+
+/* ---- Charts ---- */
+.zth-chart-line { stroke-dasharray: 1000; animation: zth-chart-draw 2s ease-out forwards; }
+.zth-candle-up { fill: #10B981; stroke: #10B981; }
+.zth-candle-down { fill: #EF4444; stroke: #EF4444; }
+.zth-wick-up { stroke: #10B981; stroke-width: 1.5; }
+.zth-wick-down { stroke: #EF4444; stroke-width: 1.5; }
+
+/* ---- Confidence Ring ---- */
+.zth-conf-ring { transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.6s ease; }
+
+/* ---- Action pulse dot ---- */
+.zth-pulse-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #10B981; box-shadow: 0 0 8px rgba(16,185,129,0.8);
+  animation: zth-pulse 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.zth-pulse-dot.red { background: #EF4444; box-shadow: 0 0 8px rgba(239,68,68,0.8); animation: zth-pulse-red 1.2s ease-in-out infinite; }
+.zth-pulse-dot.amber { background: #F59E0B; }
+
+/* ---- Toggle switch ---- */
+.zth-toggle-on { background: #10B981; }
+.zth-toggle-off { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); }
+
+/* ---- Keyframes ---- */
+@keyframes zth-pulse { 0%,100%{opacity:1;box-shadow:0 0 8px rgba(16,185,129,0.8)} 50%{opacity:0.6;box-shadow:0 0 16px rgba(16,185,129,0.4)} }
+@keyframes zth-pulse-red { 0%,100%{opacity:1} 50%{opacity:0.3} }
+@keyframes zth-breathe { 0%,100%{transform:scale(1);opacity:0.9} 50%{transform:scale(1.01);opacity:1} }
+@keyframes zth-ticker-scroll { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+@keyframes zth-fade-up { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+@keyframes zth-chart-draw { from{stroke-dashoffset:1000} to{stroke-dashoffset:0} }
+@keyframes zth-scan { 0%{transform:translateY(-100%)} 100%{transform:translateY(500px)} }
+@keyframes zth-spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+.zth-spin { animation: zth-spin 8s linear infinite; }
+.zth-scan-line { animation: zth-scan 4s linear infinite; }

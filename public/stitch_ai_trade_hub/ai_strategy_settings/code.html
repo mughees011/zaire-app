@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA TRADING - AI Strategy &amp; Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-container": "#8083ff",
+                    "secondary": "#4edea3",
+                    "on-secondary-fixed": "#002113",
+                    "inverse-on-surface": "#283044",
+                    "on-primary-fixed-variant": "#2f2ebe",
+                    "surface-dim": "#0b1326",
+                    "background": "#0b1326",
+                    "tertiary-fixed-dim": "#ffb3ad",
+                    "on-tertiary": "#68000a",
+                    "on-tertiary-container": "#5c0008",
+                    "on-background": "#dae2fd",
+                    "surface-bright": "#31394d",
+                    "secondary-fixed": "#6ffbbe",
+                    "on-tertiary-fixed": "#410004",
+                    "on-secondary": "#003824",
+                    "surface-tint": "#c0c1ff",
+                    "secondary-fixed-dim": "#4edea3",
+                    "surface-container-highest": "#2d3449",
+                    "on-secondary-fixed-variant": "#005236",
+                    "on-primary-fixed": "#07006c",
+                    "on-surface": "#dae2fd",
+                    "surface-container-lowest": "#060e20",
+                    "primary-fixed-dim": "#c0c1ff",
+                    "primary-fixed": "#e1e0ff",
+                    "error": "#ffb4ab",
+                    "surface": "#0b1326",
+                    "tertiary-fixed": "#ffdad7",
+                    "on-secondary-container": "#00311f",
+                    "outline-variant": "#464554",
+                    "tertiary": "#ffb3ad",
+                    "on-surface-variant": "#c7c4d7",
+                    "inverse-primary": "#494bd6",
+                    "on-primary-container": "#0d0096",
+                    "primary": "#c0c1ff",
+                    "inverse-surface": "#dae2fd",
+                    "surface-container": "#171f33",
+                    "surface-container-high": "#222a3d",
+                    "on-error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#930013",
+                    "outline": "#908fa0",
+                    "on-error": "#690005",
+                    "tertiary-container": "#ff5451",
+                    "surface-container-low": "#131b2e",
+                    "surface-variant": "#2d3449",
+                    "on-primary": "#1000a9",
+                    "error-container": "#93000a",
+                    "secondary-container": "#00a572"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter": "1rem",
+                    "margin-mobile": "1rem",
+                    "margin-desktop": "2rem",
+                    "lg": "1.5rem",
+                    "xs": "0.25rem",
+                    "base": "4px",
+                    "xl": "2.5rem",
+                    "sm": "0.5rem",
+                    "md": "1rem"
+            },
+            "fontFamily": {
+                    "data-lg": [
+                            "JetBrains Mono"
+                    ],
+                    "body-md": [
+                            "Inter"
+                    ],
+                    "headline-lg-mobile": [
+                            "Inter"
+                    ],
+                    "label-caps": [
+                            "Inter"
+                    ],
+                    "headline-lg": [
+                            "Inter"
+                    ],
+                    "display-lg": [
+                            "Inter"
+                    ],
+                    "data-sm": [
+                            "JetBrains Mono"
+                    ]
+            },
+            "fontSize": {
+                    "data-lg": [
+                            "20px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "body-md": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-lg-mobile": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-caps": [
+                            "11px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "headline-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "display-lg": [
+                            "48px",
+                            {
+                                    "lineHeight": "56px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "data-sm": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "400"
+                            }
+                    ]
+            }
+        },
+        },
+      }
+    </script>
+<style>
+        /* Custom scrollbar for deep dark theme */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b1326; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2d3449; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #464554; 
+        }
+        
+        /* Glassmorphism utility */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Neon Highlights */
+        .glow-primary {
+            box-shadow: 0 0 20px -5px #8083ff;
+        }
+        
+        /* Range slider styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #c0c1ff;
+            cursor: pointer;
+            margin-top: -8px; 
+            box-shadow: 0 0 10px #c0c1ff;
+        }
+        
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #2d3449;
+            border-radius: 2px;
+        }
+        
+        input[type=range]:focus {
+            outline: none;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md min-h-screen flex flex-col md:flex-row overflow-x-hidden">
+<!-- Desktop SideNavBar -->
+<nav class="hidden md:flex flex-col h-screen fixed left-0 top-0 w-64 z-40 bg-surface-dim dark:bg-surface-dim py-xl">
+<div class="px-gutter mb-8">
+<h1 class="font-headline-lg text-headline-lg text-primary">Aura AI</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-2 mt-2">
+<span class="w-2 h-2 rounded-full bg-secondary inline-block animate-pulse"></span>
+                Operational • v4.2
+            </p>
+</div>
+<div class="px-gutter mb-6">
+<button class="w-full bg-primary-container text-on-primary-container rounded-xl py-3 font-label-caps text-label-caps uppercase tracking-wider hover:bg-surface-bright/50 transition-colors">New Trade</button>
+</div>
+<ul class="flex flex-col gap-1 px-4 flex-grow">
+<li>
+<a class="text-on-surface-variant hover:text-on-surface flex items-center gap-3 px-4 py-3 hover:bg-surface-container-highest/50 transition-all rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-caps text-label-caps uppercase">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="text-on-surface-variant hover:text-on-surface flex items-center gap-3 px-4 py-3 hover:bg-surface-container-highest/50 transition-all rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="font-label-caps text-label-caps uppercase">Markets</span>
+</a>
+</li>
+<li>
+<a class="text-on-surface-variant hover:text-on-surface flex items-center gap-3 px-4 py-3 hover:bg-surface-container-highest/50 transition-all rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="pie_chart">pie_chart</span>
+<span class="font-label-caps text-label-caps uppercase">Portfolio</span>
+</a>
+</li>
+<li>
+<a class="bg-primary-container text-on-primary-container rounded-xl flex items-center gap-3 px-4 py-3 active:translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="font-label-caps text-label-caps uppercase font-bold">Strategies</span>
+</a>
+</li>
+<li>
+<a class="text-on-surface-variant hover:text-on-surface flex items-center gap-3 px-4 py-3 hover:bg-surface-container-highest/50 transition-all rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="insights">insights</span>
+<span class="font-label-caps text-label-caps uppercase">Analytics</span>
+</a>
+</li>
+</ul>
+<div class="mt-auto px-4 border-t border-white/10 pt-4">
+<ul class="flex flex-col gap-1">
+<li>
+<a class="text-on-surface-variant hover:text-on-surface flex items-center gap-3 px-4 py-3 hover:bg-surface-container-highest/50 transition-all rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-label-caps text-label-caps uppercase">Support</span>
+</a>
+</li>
+<li>
+<a class="text-on-surface-variant hover:text-on-surface flex items-center gap-3 px-4 py-3 hover:bg-surface-container-highest/50 transition-all rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-label-caps text-label-caps uppercase">Logout</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-grow md:ml-64 relative min-h-screen flex flex-col">
+<!-- Mobile Top Nav (Simplified) -->
+<header class="md:hidden flex items-center justify-between px-gutter h-16 w-full fixed top-0 z-50 bg-surface-container-low/70 backdrop-blur-xl dark:bg-surface-container-low/70 border-b border-white/10">
+<div class="font-display-lg text-display-lg text-primary tracking-tighter" style="font-size: 24px; line-height: 32px;">AURA TRADING</div>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-primary" data-icon="settings">settings</span>
+</div>
+</header>
+<!-- Canvas -->
+<div class="p-gutter mt-16 md:mt-0 flex-grow grid grid-cols-1 md:grid-cols-12 gap-gutter auto-rows-max">
+<!-- Page Header -->
+<div class="md:col-span-12 mb-4">
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">AI Strategy Configuration</h2>
+<p class="text-on-surface-variant mt-2 max-w-2xl">Manage autonomous trading parameters, risk tolerance, and active algorithm deployments.</p>
+</div>
+<!-- Master Toggle Widget -->
+<div class="md:col-span-12 lg:col-span-4 glass-panel rounded-xl p-6 flex flex-col items-center justify-center relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-br from-primary-container/20 to-transparent pointer-events-none"></div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-6">System Status</h3>
+<label class="relative inline-flex items-center cursor-pointer flex-col gap-4">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-24 h-12 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-10 after:w-10 after:transition-all peer-checked:bg-secondary glow-primary relative">
+<!-- Custom icon inside toggle -->
+<span class="material-symbols-outlined absolute left-3 top-3 text-surface-container-highest text-sm z-10 peer-checked:opacity-0 transition-opacity">power_settings_new</span>
+</div>
+<span class="font-data-lg text-data-lg text-secondary peer-checked:text-secondary">SYSTEM ONLINE</span>
+</label>
+</div>
+<!-- Risk Level Slider -->
+<div class="md:col-span-12 lg:col-span-8 glass-panel rounded-xl p-6 flex flex-col justify-between">
+<div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-2">Risk Tolerance Profile</h3>
+<p class="text-sm text-on-surface-variant mb-6">Adjusting risk affects position sizing and entry aggression.</p>
+</div>
+<div class="w-full px-4 mb-4">
+<input class="w-full h-2 rounded-lg appearance-none cursor-pointer" max="100" min="1" type="range" value="75"/>
+<div class="flex justify-between text-xs text-on-surface-variant mt-3 font-data-sm text-data-sm">
+<span>Conservative (Low Yield)</span>
+<span class="text-primary font-bold">Aggressive (High Yield)</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

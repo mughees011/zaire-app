@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AURA TRADING - Performance Analytics</title>
+<!-- Google Fonts: Inter & JetBrains Mono -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Chart.js for High-Fidelity Data Viz -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-container": "#8083ff",
+                        "secondary": "#4edea3",
+                        "on-secondary-fixed": "#002113",
+                        "inverse-on-surface": "#283044",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "surface-dim": "#0b1326",
+                        "background": "#0b1326",
+                        "tertiary-fixed-dim": "#ffb3ad",
+                        "on-tertiary": "#68000a",
+                        "on-tertiary-container": "#5c0008",
+                        "on-background": "#dae2fd",
+                        "surface-bright": "#31394d",
+                        "secondary-fixed": "#6ffbbe",
+                        "on-tertiary-fixed": "#410004",
+                        "on-secondary": "#003824",
+                        "surface-tint": "#c0c1ff",
+                        "secondary-fixed-dim": "#4edea3",
+                        "surface-container-highest": "#2d3449",
+                        "on-secondary-fixed-variant": "#005236",
+                        "on-primary-fixed": "#07006c",
+                        "on-surface": "#dae2fd",
+                        "surface-container-lowest": "#060e20",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "primary-fixed": "#e1e0ff",
+                        "error": "#ffb4ab",
+                        "surface": "#0b1326",
+                        "tertiary-fixed": "#ffdad7",
+                        "on-secondary-container": "#00311f",
+                        "outline-variant": "#464554",
+                        "tertiary": "#ffb3ad",
+                        "on-surface-variant": "#c7c4d7",
+                        "inverse-primary": "#494bd6",
+                        "on-primary-container": "#0d0096",
+                        "primary": "#c0c1ff",
+                        "inverse-surface": "#dae2fd",
+                        "surface-container": "#171f33",
+                        "surface-container-high": "#222a3d",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#930013",
+                        "outline": "#908fa0",
+                        "on-error": "#690005",
+                        "tertiary-container": "#ff5451",
+                        "surface-container-low": "#131b2e",
+                        "surface-variant": "#2d3449",
+                        "on-primary": "#1000a9",
+                        "error-container": "#93000a",
+                        "secondary-container": "#00a572"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "gutter": "1rem",
+                        "margin-mobile": "1rem",
+                        "margin-desktop": "2rem",
+                        "lg": "1.5rem",
+                        "xs": "0.25rem",
+                        "base": "4px",
+                        "xl": "2.5rem",
+                        "sm": "0.5rem",
+                        "md": "1rem"
+                    },
+                    fontFamily: {
+                        "data-lg": ["JetBrains Mono"],
+                        "body-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "data-sm": ["JetBrains Mono"]
+                    },
+                    fontSize: {
+                        "data-lg": ["20px", { "lineHeight": "28px", "fontWeight": "500" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "data-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom scrollbar for data tables if needed */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #464554; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #908fa0; }
+        
+        /* Glassmorphism utility */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md min-h-screen overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full z-50 bg-surface-container-low/70 backdrop-blur-xl border-b border-white/10 shadow-sm flex items-center justify-between px-gutter h-16 w-full">
+<div class="flex items-center gap-4">
+<!-- Mobile Menu Toggle (Decorative) -->
+<button class="md:hidden text-on-surface-variant p-2 -ml-2 rounded-lg hover:bg-surface-bright/50 transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<div class="font-display-lg text-display-lg text-primary tracking-tighter" style="font-size: 24px; line-height: 28px;">AURA TRADING</div>
+</div>
+<div class="flex items-center gap-2">
+<!-- Actions -->
+<button class="p-2 text-on-surface-variant hover:bg-surface-bright/50 transition-colors rounded-full active:scale-95 duration-150 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-secondary rounded-full animate-pulse"></span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-bright/50 transition-colors rounded-full active:scale-95 duration-150">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-bright/50 transition-colors rounded-full active:scale-95 duration-150 hidden md:flex">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<!-- Profile -->
+<div class="ml-2 w-8 h-8 rounded-full bg-surface-variant overflow-hidden border border-white/10">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A futuristic, slightly glowing digital avatar portrait of a trader, rendered in a high-contrast dark mode style with subtle neon violet edge lighting, isolated on a deep space black background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCc9pLdzYbrK4-6mOMUkBtChvbl7sT-2O-Iu5_s2HwI3o2uhS_vwBr53Duh3p_9u_Yk_YwXDfP3sGkUYIlEQWXgnZP5D9j7zKYCOf4dw_zfN8yBVrjsohWINn2u-CBC7H7JUjf3GI4b_9E86wPeoanv91NEWmI_5cGt-qo2o2Qh3cfmBNflcRw5KgaQEM2FP9b2erXqWad2tPxqMT3NHVi4QLEtuOjnVo9wBgeKCk6eX1yXqVzmE47-9w"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar (Desktop) -->
+<aside class="hidden md:flex fixed left-0 top-0 h-full w-64 z-40 bg-surface-dim border-r border-white/10 flex-col py-xl pt-24">
+<!-- Header -->
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-primary-container/20 border border-primary/30 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">memory</span>
+</div>
+<div>
+<div class="font-headline-lg text-headline-lg text-primary" style="font-size: 18px; line-height: 24px;">Aura AI</div>
+<div class="font-label-caps text-label-caps text-secondary flex items-center gap-1 mt-0.5">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> Operational • v4.2
+                </div>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<nav class="flex-1 px-4 space-y-1">
+<a class="text-on-surface-variant hover:text-on-surface flex items-center gap-3 px-4 py-3 hover:bg-surface-container-highest/50 transition-all rounded-xl active:translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-body-md font-medium">Dashboard</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-surface flex items-center gap-3 px-4 py-3 hover:bg-surface-container-highest/50 transition-all rounded-xl active:translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined">monitoring</span>
+<span class="font-body-md text-body-md font-medium">Markets</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-surface flex items-center gap-3 px-4 py-3 hover:bg-surface-container-highest/50 transition-all rounded-xl active:translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined">pie_chart</span>
+<span class="font-body-md text-body-md font-medium">Portfolio</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-surface flex items-center gap-3 px-4 py-3 hover:bg-surface-container-highest/50 transition-all rounded-xl active:translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="font-body-md text-body-md font-medium">Strategies</span>
+</a>
+<!-- Active Tab -->
+<a class="bg-primary-container text-on-primary-container rounded-xl flex items-center gap-3 px-4 py-3 active:translate-x-1 duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">insights</span>
+<span class="font-body-md text-body-md font-semibold">Analytics</span>
+</a>
+</nav>
+<!-- CTA & Footer Tabs -->
+<div class="px-4 mt-auto space-y-4">
+<button class="w-full bg-primary text-on-primary font-body-md text-body-md font-medium py-3 rounded-xl hover:bg-primary/90 transition-colors shadow-[0_0_15px_rgba(192,193,255,0.2)]">
+                New Trade
+            </button>
+<div class="pt-4 border-t border-white/5 space-y-1">
+<a class="text-on-surface-variant hover:text-on-surface flex items-center gap-3 px-4 py-2 hover:bg-surface-container-highest/50 transition-all rounded-xl text-sm" href="#">
+<span class="material-symbols-outlined text-[20px]">help</span>
+                    Support
+                </a>
+<a class="text-on-surface-variant hover:text-on-surface flex items-center gap-3 px-4 py-2 hover:bg-surface-container-highest/50 transition-all rounded-xl text-sm" href="#">
+<span class="material-symbols-outlined text-[20px]">logout</span>
+                    Logout
+                </a>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="pt-16 md:pl-64 min-h-screen flex flex-col p-gutter md:p-margin-desktop gap-gutter md:gap-lg">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+<div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-surface">Performance Analytics</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Deep learning trajectory and historical backtest metrics.</p>
+</div>
+<div class="flex items-center gap-3">
+<!-- Benchmark Toggle -->
+<div class="glass-panel rounded-lg p-1 flex items-center">
+<button class="px-3 py-1.5 rounded-md bg-surface-bright text-on-surface font-label-caps text-label-caps shadow-sm">AI Core</button>
+<button class="px-3 py-1.5 rounded-md text-on-surface-variant font-label-caps text-label-caps hover:text-on-surface transition-colors">vs S&amp;P 500</button>
+</div>
+<!-- Date Picker -->
+<button class="glass-panel flex items-center gap-2 px-4 py-2 rounded-lg text-on-surface hover:bg-surface-bright/50 transition-colors font-data-sm text-data-sm">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                    YTD 2024
+                    <span class="material-symbols-outlined text-[18px]">arrow_drop_down</span>
+</button>
+</div>
+</div>
+<!-- Key Statistics (Bento Top Row) -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-gutter md:gap-lg">
+<!-- Stat 1 -->
+<div class="glass-panel rounded-xl p-5 relative overflow-hidden group">
+<div class="absolute inset-0 bg-gradient-to-br from-secondary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="font-label-caps text-label-caps text-on-surface-variant mb-2">Net Profit (YTD)</div>
+<div class="font-data-lg text-data-lg text-secondary flex items-end gap-2">
+                    +42.8%
+                    <span class="material-symbols-outlined text-[20px] mb-0.5">trending_up</span>
+</div>
+<div class="mt-2 h-1 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-3/4 rounded-full"></div>
+</div>
+</div>
+<!-- Stat 2 -->
+<div class="glass-panel rounded-xl p-5 relative overflow-hidden group">
+<div class="absolute inset-0 bg-gradient-to-br from-error/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="font-label-caps text-label-caps text-on-surface-variant mb-2 flex items-center justify-between">
+                    Max Drawdown
+                    <span class="material-symbols-outlined text-[16px] text-on-surface-variant/50 cursor-help" title="Maximum observed loss from a peak to a trough of a portfolio">info</span>
+</div>
+<div class="font-data-lg text-data-lg text-error">-12.4%</div>
+<div class="font-data-sm text-data-sm text-on-surface-variant mt-1 opacity-70">Benchmark: -18.2%</div>
+</div>
+<!-- Stat 3 -->
+<div class="glass-panel rounded-xl p-5 relative overflow-hidden">
+<div class="font-label-caps text-label-caps text-on-surface-variant mb-2">Win/Loss Ratio</div>
+<div class="font-data-lg text-data-lg text-on-surface">68.2%</div>
+<div class="flex items-center gap-2 mt-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span> <span class="font-data-sm text-data-sm text-on-surface-variant">Wins</span>
+<span class="w-2 h-2 rounded-full bg-error ml-2"></span> <span class="font-data-sm text-data-sm text-on-surface-variant">Losses</span>
+</div>
+</div>
+<!-- Stat 4 -->
+<div class="glass-panel rounded-xl p-5 relative overflow-hidden">
+<div class="font-label-caps text-label-caps text-on-surface-variant mb-2">Avg Trade Duration</div>
+<div class="font-data-lg text-data-lg text-on-surface">4h 12m</div>
+<div class="font-data-sm text-data-sm text-primary mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">bolt</span> High Frequency
+                </div>
+</div>
+</div>
+<!-- Main Data Viz Area (Bento Mid Section) -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter md:gap-lg h-[400px] lg:h-[500px]">
+<!-- Large Growth Curve -->
+<div class="glass-panel rounded-xl lg:col-span-2 p-5 flex flex-col relative border border-primary/20">
+<!-- Decorative AI Glow -->
+<div class="absolute -top-10 -right-10 w-32 h-32 bg-primary/20 rounded-full blur-3xl pointer-events-none"></div>
+<div class="flex items-center justify-between mb-4">
+<h2 class="font-body-md text-body-md font-semibold text-on-surface">Cumulative Returns</h2>
+<div class="flex gap-2">
+<button class="px-2 py-1 rounded bg-surface-container text-on-surface font-data-sm text-data-sm border border-white/5">1M</button>
+<button class="px-2 py-1 rounded bg-surface-container text-on-surface font-data-sm text-data-sm border border-white/5">3M</button>
+<button class="px-2 py-1 rounded bg-primary/20 text-primary border border-primary/30 font-data-sm text-data-sm">YTD</button>
+<button class="px-2 py-1 rounded bg-surface-container text-on-surface font-data-sm text-data-sm border border-white/5">ALL</button>
+</div>
+</div>
+<div class="flex-1 relative w-full">
+<canvas id="growthChart"></canvas>
+</div>
+</div>
+<!-- Win/Loss Pie & Additional Stats -->
+<div class="flex flex-col gap-gutter md:gap-lg">
+<!-- Pie Chart -->
+<div class="glass-panel rounded-xl p-5 flex flex-col items-center justify-center relative flex-1">
+<h2 class="font-body-md text-body-md font-semibold text-on-surface self-start w-full absolute top-5 left-5">Execution Distribution</h2>
+<div class="w-full max-w-[200px] aspect-square mt-6">
+<canvas id="winLossChart"></canvas>
+</div>
+</div>
+<!-- Monthly Growth Mini Bar Chart -->
+<div class="glass-panel rounded-xl p-5 flex flex-col flex-1">
+<h2 class="font-body-md text-body-md font-semibold text-on-surface mb-4">Monthly Delta</h2>
+<div class="flex-1 w-full relative">
+<canvas id="monthlyChart"></canvas>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Chart.js Initialization Script -->
+<script>
+        // Use Tailwind config colors for consistency
+        const colorPrimary = '#c0c1ff';
+        const colorPrimaryContainer = '#8083ff';
+        const colorSecondary = '#4edea3';
+        const colorError = '#ffb4ab';
+        const colorSurface = '#131b2e';
+        const colorOnSurfaceVariant = '#c7c4d7';
+        const colorGridLine = 'rgba(255, 255, 255, 0.05)';
+        
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                    titleFont: { family: 'Inter', size: 12 },
+                    bodyFont: { family: 'JetBrains Mono', size: 14 },
+                    padding: 10,
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    displayColors: false
+                }
+            }
+        };
+
+        // 1. Growth Area Chart
+        const ctxGrowth = document.getElementById('growthChart').getContext('2d');
+        const gradientGrowth = ctxGrowth.createLinearGradient(0, 0, 0, 400);
+        gradientGrowth.addColorStop(0, 'rgba(192, 193, 255, 0.3)'); // primary with opacity
+        gradientGrowth.addColorStop(1, 'rgba(192, 193, 255, 0)');
+
+        new Chart(ctxGrowth, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
+                datasets: [{
+                    label: 'AI Strategy Return',
+                    data: [0, 5, 12, 9, 22, 18, 30, 28, 38, 42.8],
+                    borderColor: colorPrimary,
+                    backgroundColor: gradientGrowth,
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: colorSurface,
+                    pointBorderColor: colorPrimary,
+                    pointBorderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    x: {
+                        grid: { display: false, drawBorder: false },
+                        ticks: { color: colorOnSurfaceVariant, font: { family: 'JetBrains Mono', size: 10 } }
+                    },
+                    y: {
+                        grid: { color: colorGridLine, drawBorder: false },
+                        ticks: {
+                            color: colorOnSurfaceVariant,
+                            font: { family: 'JetBrains Mono', size: 10 },
+                            callback: function(value) { return value + '%'; }
+                        }
+                    }
+                }
+            }
+        });
+
+        // 2. Win/Loss Doughnut Chart
+        const ctxWinLoss = document.getElementById('winLossChart').getContext('2d');
+        new Chart(ctxWinLoss, {
+            type: 'doughnut',
+            data: {
+                labels: ['Wins', 'Losses', 'Breakeven'],
+                datasets: [{
+                    data: [68.2, 28.5, 3.3],
+                    backgroundColor: [colorSecondary, colorError, colorOnSurfaceVariant],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                ...commonOptions,
+                cutout: '75%',
+                plugins: {
+                    ...commonOptions.plugins,
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) { return context.label + ': ' + context.raw + '%'; }
+                        }
+                    }
+                }
+            }
+        });
+
+        // 3. Monthly Bar Chart
+        const ctxMonthly = document.getElementById('monthlyChart').getContext('2d');
+        new Chart(ctxMonthly, {
+            type: 'bar',
+            data: {
+                labels: ['M', 'J', 'J', 'A', 'S', 'O'],
+                datasets: [{
+                    label: 'Monthly Delta',
+                    data: [13, -4, 12, -2, 10, 4.8],
+                    backgroundColor: function(context) {
+                        const value = context.dataset.data[context.dataIndex];
+                        return value < 0 ? colorError : colorSecondary;
+                    },
+                    borderRadius: 2,
+                    barPercentage: 0.6
+                }]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    x: {
+                        grid: { display: false, drawBorder: false },
+                        ticks: { color: colorOnSurfaceVariant, font: { family: 'JetBrains Mono', size: 10 } }
+                    },
+                    y: {
+                        display: false // Hide Y axis for cleaner look in small widget
+                    }
+                }
+            }
+        });
+    </script>
+</body></html>
