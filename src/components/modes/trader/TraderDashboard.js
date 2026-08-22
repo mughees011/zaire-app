@@ -1,19 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { io } from 'socket.io-client';
 import { ArrowUp, ArrowDown, Pause, Landmark, Cpu, Sparkles } from 'lucide-react';
 
-// ── Live feed items (static seed, updated every 8s) ──
+// ── Live feed items (fallback initial state) ──
 const FEED_SEED = [
-  { action:'BUY',  amount:'0.025 BTC', asset:'BTC/USD', price:null, reason:'Breakout detected on 5m chart. Volume spike +340%. MACD crossover bullish.', sym:'BTC-USD' },
-  { action:'SELL', amount:'500 TSLA',  asset:'TSLA',    price:null, reason:'Reached profit target resistance. Risk-off macro indicators. Profits taken +4.2%.', sym:'TSLA' },
-  { action:'HOLD', amount:'—',         asset:'ETH/USD', price:null, reason:'RSI approaching overbought. Waiting for pullback to $3,380 before adding position.', sym:'ETH-USD' },
-  { action:'BUY',  amount:'150 AAPL',  asset:'AAPL',    price:null, reason:'Positive earnings revision. EMA 50 acting as support. Strong institutional volume.', sym:'AAPL' },
-  { action:'WAIT', amount:'—',         asset:'SOL/USD', price:null, reason:'News sentiment analysis running. 2 conflicting signals detected. Halting for clarity.', sym:'SOL-USD' },
+  { action:'HOLD',  amount:'—', asset:'BTC/USD', price:null, reason:'System Initializing. Awaiting live telemetry from Apex Daemon...', sym:'BTC-USD' },
 ];
 
 const colorFor = a => a==='BUY'?'#10B981':a==='SELL'?'#EF4444':'#F59E0B';
 const iconFor  = a => a==='BUY'?<ArrowUp size={14}/>:a==='SELL'?<ArrowDown size={14}/>:<Pause size={14}/>;
 
-const TraderDashboard = ({ traderData, decisions, profit }) => {
+const TraderDashboard = ({ traderData, decisions, profit, apiBase }) => {
   const { prices, isLive, fmtPrice, fmtPercent } = traderData;
   const [feed, setFeed] = useState(FEED_SEED);
 
@@ -25,19 +22,25 @@ const TraderDashboard = ({ traderData, decisions, profit }) => {
     livePrice: getQuote(item.sym)?.price ?? null,
   }));
 
-  // auto-add new item every 8s
   useEffect(() => {
-    const rotations = [
-      { action:'BUY',  amount:'0.1 ETH', asset:'ETH/USD', reason:'Support bounce confirmed. RSI reset to 45. Adding to DCA position.', sym:'ETH-USD' },
-      { action:'HOLD', amount:'—',       asset:'BTC/USD', reason:'Market consolidating. Monitoring $64,500 resistance breakout level.', sym:'BTC-USD' },
-      { action:'BUY',  amount:'12 SOL',  asset:'SOL/USD', reason:'EMA golden cross on 1H. Volume expansion +180%. Entry at market.', sym:'SOL-USD' },
-    ];
-    const t = setInterval(() => {
-      const item = rotations[Math.floor(Math.random()*rotations.length)];
-      setFeed(prev => [item, ...prev.slice(0, 4)]);
-    }, 8000);
-    return () => clearInterval(t);
-  }, []);
+    if (!apiBase) return;
+    const socket = io(apiBase, { transports: ['polling', 'websocket'] });
+
+    socket.on('APEX_SIGNAL', (signal) => {
+      // transform backend signal to frontend format
+      const newItem = {
+        action: signal.action,
+        amount: signal.action === 'HOLD' ? '—' : 'Calculated Size',
+        asset: signal.asset.replace('-', '/'),
+        price: signal.price,
+        reason: signal.reason,
+        sym: signal.asset
+      };
+      setFeed(prev => [newItem, ...prev].slice(0, 50)); // keep last 50
+    });
+
+    return () => socket.disconnect();
+  }, [apiBase]);
 
   const btc = getQuote('BTC-USD');
   const eth = getQuote('ETH-USD');

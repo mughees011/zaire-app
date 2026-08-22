@@ -155,7 +155,19 @@ const buildInitialSettingsLocalState = (customModes) => ({
   aiVaultSaveStatus: '',
   customApis: [],
   customApiDraft: blankCustomApiDraft,
-  customApiStatus: ''
+  customApiStatus: '',
+  traderVault: {
+    binanceApiKey: '',
+    binanceSecretKey: '',
+    alpacaApiKey: '',
+    alpacaSecretKey: '',
+    paperTrading: true,
+    hasBinanceApi: false,
+    hasBinanceSecret: false,
+    hasAlpacaApi: false,
+    hasAlpacaSecret: false
+  },
+  traderVaultStatus: ''
 });
 
 const buildPersistedSettingsPayload = ({
@@ -691,7 +703,9 @@ function useSettingsModalController({
     aiVaultSaveStatus,
     customApis,
     customApiDraft,
-    customApiStatus
+    customApiStatus,
+    traderVault,
+    traderVaultStatus
   } = settingsLocalState;
   const [aiVaultSlotStatuses, setAiVaultSlotStatuses] = useState(['', '', '']);
   const setCreatorDraft = useReducerFieldSetter(dispatchSettingsLocalState, 'creatorDraft');
@@ -711,6 +725,8 @@ function useSettingsModalController({
   const setCustomApis = useReducerFieldSetter(dispatchSettingsLocalState, 'customApis');
   const setCustomApiDraft = useReducerFieldSetter(dispatchSettingsLocalState, 'customApiDraft');
   const setCustomApiStatus = useReducerFieldSetter(dispatchSettingsLocalState, 'customApiStatus');
+  const setTraderVault = useReducerFieldSetter(dispatchSettingsLocalState, 'traderVault');
+  const setTraderVaultStatus = useReducerFieldSetter(dispatchSettingsLocalState, 'traderVaultStatus');
   const settingsWarningState = React.useRef({
     briefingsLogged: false,
     memoryLogged: false,
@@ -1077,6 +1093,16 @@ function useSettingsModalController({
   useEffect(() => {
     if (!isOpen) return;
     loadAiProviders();
+    
+    // Fetch trading vault status
+    fetch(`${API_URL}/api/vault/trading/status`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && data.traderVault) {
+          setTraderVault(prev => ({ ...prev, ...data.traderVault }));
+        }
+      })
+      .catch(() => {});
   }, [isOpen]);
 
   const setModalField = useCallback((field, value) => {
@@ -1429,6 +1455,29 @@ function useSettingsModalController({
             body: JSON.stringify(vaultPayload)
           });
           await ensureOk(vaultResponse, 'Vault save');
+        }
+
+        // Save Trading Vault (no token required, it uses local secrets)
+        const tradingVaultPayload = {
+          binanceApiKey: traderVault.binanceApiKey,
+          binanceSecretKey: traderVault.binanceSecretKey,
+          alpacaApiKey: traderVault.alpacaApiKey,
+          alpacaSecretKey: traderVault.alpacaSecretKey,
+          paperTrading: traderVault.paperTrading
+        };
+        // Only send if they touched the inputs
+        if (
+          tradingVaultPayload.binanceApiKey ||
+          tradingVaultPayload.binanceSecretKey ||
+          tradingVaultPayload.alpacaApiKey ||
+          tradingVaultPayload.alpacaSecretKey ||
+          tradingVaultPayload.paperTrading !== undefined
+        ) {
+          await fetch(`${API_URL}/api/vault/trading/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(tradingVaultPayload)
+          });
         }
 
         const settingsResponse = await fetch(`${API_URL}/api/settings`, {
@@ -2049,6 +2098,72 @@ function useSettingsModalController({
                 <div className="api-limit-note">Keys are saved securely on your local server.</div>
                 <div className="memory-action-status" style={{ marginTop: '10px' }}>
                   {aiVaultSaveStatus || 'Choose a provider, paste its key, optionally set model/base URL, then apply CORE_SYNC.'}
+                </div>
+              </Section>
+              
+              <Section title="TRADING ACCOUNTS">
+                <div style={{ padding: '15px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '15px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <div>
+                      <div style={{ fontSize: '14px', color: 'white', fontWeight: 'bold' }}>Trading Mode</div>
+                      <div style={{ fontSize: '11px', color: 'gray', marginTop: '4px' }}>Toggle between paper trading (simulated) and live execution.</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '12px', color: traderVault.paperTrading ? '#10b981' : 'gray', fontWeight: 'bold' }}>PAPER</span>
+                      <Toggle 
+                        checked={!traderVault.paperTrading} 
+                        onChange={(val) => {
+                          if (val) {
+                            // Switching to LIVE
+                            if (window.confirm("WARNING: You are switching to LIVE trading mode. Real capital will be used. Are you absolutely sure?")) {
+                              setTraderVault(prev => ({ ...prev, paperTrading: false }));
+                            }
+                          } else {
+                            // Switching to PAPER
+                            setTraderVault(prev => ({ ...prev, paperTrading: true }));
+                          }
+                        }} 
+                      />
+                      <span style={{ fontSize: '12px', color: !traderVault.paperTrading ? '#ef4444' : 'gray', fontWeight: 'bold' }}>LIVE</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    {/* BINANCE */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ fontSize: '12px', color: 'white', fontWeight: 'bold', letterSpacing: '1px' }}>BINANCE</div>
+                      <input 
+                        className="custom-api-input" 
+                        placeholder={traderVault.binanceApiKeyMask || "API Key"} 
+                        value={traderVault.binanceApiKey} 
+                        onChange={e => setTraderVault(prev => ({ ...prev, binanceApiKey: e.target.value }))}
+                      />
+                      <input 
+                        className="custom-api-input" 
+                        type="password"
+                        placeholder={traderVault.binanceSecretKeyMask || "Secret Key"} 
+                        value={traderVault.binanceSecretKey} 
+                        onChange={e => setTraderVault(prev => ({ ...prev, binanceSecretKey: e.target.value }))}
+                      />
+                    </div>
+                    {/* ALPACA */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ fontSize: '12px', color: 'white', fontWeight: 'bold', letterSpacing: '1px' }}>ALPACA</div>
+                      <input 
+                        className="custom-api-input" 
+                        placeholder={traderVault.alpacaApiKeyMask || "API Key"} 
+                        value={traderVault.alpacaApiKey} 
+                        onChange={e => setTraderVault(prev => ({ ...prev, alpacaApiKey: e.target.value }))}
+                      />
+                      <input 
+                        className="custom-api-input" 
+                        type="password"
+                        placeholder={traderVault.alpacaSecretKeyMask || "Secret Key"} 
+                        value={traderVault.alpacaSecretKey} 
+                        onChange={e => setTraderVault(prev => ({ ...prev, alpacaSecretKey: e.target.value }))}
+                      />
+                    </div>
+                  </div>
                 </div>
               </Section>
             </div>

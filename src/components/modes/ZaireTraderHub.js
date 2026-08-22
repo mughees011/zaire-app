@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import useTraderData from './useTraderData';
 import './ZaireTraderHub.css';
+import { io } from 'socket.io-client';
 
 // ─── Sub-page imports ─────────────────────────────────────────────────────────
 import TraderDashboard    from './trader/TraderDashboard';
@@ -27,6 +28,7 @@ const ZaireTraderHub = ({ apiBase = 'http://localhost:3001' }) => {
   const [decisions, setDecisions]   = useState(847);
   const [profit, setProfit]         = useState(14230.45);
   const [clock, setClock]           = useState('');
+  const [traderStatus, setTraderStatus] = useState(null);
 
   const traderData = useTraderData(apiBase);
   const { prices, isLive, fmtPrice, fmtPercent } = traderData;
@@ -41,6 +43,16 @@ const ZaireTraderHub = ({ apiBase = 'http://localhost:3001' }) => {
     }, 1000);
     return () => clearInterval(t);
   }, []);
+
+  // ── Listen to TRADER_STATUS for LIVE/PAPER mode ──
+  useEffect(() => {
+    if (!apiBase) return;
+    const socket = io(apiBase, { transports: ['polling', 'websocket'] });
+    socket.on('TRADER_STATUS', (status) => {
+      setTraderStatus(status);
+    });
+    return () => socket.disconnect();
+  }, [apiBase]);
 
   // ── Profit ticker ──
   useEffect(() => {
@@ -89,7 +101,7 @@ const ZaireTraderHub = ({ apiBase = 'http://localhost:3001' }) => {
       case 'portfolio':    return <TraderPortfolio    {...sharedProps} />;
       case 'strategies':   return <TraderStrategies   {...sharedProps} />;
       case 'analytics':    return <TraderAnalytics    {...sharedProps} />;
-      default:             return <TraderDashboard    {...sharedProps} decisions={decisions} profit={profit} />;
+      default:             return <TraderDashboard    {...sharedProps} decisions={decisions} profit={profit} apiBase={apiBase} />;
     }
   };
 
@@ -110,9 +122,22 @@ const ZaireTraderHub = ({ apiBase = 'http://localhost:3001' }) => {
         </div>
         <div className="zth-status-right">
           <span className="zth-halal-badge">HALAL ✓</span>
-          <span className={`zth-live-badge ${isLive ? '' : 'offline'}`}>
-            {isLive ? '● LIVE DATA' : '○ SIM DATA'}
+          
+          {/* Market Data Status */}
+          <span className={`zth-live-badge ${isLive ? '' : 'offline'}`} style={{ marginRight: '8px' }}>
+            {isLive ? '● MKT LIVE' : '○ MKT SIM'}
           </span>
+
+          {/* Trading Execution Mode Badge */}
+          {traderStatus && (
+            <span className={`zth-live-badge ${traderStatus.paper_trading ? 'offline' : 'live-danger'}`} style={{ 
+              background: traderStatus.paper_trading ? 'rgba(245, 158, 11, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+              color: traderStatus.paper_trading ? '#F59E0B' : '#EF4444',
+              border: `1px solid ${traderStatus.paper_trading ? '#F59E0B' : '#EF4444'}`
+            }}>
+              {traderStatus.paper_trading ? '🛡 PAPER TRADING' : '⚠️ LIVE EXECUTION'}
+            </span>
+          )}
           <span className="zth-status-text">Scan: {String(scanCountdown).padStart(2,'0')}s</span>
           <span className="zth-status-text" style={{ display:'none' }}>{clock}</span>
         </div>
