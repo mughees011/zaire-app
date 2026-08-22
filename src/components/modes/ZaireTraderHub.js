@@ -128,16 +128,6 @@ const ZaireTraderHub = ({ apiBase = 'http://localhost:3001' }) => {
             {isLive ? '● MKT LIVE' : '○ MKT SIM'}
           </span>
 
-          {/* Trading Execution Mode Badge */}
-          {traderStatus && (
-            <span className={`zth-live-badge ${traderStatus.paper_trading ? 'offline' : 'live-danger'}`} style={{ 
-              background: traderStatus.paper_trading ? 'rgba(245, 158, 11, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-              color: traderStatus.paper_trading ? '#F59E0B' : '#EF4444',
-              border: `1px solid ${traderStatus.paper_trading ? '#F59E0B' : '#EF4444'}`
-            }}>
-              {traderStatus.paper_trading ? '🛡 PAPER TRADING' : '⚠️ LIVE EXECUTION'}
-            </span>
-          )}
           <span className="zth-status-text">Scan: {String(scanCountdown).padStart(2,'0')}s</span>
           <span className="zth-status-text" style={{ display:'none' }}>{clock}</span>
         </div>
@@ -154,6 +144,39 @@ const ZaireTraderHub = ({ apiBase = 'http://localhost:3001' }) => {
           ))}
         </div>
       </div>
+
+      {/* ── UNMISSABLE EXECUTION MODE BANNER ── */}
+      {traderStatus && (
+        <div style={{
+          width: '100%',
+          padding: '8px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          background: traderStatus.paper_trading ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.9)',
+          color: traderStatus.paper_trading ? '#F59E0B' : '#FFFFFF',
+          borderBottom: `1px solid ${traderStatus.paper_trading ? 'rgba(245, 158, 11, 0.2)' : 'rgba(239, 68, 68, 1)'}`,
+          fontWeight: 700,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          fontSize: traderStatus.paper_trading ? '11px' : '13px',
+          animation: traderStatus.paper_trading ? 'none' : 'zth-pulse 2s infinite'
+        }}>
+          {traderStatus.paper_trading ? (
+            <>
+              <ShieldCheck size={16} />
+              <span>Paper Trading Mode Active — No Real Capital at Risk</span>
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: '16px' }}>⚠️</span>
+              <span>DANGER: LIVE EXECUTION MODE ACTIVE — REAL CAPITAL DEPLOYED</span>
+              <span style={{ fontSize: '16px' }}>⚠️</span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── LAYOUT ── */}
       <div className="zth-layout">

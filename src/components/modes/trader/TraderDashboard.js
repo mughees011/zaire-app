@@ -26,17 +26,25 @@ const TraderDashboard = ({ traderData, decisions, profit, apiBase }) => {
     if (!apiBase) return;
     const socket = io(apiBase, { transports: ['polling', 'websocket'] });
 
-    socket.on('APEX_SIGNAL', (signal) => {
-      // transform backend signal to frontend format
+    socket.on('trader_signal', (signal) => {
+      // Transform the daemon payload into a feed card
+      const ts = signal.timestamp ? new Date(signal.timestamp) : new Date();
+      const timeLabel = ts.toLocaleTimeString('en-US', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      });
       const newItem = {
-        action: signal.action,
-        amount: signal.action === 'HOLD' ? '—' : 'Calculated Size',
-        asset: signal.asset.replace('-', '/'),
-        price: signal.price,
-        reason: signal.reason,
-        sym: signal.asset
+        action:    signal.action,                           // BUY | SELL | HOLD
+        amount:    signal.action === 'HOLD' ? '—' : '~20% position',
+        asset:     (signal.asset || '').replace('USDT', '/USDT').replace('/-', '/'),
+        price:     signal.price,
+        reason:    signal.reason,
+        sym:       signal.asset,
+        timeLabel,
+        mode:      signal.mode,   // PAPER | LIVE
+        rsi:       signal.rsi,
+        live:      true,          // flag — this entry came from the real daemon
       };
-      setFeed(prev => [newItem, ...prev].slice(0, 50)); // keep last 50
+      setFeed(prev => [newItem, ...prev].slice(0, 50));
     });
 
     return () => socket.disconnect();
@@ -201,24 +209,48 @@ const TraderDashboard = ({ traderData, decisions, profit, apiBase }) => {
         <div className="zth-glass" style={{ gridColumn:'span 8', overflow:'hidden' }}>
           <div style={{ padding:'12px 16px', borderBottom:'1px solid rgba(255,255,255,0.05)', display:'flex', alignItems:'center', gap:8 }}>
             <span className="zth-pulse-dot red" style={{ width:8, height:8 }} />
-            <span className="zth-mono" style={{ fontSize:12, fontWeight:600 }}>Live Execution Feed</span>
-            <span className="zth-mono" style={{ marginLeft:'auto', fontSize:9, color:'#334155' }}>Auto-updating</span>
+            <span className="zth-mono" style={{ fontSize:12, fontWeight:600 }}>Apex Daemon · Live Execution Feed</span>
+            <span className="zth-mono" style={{ marginLeft:'auto', fontSize:9, color:'#334155' }}>trader_signal socket</span>
           </div>
           <div style={{ padding:8, maxHeight:260, overflowY:'auto' }}>
             {enrichedFeed.map((item, i) => {
               const c = colorFor(item.action);
-              const displayPrice = item.livePrice ? fmtPrice(item.livePrice) : item.price || '—';
+              const displayPrice = item.livePrice ? fmtPrice(item.livePrice) : (item.price ? `$${Number(item.price).toLocaleString()}` : '—');
+              const isLiveDaemon = item.live === true;
               return (
-                <div key={i} style={{ display:'flex', gap:10, padding:10, borderRadius:8, marginBottom:6, background:'rgba(255,255,255,0.015)', border:'1px solid transparent' }}>
+                <div key={i} style={{
+                  display:'flex', gap:10, padding:10, borderRadius:8, marginBottom:6,
+                  background: isLiveDaemon ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.01)',
+                  border: isLiveDaemon ? `1px solid ${c}33` : '1px solid transparent',
+                  boxShadow: isLiveDaemon && i===0 ? `0 0 10px ${c}15` : 'none'
+                }}>
                   <div style={{ width:32, height:32, borderRadius:8, background:`rgba(${c==='#10B981'?'16,185,129':c==='#EF4444'?'239,68,68':'245,158,11'},0.1)`, border:`1px solid rgba(${c==='#10B981'?'16,185,129':c==='#EF4444'?'239,68,68':'245,158,11'},0.2)`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, color:c }}>
                     {iconFor(item.action)}
                   </div>
                   <div style={{ flex:1 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
                       <span className="zth-mono" style={{ fontSize:11, fontWeight:700, color:'#F1F5F9' }}>
-                        {item.action} {item.amount} <span style={{ color:'#475569', fontWeight:400 }}>@ {displayPrice}</span>
+                        <span style={{ color:c }}>{item.action}</span>
+                        {' '}{item.amount}
+                        {' '}<span style={{ color:'#475569', fontWeight:400 }}>{item.asset} @ {displayPrice}</span>
+                        {item.rsi != null && <span style={{ color:'#64748B', fontWeight:400, marginLeft:6 }}>RSI {item.rsi}</span>}
                       </span>
-                      <span className="zth-mono" style={{ fontSize:9, color:'#334155' }}>{i===0?'just now':`${(i+1)*2}m ago`}</span>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        {/* PAPER/LIVE mode badge — only on real daemon entries */}
+                        {isLiveDaemon && item.mode && (
+                          <span style={{
+                            fontSize:8, fontWeight:700, letterSpacing:'0.08em', padding:'2px 5px', borderRadius:4,
+                            background: item.mode === 'LIVE' ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)',
+                            color: item.mode === 'LIVE' ? '#EF4444' : '#F59E0B',
+                            border: `1px solid ${item.mode === 'LIVE' ? '#EF4444' : '#F59E0B'}66`
+                          }}>
+                            {item.mode}
+                          </span>
+                        )}
+                        <span className="zth-mono" style={{ fontSize:9, color:'#334155' }}>
+                          {item.timeLabel || (i===0 ? 'just now' : `${(i+1)*2}m ago`)}
+                        </span>
+                      </div>
                     </div>
                     <div style={{ background:'rgba(2,3,5,0.4)', borderLeft:`2px solid ${c}40`, padding:'6px 8px', borderRadius:4 }}>
                       <span className="zth-mono" style={{ fontSize:9, color:'#64748B', display:'flex', alignItems:'flex-start', gap:4 }}>
@@ -232,6 +264,7 @@ const TraderDashboard = ({ traderData, decisions, profit, apiBase }) => {
             })}
           </div>
         </div>
+
 
         {/* Active Strategies */}
         <div className="zth-glass" style={{ gridColumn:'span 4', padding:20 }}>
